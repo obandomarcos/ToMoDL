@@ -16,6 +16,7 @@ import re
 from tqdm import tqdm
 import SimpleITK as sitk
 import pickle
+x = 1
 
 class ZebraDataset:
   '''

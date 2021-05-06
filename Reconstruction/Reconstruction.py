@@ -43,7 +43,8 @@ def TwIST(y, A, AT, tau, kwarg, true_img = None):
 
   '''
   # Normalization / True_img comes prevously normalised at fbp reconstruction 
-  y = y/y.max()
+  y = y-y.min()
+  y /= y.max()
 
   # Default optional parameters
   stopCriterion = 1
@@ -474,7 +475,8 @@ def ADMM(y, A, AT, Den, alpha, delta, max_iter,
   assert(callable(Den))  # Assert Denoiser is callable
 
   # Normalization
-  y = y/y.max()
+  y = y-y.min()
+  y /= y.max()
   
   b = np.zeros(AT(y).shape)
   s = np.zeros(AT(y).shape)
@@ -716,10 +718,10 @@ def iter_proj(method, hR, hRT, volume, max_angle, projections, n_z):
   for z in n_z:
   
     y_full = volume[:,:, z].T          # Full sinogram
-    y_full = y_full/y_full.max()
+    y_full = normalize(y_sub)
 
     y_sub = subsampled_vol[:,:, z].T   # subsampled sinogram
-    y_sub = y_sub/y_sub.max()
+    y_sub = normalize(y_sub)
 
     true_img = hRT(y_full, theta_full)   # use full backprojected image
 
@@ -739,3 +741,7 @@ def iter_proj(method, hR, hRT, volume, max_angle, projections, n_z):
     fbp_x.append(fbp_sub)
 
   return recons_x, fbp_x, objectives, errors_MSE, errors_SSIM, trues_x
+
+def normalize(x):
+  y = x-x.min()
+  return y/y.max()

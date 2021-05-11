@@ -101,7 +101,7 @@ class Aclass:
             self.pixels=self.nrow*self.ncol
             self.mask=mask                          # Masking method should be modified
             self.csm=csm                            # This isn't part of OPT modelling
-            self.SF=tf.complex(tf.sqrt(tf.to_float(self.pixels) ),0.)   # Scale Factor also should be disabled
+            self.SF=tf.complex(tf.sqrt(tf.cast(self.pixels, dtype = float)),0.)   # Scale Factor also should be disabled
             self.lam=lam                            # Don't know what's this
             #self.cgIter=cgIter
             #self.tol=tol

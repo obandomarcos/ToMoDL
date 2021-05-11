@@ -6,13 +6,14 @@ by H.K. Aggarwal, M.P. Mani, M. Jacob from University of Iowa.
 Paper dwonload  Link:     https://arxiv.org/abs/1712.02862
 
 @author: haggarwal
+@Edited by Obanmarcos
 """
 import tensorflow as tf
 import numpy as np
-from os.path import expanduser
-home = expanduser("~")
-epsilon=1e-5
-TFeps=tf.constant(1e-5,dtype=tf.float32)
+from os.path import expanduser      
+home = expanduser("~")      # searches for home user in directory
+epsilon=1e-5            # epsilon 
+TFeps=tf.constant(1e-5,dtype=tf.float32) # constant value as a tensor object
 
 
 # function c2r contatenate complex input as new axis two two real inputs
@@ -25,7 +26,17 @@ def createLayer(x, szW, trainning,lastLayer):
     This function create a layer of CNN consisting of convolution, batch-norm,
     and ReLU. Last layer does not have ReLU to avoid truncating the negative
     part of the learned noise and alias patterns.
+
+    DOCS related to tf:
+        -get_variable creates a new variable with these parameters. 
+        - Weights as W, initialized with xavier: random uniform bounded between \pm sqrt(6)/sqrt(n_{i}+n_{i+1}), n_i are incoming connections, n_{i+1} are outgoing connections. These solves vanishing gradients problems
+        - tf.nn.conv2d creates 2D convolution and filters:      
+            -input tensor has rank 4 or higher and shapes [:-3]    (the first ones) are batch dimension (in our case, [batch_shape, (in_height, in_width, in_channel) where currently we operate on one channel]). 
+            - Filters have shape [filter_height, filter_width, in_channels, out_channels]
+            - Batch normalization: applies transformation that maintains mean output close to 0 and standard deviation close to 1. During training, layer normalises output using mean and std of the current batch. During inference, layer normalises its output using a moving average of the mean and std of the batches seen during training. These variables update in training mode. this is enabled with trainning boolean parameters
+            - ReLu: rectified linear (max(features, 0))
     """
+
     W=tf.get_variable('W',shape=szW,initializer=tf.contrib.layers.xavier_initializer())
     x = tf.nn.conv2d(x, W, strides=[1, 1, 1, 1], padding='SAME')
     xbn=tf.layers.batch_normalization(x,training=trainning,fused=True,name='BN')

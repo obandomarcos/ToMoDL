@@ -154,7 +154,7 @@ def myCG(A,rhs):
 
     x=tf.zeros_like(rhs)
     i,r,p=0,rhs,rhs
-    rTr = tf.to_float( tf.reduce_sum(tf.math.conj(r)*r),)
+    rTr = tf.cast( tf.reduce_sum(tf.math.conj(r)*r), float)
     loopVar=i,rTr,x,r,p
     out=tf.while_loop(cond,body,loopVar,name='CGwhile',parallel_iterations=1)[2]
     return c2r(out)

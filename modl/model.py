@@ -37,9 +37,9 @@ def createLayer(x, szW, trainning,lastLayer):
             - ReLu: rectified linear (max(features, 0))
     """
 
-    W=tf.get_variable('W',shape=szW,initializer=tf.contrib.layers.xavier_initializer())
+    W=tf.compat.v1.get_variable('W',shape=szW,initializer=tf.contrib.layers.xavier_initializer())
     x = tf.nn.conv2d(x, W, strides=[1, 1, 1, 1], padding='SAME')
-    xbn=tf.layers.batch_normalization(x,training=trainning,fused=True,name='BN')
+    xbn=tf.keras.layers.batch_normalization(x,trainable=trainning,fused=True,name='BN')
 
     if not(lastLayer):
         return tf.nn.relu(xbn)
@@ -61,7 +61,7 @@ def dw(inp,trainning,nLay, inChan = 2, outChan = 2):
         Here input has two channels (for Fourier space), in our case that would be 
         input layer (3,3,1,64) and output layer (3,3,64,1), due that input has only
         one channel for OPT
-        - tf.variable_scope allows to easily share variables across different parts of the program, even within different name scopes
+        - tf.compat.v1.variable_scope allows to easily share variables across different parts of the program, even within different name scopes
         - Creates chained layers with variable_scope 'layerx', passing previous layer
         - 'Residual': sums directly input (shorcut is an identity input copy, works great in same device) and last layer (w/o Relu)
     """
@@ -76,7 +76,7 @@ def dw(inp,trainning,nLay, inChan = 2, outChan = 2):
     for i in np.arange(1,nLay+1):
         if i==nLay:
             lastLayer=True
-        with tf.variable_scope('Layer'+str(i)):
+        with tf.compat.v1.variable_scope('Layer'+str(i)):
             nw['c'+str(i)]=createLayer(nw['c'+str(i-1)],szW[i],trainning,lastLayer)
 
     with tf.name_scope('Residual'):
@@ -135,9 +135,10 @@ def myCG(A,rhs):
     - For OPT, should modify CG, but still use this operator for CG - revise notes on previously 
     implemented CG.
     """
-    rhs=r2c(rhs)
-    cond=lambda i,rTr,*_: tf.logical_and( tf.less(i,10), rTr>1e-10)
+    rhs=r2c(rhs)        # This wouldn't apply for real-valued data
+    cond=lambda i,rTr,*_: tf.logical_and( tf.less(i,10), rTr>1e-10) # Convergence condition
     
+    # Conjugate gradients body, iterated in Tensorflow with while loop
     def body(i,rTr,x,r,p):
         with tf.name_scope('cgBody'):
             Ap=A.myAtA(p)
@@ -163,29 +164,35 @@ def getLambda():
     create a shared variable called lambda.
     
     - Shared variable lambda is the regularisation parameter, used all over the network
-        - tf.get_variable_scope : in this case, creates a new variable that 
+        - tf.compat.v1.get_variable_scope : in this case, creates a new variable or reuses if it was previously created in this scope. This is useful because lambda regularisation parameter is being shared across
     """
-    with tf.variable_scope(tf.get_variable_scope(), reuse=tf.AUTO_REUSE):
-        lam = tf.get_variable(name='lam1', dtype=tf.float32, initializer=.05)
+    with tf.compat.v1.variable_scope(tf.compat.v1.get_variable_scope(), reuse=tf.compat.v1.AUTO_REUSE):
+        lam = tf.compat.v1.get_variable(name='lam1', dtype=tf.float32, initializer=.05)
     return lam
 
 def callCG(rhs):
     """
     this function will call the function myCG on each image in a batch
+
+    Comments: 
+        - get default graph gets the current thread default graph
     """
     G=tf.get_default_graph()
     getnext=G.get_operation_by_name('getNext')
     _,_,csm,mask=getnext.outputs
-    l=getLambda()
-    l2=tf.complex(l,0.)
+    l=getLambda()       # Lambda parameter
+    l2=tf.complex(l,0.) # Relevant to MRI
+    
     def fn(tmp):
         c,m,r=tmp
         Aobj=Aclass(c,m,l2)
-        y=myCG(Aobj,r)
+        y=myCG(Aobj,r)  # Solves CG with the CG algorithm
         return y
-    inp=(csm,mask,rhs)
-    rec=tf.map_fn(fn,inp,dtype=tf.float32,name='mapFn2' )
-    return rec
+    
+    inp=(csm,mask,rhs)      # MRI specifics
+    rec=tf.map_fn(fn,inp,dtype=tf.float32,name='mapFn2')    # applies fn to inputs unstacked on axis 0 (for batch operation)
+    
+    return rec      
 
 @tf.custom_gradient
 def dcManualGradient(x):
@@ -194,6 +201,10 @@ def dcManualGradient(x):
     TensorFlow to calculate the gradient for the conjuagte gradient part.
     We can calculate the gradient manually as well by using this function.
     Please see section III (c) in the paper.
+
+     - Data consistency custom gradients:
+        This decorator defines function with a custom gradient, which in this case is given by the callCG to calculate the gradient.
+
     """
     y=callCG(x)
     def grad(inp):
@@ -213,29 +224,36 @@ def dc(rhs,csm,mask,lam1):
         Aobj=Aclass( c,m,lam2 )
         y=myCG(Aobj,r)
         return y
+        
     inp=(csm,mask,rhs)
-    rec=tf.map_fn(fn,inp,dtype=tf.float32,name='mapFn' )
+    rec=tf.map_fn(fn,inp,dtype=tf.float32,name='mapFn')
     return rec
 
 def makeModel(atb,csm,mask,training,nLayers,K,gradientMethod):
     """
     This is the main function that creates the model.
 
+    Comments:
+
+        - The whole scope is called myModel, where this is implemented. 
+        - Iterations i conform the nLayers model and attaches a dw network.
+        As x_0 = atb, the model would be 
+        {atb, dw1, dc1, ...  }
     """
     out={}
-    out['dc0']=atb
+    out['dc0']=atb #x_0 initialization
     with tf.name_scope('myModel'):
-        with tf.variable_scope('Wts',reuse=tf.AUTO_REUSE):
+        with tf.compat.v1.variable_scope('Wts',reuse=tf.compat.v1.AUTO_REUSE):
             for i in range(1,K+1):
                 j=str(i)
                 out['dw'+j]=dw(out['dc'+str(i-1)],training,nLayers)
                 lam1=getLambda()
-                rhs=atb + lam1*out['dw'+j]
+                rhs=atb + lam1*out['dw'+j]  
                 if gradientMethod=='AG':
-                    out['dc'+j]=dc(rhs,csm,mask,lam1)
+                    out['dc'+j]=dc(rhs,csm,mask,lam1)   #Forward pass? 
                 elif gradientMethod=='MG':
                     if training:
-                        out['dc'+j]=dcManualGradient(rhs)
+                        out['dc'+j]=dcManualGradient(rhs) #Calculate gradients manually for faster implementation
                     else:
                         out['dc'+j]=dc(rhs,csm,mask,lam1)
     return out

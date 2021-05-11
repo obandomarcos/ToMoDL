@@ -17,7 +17,7 @@ TFeps=tf.constant(1e-5,dtype=tf.float32) # constant value as a tensor object
 
 
 # function c2r contatenate complex input as new axis two two real inputs
-c2r=lambda x:tf.stack([tf.real(x),tf.imag(x)],axis=-1)
+c2r=lambda x:tf.stack([tf.math.real(x),tf.math.imag(x)],axis=-1)
 #r2c takes the last dimension of real input and converts to complex
 r2c=lambda x:tf.complex(x[...,0],x[...,1])
 
@@ -39,7 +39,7 @@ def createLayer(x, szW, trainning,lastLayer):
 
     W=tf.compat.v1.get_variable('W',shape=szW,initializer=tf.contrib.layers.xavier_initializer())
     x = tf.nn.conv2d(x, W, strides=[1, 1, 1, 1], padding='SAME')
-    xbn=tf.keras.layers.batch_normalization(x,trainable=trainning,fused=True,name='BN')
+    xbn=tf.keras.layers.BatchNormalization(x,trainable=trainning,fused=True,name='BN')
 
     if not(lastLayer):
         return tf.nn.relu(xbn)
@@ -119,10 +119,10 @@ class Aclass:
             # For MRI
             with tf.name_scope('AtA'):
                 coilImages=self.csm*img
-                kspace=  tf.fft2d(coilImages)/self.SF
+                kspace=  tf.signal.fft2d(coilImages)/self.SF
                 temp=kspace*self.mask
-                coilImgs =tf.ifft2d(temp)*self.SF
-                coilComb= tf.reduce_sum(coilImgs*tf.conj(self.csm),axis=0)
+                coilImgs =tf.signal.ifft2d(temp)*self.SF
+                coilComb= tf.reduce_sum(coilImgs*tf.math.conj(self.csm),axis=0)
                 coilComb=coilComb+self.lam*img
             
             return coilComb
@@ -142,11 +142,11 @@ def myCG(A,rhs):
     def body(i,rTr,x,r,p):
         with tf.name_scope('cgBody'):
             Ap=A.myAtA(p)
-            alpha = rTr / tf.to_float(tf.reduce_sum(tf.conj(p)*Ap))
+            alpha = rTr / tf.to_float(tf.reduce_sum(tf.math.conj(p)*Ap))
             alpha=tf.complex(alpha,0.)
             x = x + alpha * p
             r = r - alpha * Ap
-            rTrNew = tf.to_float( tf.reduce_sum(tf.conj(r)*r))
+            rTrNew = tf.to_float( tf.reduce_sum(tf.math.conj(r)*r))
             beta = rTrNew / rTr
             beta=tf.complex(beta,0.)
             p = r + beta * p
@@ -154,7 +154,7 @@ def myCG(A,rhs):
 
     x=tf.zeros_like(rhs)
     i,r,p=0,rhs,rhs
-    rTr = tf.to_float( tf.reduce_sum(tf.conj(r)*r),)
+    rTr = tf.to_float( tf.reduce_sum(tf.math.conj(r)*r),)
     loopVar=i,rTr,x,r,p
     out=tf.while_loop(cond,body,loopVar,name='CGwhile',parallel_iterations=1)[2]
     return c2r(out)

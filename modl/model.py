@@ -91,36 +91,53 @@ class Aclass:
 
     Docs usage:
         -We have our own data consistency step for our data, this might be the critical step to change.
-        - A class depicts the model, here we should discard csm
+        - A class depicts the model, here we should discard csm (coil sensitivity maps), specifical to MRI reconstruction
+        - 
     """
     def __init__(self, csm,mask,lam):
         with tf.name_scope('Ainit'):
             s=tf.shape(mask)
             self.nrow,self.ncol=s[0],s[1]
             self.pixels=self.nrow*self.ncol
-            self.mask=mask
-            self.csm=csm
-            self.SF=tf.complex(tf.sqrt(tf.to_float(self.pixels) ),0.)
-            self.lam=lam
+            self.mask=mask                          # Masking method should be modified
+            self.csm=csm                            # This isn't part of OPT modelling
+            self.SF=tf.complex(tf.sqrt(tf.to_float(self.pixels) ),0.)   # Scale Factor also should be disabled
+            self.lam=lam                            # Don't know what's this
             #self.cgIter=cgIter
             #self.tol=tol
-    def myAtA(self,img):
-        with tf.name_scope('AtA'):
-            coilImages=self.csm*img
-            kspace=  tf.fft2d(coilImages)/self.SF
-            temp=kspace*self.mask
-            coilImgs =tf.ifft2d(temp)*self.SF
-            coilComb= tf.reduce_sum(coilImgs*tf.conj(self.csm),axis=0)
-            coilComb=coilComb+self.lam*img
-        return coilComb
+
+    def myAtA(self,img, mode='MultiMRI'):
+        # For OPT tentative
+
+        if mode == 'OPT':
+            with tf.name_scope('AtA'):
+                img = self.mask(img)        # masking actually subsamples images
+                
+                return img
+
+        if mode == 'MultiMRI':
+            # For MRI
+            with tf.name_scope('AtA'):
+                coilImages=self.csm*img
+                kspace=  tf.fft2d(coilImages)/self.SF
+                temp=kspace*self.mask
+                coilImgs =tf.ifft2d(temp)*self.SF
+                coilComb= tf.reduce_sum(coilImgs*tf.conj(self.csm),axis=0)
+                coilComb=coilComb+self.lam*img
+            
+            return coilComb
 
 def myCG(A,rhs):
     """
     This is my implementation of CG algorithm in tensorflow that works on
     complex data and runs on GPU. It takes the class object as input.
+
+    - For OPT, should modify CG, but still use this operator for CG - revise notes on previously 
+    implemented CG.
     """
     rhs=r2c(rhs)
     cond=lambda i,rTr,*_: tf.logical_and( tf.less(i,10), rTr>1e-10)
+    
     def body(i,rTr,x,r,p):
         with tf.name_scope('cgBody'):
             Ap=A.myAtA(p)
@@ -144,6 +161,9 @@ def myCG(A,rhs):
 def getLambda():
     """
     create a shared variable called lambda.
+    
+    - Shared variable lambda is the regularisation parameter, used all over the network
+        - tf.get_variable_scope : in this case, creates a new variable that 
     """
     with tf.variable_scope(tf.get_variable_scope(), reuse=tf.AUTO_REUSE):
         lam = tf.get_variable(name='lam1', dtype=tf.float32, initializer=.05)

@@ -47,9 +47,9 @@ run the newly trained model on the test data.
 @author: Hemant Kumar Aggarwal
 """
 
-# import some librariesw
+# import some libraries
 import os,time
-os.environ['TF_CPP_MIN_LOG_LEVEL']='2'
+os.environ['TF_CPP_MIN_LOG_LEVEL']='2'  #Avoids printing on stderr 
 import numpy as np
 import tensorflow as tf
 from datetime import datetime
@@ -153,13 +153,12 @@ with tf.name_scope('optimizer'):
 
 #%% training code
 
-
 print ('training started at', datetime.now().strftime("%d-%b-%Y %I:%M %P"))
 print ('parameters are: Epochs:',epochs,' BS:',batchSize,'nSteps:',nSteps,'nSamples:',nTrn)
 
 saver = tf.train.Saver(max_to_keep=100)
 totalLoss,ep=[],0
-lossT = tf.placeholder(tf.float32)
+lossT = tf.placeholder(tf.float32)      
 lossSumT = tf.summary.scalar("TrnLoss", lossT)
 
 with tf.Session(config=config) as sess:

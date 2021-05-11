@@ -27,7 +27,7 @@ def createLayer(x, szW, trainning,lastLayer):
     and ReLU. Last layer does not have ReLU to avoid truncating the negative
     part of the learned noise and alias patterns.
 
-    DOCS related to tf:
+    DOCS related to tf usage:
         -get_variable creates a new variable with these parameters. 
         - Weights as W, initialized with xavier: random uniform bounded between \pm sqrt(6)/sqrt(n_{i}+n_{i+1}), n_i are incoming connections, n_{i+1} are outgoing connections. These solves vanishing gradients problems
         - tf.nn.conv2d creates 2D convolution and filters:      
@@ -46,21 +46,32 @@ def createLayer(x, szW, trainning,lastLayer):
     else:
         return xbn
 
-def dw(inp,trainning,nLay):
+def dw(inp,trainning,nLay, inChan = 2, outChan = 2):
     """
     This is the Dw block as defined in the Fig. 1 of the MoDL paper
     It creates an n-layer (nLay) residual learning CNN.
     Convolution filters are of size 3x3 and 64 such filters are there.
     nw: It is the learned noise
     dw: it is the output of residual learning after adding the input back.
+
+    DOCS related to tf usage:
+        - nw is a dictionary of layers, where c0 stores the input to the network
+        - szW is a len=N-1 dict of sizes for convolutional kernels (3,3,64,64).
+        Then input layer changes to (3,3,2,64) and output to (3,3,2,64)
+        Here input has two channels (for Fourier space), in our case that would be 
+        input layer (3,3,1,64) and output layer (3,3,64,1), due that input has only
+        one channel for OPT
+        - tf.variable_scope allows to easily share variables across different parts of the program, even within different name scopes
+        - Creates chained layers with variable_scope 'layerx', passing previous layer
+        - 'Residual': sums directly input (shorcut is an identity input copy, works great in same device) and last layer (w/o Relu)
     """
     lastLayer=False
     nw={}
     nw['c'+str(0)]=inp
     szW={}
     szW = {key: (3,3,64,64) for key in range(2,nLay)}
-    szW[1]=(3,3,2,64)
-    szW[nLay]=(3,3,64,2)
+    szW[1]=(3,3,inChan,64)
+    szW[nLay]=(3,3,64,outChan)
 
     for i in np.arange(1,nLay+1):
         if i==nLay:
@@ -77,6 +88,10 @@ def dw(inp,trainning,nLay):
 class Aclass:
     """
     This class is created to do the data-consistency (DC) step as described in paper.
+
+    Docs usage:
+        -We have our own data consistency step for our data, this might be the critical step to change.
+        - A class depicts the model, here we should discard csm
     """
     def __init__(self, csm,mask,lam):
         with tf.name_scope('Ainit'):

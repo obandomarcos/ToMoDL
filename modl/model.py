@@ -39,7 +39,7 @@ def createLayer(x, szW, trainning,lastLayer):
 
     W=tf.compat.v1.get_variable('W',shape=szW,initializer=tf.contrib.layers.xavier_initializer())
     x = tf.nn.conv2d(x, W, strides=[1, 1, 1, 1], padding='SAME')
-    xbn=tf.keras.layers.BatchNormalization(x,trainable=trainning,fused=True,name='BN')
+    xbn=tf.keras.layers.BatchNormalization(x,trainable=trainning,fused=True,name='BN')(x)
 
     if not(lastLayer):
         return tf.nn.relu(xbn)

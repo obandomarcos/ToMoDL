@@ -79,7 +79,7 @@ def myPSNR(org,recon):
 def getData(trnTst='testing',num=100,sigma=.01):
     #num: set this value between 0 to 163. There are total testing 164 slices in testing data
     print('Reading the data. Please wait...')
-    filename='modl/demoImage.hdf5' #set the correct path here
+    filename='modl/dataset.hdf5' #set the correct path here
     #filename='/Users/haggarwal/datasets/piData/dataset.hdf5'
 
     tic()

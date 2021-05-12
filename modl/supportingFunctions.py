@@ -83,7 +83,7 @@ def getData(trnTst='testing',num=100,sigma=.01):
     #filename='/Users/haggarwal/datasets/piData/dataset.hdf5'
 
     tic()
-    with h5.File(filename) as f:
+    with h5.File(filename, 'r') as f:
         if trnTst=='training':
             org,csm,mask=f['trnOrg'][:],f['trnCsm'][:],f['trnMask'][:]
         else:

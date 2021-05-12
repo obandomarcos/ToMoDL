@@ -146,7 +146,7 @@ def myCG(A,rhs):
             alpha=tf.complex(alpha,0.)
             x = x + alpha * p
             r = r - alpha * Ap
-            rTrNew = tf.cast( tf.reduce_sum(tf.math.conj(r)*r), float)
+            rTrNew = tf.cast(tf.reduce_sum(tf.math.conj(r)*r), float)
             beta = rTrNew / rTr
             beta=tf.complex(beta,0.)
             p = r + beta * p

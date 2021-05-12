@@ -142,7 +142,7 @@ def myCG(A,rhs):
     def body(i,rTr,x,r,p):
         with tf.name_scope('cgBody'):
             Ap=A.myAtA(p)
-            alpha = rTr / tf.to_float(tf.reduce_sum(tf.math.conj(p)*Ap))
+            alpha = rTr / tf.cast(tf.reduce_sum(tf.math.conj(p)*Ap), float)
             alpha=tf.complex(alpha,0.)
             x = x + alpha * p
             r = r - alpha * Ap

@@ -33,6 +33,7 @@ class ZebraDataset:
     self.fileList = self._searchAllFiles(self.folderPath)
     self.datasetFolder = datasetsFolder
     self.experimentName = experimentName
+    self.registeredVolume = None
 
     if '4X' in self.folderName:
 
@@ -281,7 +282,7 @@ class ZebraDataset:
     
     self.registeredDataset = self.registeredDataset.sort_values(['Sample','Angle'], axis = 0).reset_index(drop=True)
   
-  def getRegisteredVolume(self, margin = 10, useSegmented = False):
+  def getRegisteredVolume(self, sample ,saveDataset = True, margin = 10, useSegmented = False):
     '''
     Returns registered and stacked numpy volume, ordered by angle
     Calculates lower and upper non-zero limits for sinograms, with a safety
@@ -289,14 +290,39 @@ class ZebraDataset:
     '''
     assert(self.registeredDataset is not None)
 
-    self.registeredVolume = np.stack(self.registeredDataset['Image'].to_numpy())
+    if self.registeredVolume is not None:
+
+      return self.registeredVolume
+
+    # Filter by sample
+    self.registeredVolume = np.stack(self.registeredDataset[self.registeredDataset.Sample == sample]['Image'].to_numpy())
+    self.registeredAngles = np.stack(self.registeredDataset[self.registeredDataset.Sample == sample]['Angle'].to_numpy())
+    
     # Calculates non-zero boundary limit for segmenting the volume
     self.upperLimit = np.argmin(self.registeredVolume.sum(axis = (0,2)))-margin
     self.lowerLimit = self.registeredVolume.shape[1] - self.upperLimit
     
+    # save dataset in HDF5
+    if saveDataset == True:
+      
+      with h5py.File(self.datasetFolder+'/'+'OPTdatasets.hdf5', 'a') as datasets_file:
+        
+        # If experiment isn't in the current folder, creates experiment
+        if self.experimentName not in datasets_file.keys():
+
+          datasets_file.create_group(self.experimentName)
+        
+        # Creates experiment specifics 
+        if self.folderName not in datasets_file[self.experimentName]:
+
+          datasets_file[self.experimentName].create_group(self.folderName)
+        
+        datasets_file[self.experimentName][self.folderName].create_dataset(sample, data = self.registeredVolume)
+        datasets_file[self.experimentName][self.folderName].create_dataset(sample+'_angles', data = self.registeredAngles)
+    
     # Normalize volume
     if useSegmented == True:
-    
+  
       return self.registeredVolume[:, self.lowerLimit:self.upperLimit, :]
     
     else:
@@ -328,31 +354,18 @@ class ZebraDataset:
 
     elif mode == 'hdf5':
       
-      # Take each sample and creates a new dataset
-      for sample in self.registeredDataset.Sample.unique():
-
-        with h5py.File(self.datasetFolder+'/'+'OPTdatasets.hdf5', 'a') as datasets_file:
-          
-          # If experiment isn't in the current folder 
-          if self.experimentName not in datasets_file.keys():
-
-            datasets_file.create_group(self.experimentName)
-          
-          # Creates experiment specifics 
-          if self.folderName not in datasets_file[self.experimentName]:
-
-            datasets_file[self.experimentName].create_group(self.folderName)
-
-          # Using Pandas built-in HDF5 converter save images
-        self.registeredDataset[self.registeredDataset.Sample == sample]['Image'].rename(sample).to_hdf(
-                                      self.datasetFolder+'/'+'OPTdatasets.hdf5',
-                                      key = self.experimentName+'/'+
-                                      self.folderName,
-                                      mode = 'a',
-                                      format = 'table')
-          
-        # Metadata includes angles and eventually other parameters
-        datasets_file[self.experimentName+'/'+self.folderName+'/'+sample].attrs['Angle'] = self.registeredDataset[self.registeredDataset.Sample == 'head']['Angle']
+      with pd.HDFStore(self.datasetFolder+'/'+'OPTdatasets.hdf5', 'a') as datasets_file:
+        # Take each sample and creates a new dataset
+        for sample in self.registeredDataset.Sample.unique():
+            
+            # Using Pandas built-in HDF5 converter save images
+          datasets_file.put(key = self.experimentName+'/'+self.folderName+'/'+sample,
+                            value = self.registeredDataset[self.registeredDataset.Sample == sample],
+                            data_columns = True)
+            
+          # Metadata includes angles and eventually other parameters
+          # print(self.experimentName+'/'+self.folderName+'/'+sample+'/'+'values')
+          # datasets_file[self.experimentName+'/'+self.folderName+'/'+sample+'/'+'values'].attrs['Angle'] = self.registeredDataset[self.registeredDataset.Sample == 'head']['Angle'].to_numpy()
 
   def loadRegisteredDataset(self):
 

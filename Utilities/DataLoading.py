@@ -375,6 +375,27 @@ class ZebraDataset:
       self.registeredDataset = reg['reg_dataset']
       self.Tparams = reg['reg_transform']
 
+def getDataset(sample, experimentName, randomChoice = True, datasetFilename = 'Datasets/OPTdatasets.hdf5'):
+  '''
+  Gets specific(s) dataset(s) from the box.
+  Params:
+    - experiment_name (str): indicates experiment's maker
+    - sample (str) : if needed, selects kind of sample part (for instance, head) 
+    - dataset_filename (str) : filename for looking up datasets
+  '''
+
+  print('Loading registered dataset\n')
+
+  with h5.File(datasetFilename, 'r') as f:
+
+    if randomChoice == True:
+
+      randomFolder = random.choice(list(f[experimentName].keys()))
+      
+    volume, angles = f[experimentName][randomFolder][sample][:], f[experimentName][randomFolder][sample+'_angles'][:]
+
+  return volume, angles
+
 def subsample(volume, max_angle, angle_step, subsampling_type = 'linear'):
   '''
   Subsamples projections according to maximum angle. 

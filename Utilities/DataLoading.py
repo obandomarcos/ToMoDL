@@ -16,7 +16,7 @@ import re
 from tqdm import tqdm
 import SimpleITK as sitk
 import pickle
-x = 1
+import h5py
 
 class ZebraDataset:
   '''
@@ -24,13 +24,15 @@ class ZebraDataset:
   Params:
     - folderPath (string): full path folder 
   '''
-  def __init__(self, folderPath):
+  def __init__(self, folderPath, datasetsFolder, experimentName):
 
     self.folderPath = pathlib.Path(folderPath)
     self.folderName = pathlib.PurePath(self.folderPath).name
 
     self.objective = 10
     self.fileList = self._searchAllFiles(self.folderPath)
+    self.datasetFolder = datasetsFolder
+    self.experimentName = experimentName
 
     if '4X' in self.folderName:
 
@@ -311,12 +313,46 @@ class ZebraDataset:
     with open(str(self.folderPath)+'transform.pickle', 'rb') as h:
       self.Tparams = pickle.load(h)
 
-  def saveRegisteredDataset(self, pickleName = ''):
+  def saveRegisteredDataset(self, name = '', mode = 'hdf5'):
+    '''
+    Saves registered dataset for DL usage (HDF5) or just pickle for binary storage
+    params :
+    '''
 
-    with open(str(self.folderPath)+pickleName+'.pickle', 'wb') as pickleFile:
-    
-      pickle.dump({'reg_dataset' : self.registeredDataset,
-                  'reg_transform' : self.Tparams}, pickleFile)
+    if mode == 'pickle':
+
+      with open(str(self.folderPath)+name+'.pickle', 'wb') as pickleFile:
+      
+        pickle.dump({'reg_dataset' : self.registeredDataset,
+                    'reg_transform' : self.Tparams}, pickleFile)
+
+    elif mode == 'hdf5':
+      
+      # Take each sample and creates a new dataset
+      for sample in self.registeredDataset.Sample.unique():
+
+        with h5py.File(self.datasetFolder+'/'+'OPTdatasets.hdf5', 'a') as datasets_file:
+          
+          # If experiment isn't in the current folder 
+          if self.experimentName not in datasets_file.keys():
+
+            datasets_file.create_group(self.experimentName)
+          
+          # Creates experiment specifics 
+          if self.folderName not in datasets_file[self.experimentName]:
+
+            datasets_file[self.experimentName].create_group(self.folderName)
+
+          # Using Pandas built-in HDF5 converter save images
+        self.registeredDataset[self.registeredDataset.Sample == sample]['Image'].rename(sample).to_hdf(
+                                      self.datasetFolder+'/'+'OPTdatasets.hdf5',
+                                      key = self.experimentName+'/'+
+                                      self.folderName,
+                                      mode = 'a',
+                                      format = 'table')
+          
+        # Metadata includes angles and eventually other parameters
+        datasets_file[self.experimentName+'/'+self.folderName+'/'+sample].attrs['Angle'] = self.registeredDataset[self.registeredDataset.Sample == 'head']['Angle']
 
   def loadRegisteredDataset(self):
 

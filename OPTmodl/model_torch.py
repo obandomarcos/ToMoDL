@@ -7,6 +7,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
+from torch_radon import Radon, RadonFanbeam
+
 class dwLayer(nn.Module):
     
     def __init__(self, szW, lastLayer):
@@ -15,13 +17,20 @@ class dwLayer(nn.Module):
         """
         self.lastLayer = lastLayer
         self.conv = nn.Conv2d(szW)
-        self.batch = nn.BatchNorm2d(szW[1])
+        self.batchNorm = nn.BatchNorm2d(szW[1])
     
     def forward(self, x):
+        """
+        Forward pass for block
+        """
+        x = self.conv(x)
+        x = self.batchNorm(x)
         
-        self.
+        if self.lastLayer != True:
+            
+            output = F.relu(x)
         
-
+        return output
 
 class dw(nn.Module):
 
@@ -30,6 +39,7 @@ class dw(nn.Module):
         Initialises dw block
         """
         super(dw, self).__init__()
+
         self.lastLayer = False
         self.nw = {}
         self.kernelSize = 3
@@ -42,9 +52,97 @@ class dw(nn.Module):
 
         for i in np.arange(1,nLayer+1):
             
-            self.nw['c'+str(i)] = {'conv':nn.Conv2d(*self.szW[i]),
-                                    'batch_norm': nn.BatchNorm2d(self.szW[i][1])}
-            if i != nLayer:
-                self.nw['c'+str(i)]['relu'] = 
-            
+            if i == nLayer:
+                self.lastLayer = True
 
+            self.nw['c'+str(i)] = dwLayer(szW = self.szW[i], self.lastLayer)
+
+    def forward(x):
+        
+        residual = x    # Ojo con esto por las copias
+        
+        for layer in self.nw.items():
+
+            x = layer(x)
+        
+        output = x_n + residual
+
+        return output
+ 
+class Aclass:
+    """
+    This class is created to do the data-consistency (DC) step as described in paper.
+    """
+    def __init__(self, maxAngle, nAngles, image_size, mask,lam):
+    
+        self.mask=mask
+        self.image_size = image_size
+        self.angles = np.linspace(0,maxAngle,nAngles,endpoint = False)
+        self.det_count = int(np.sqrt(2)*self.image_size+0.5)
+        self.radon = Radon(self.image_size, self.angles, clip_to_circle = False, self.det_count)
+        self.lam = lam
+        
+    def myAtA(self,img):
+        """
+        Image is already in device as a Tensor
+        """
+        # Pending mask
+        sinogram = self.radon.forward(img)
+        iradon = self.radon.backward(self.radon.filtered_sinogram(sinogram))
+        output = iradon+self.lam*img
+
+        return output
+
+def myCG(A,rhs):
+    """
+    My implementation of conjugate gradients in PyTorch
+    """
+    
+    i = 0
+    x = torch.zeros_like(rhs)
+    r, p = rhs 
+    rTr = torch.sum(r*r)
+
+    while((i<10) or (rTr<1e-10)):
+
+        Ap = A.myAtA(p)
+        alpha = rTr/torch.sum(p*Ap)
+        x = x + alpha*p
+        r = r - alpha*Ap
+        rTrNew = torch.sum(r*r)
+        beta = rTrNew/rTr
+        p = r + beta * p
+    
+    return x
+
+def dc(rhs, lam, maxAngle):
+    """
+    Applies CG on each image on the batch
+    """
+    
+    y = torch.zeros_like(rhs)
+    nAngles = rhs.shape[1]   #Check this!!
+    imageSize = rhs.shape[2]
+    Aobj = Aclass(maxAngle, nAngles, imageSize, None, lam)
+
+    for (i, image) in enumerate(rhs):
+
+        y[i,:,:] = myCG(Aobj, rhs) # This indexing may fail
+
+    return y
+
+def makeModel(atb, nLayer, K, lam, maxAngle):
+    """
+    Main function that creates the model
+    """
+    out = {}
+    out['dc0'] = atb
+
+    for i in range(1, K+1):
+        
+        j = str(i)
+        out['dw'+j] = dw(nLayer).forward(out['dc'+str(i-1)])
+        rhs = atb+lam*out['dw'+j]
+        out['dc'+j] = dc(rhs, lam, maxAngle)
+    
+    return out

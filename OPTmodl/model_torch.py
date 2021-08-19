@@ -15,8 +15,9 @@ class dwLayer(nn.Module):
         """
         Dw component
         """
+        super().__init__()
         self.lastLayer = lastLayer
-        self.conv = nn.Conv2d(szW)
+        self.conv = nn.Conv2d(*szW)
         self.batchNorm = nn.BatchNorm2d(szW[1])
     
     def forward(self, x):
@@ -55,7 +56,7 @@ class dw(nn.Module):
             if i == nLayer:
                 self.lastLayer = True
 
-            self.nw['c'+str(i)] = dwLayer(szW = self.szW[i], self.lastLayer)
+            self.nw['c'+str(i)] = dwLayer(self.szW[i], self.lastLayer)
 
     def forward(x):
         
@@ -79,7 +80,7 @@ class Aclass:
         self.image_size = image_size
         self.angles = np.linspace(0,maxAngle,nAngles,endpoint = False)
         self.det_count = int(np.sqrt(2)*self.image_size+0.5)
-        self.radon = Radon(self.image_size, self.angles, clip_to_circle = False, self.det_count)
+        self.radon = Radon(self.image_size, self.angles, clip_to_circle = False, det_count = self.det_count)
         self.lam = lam
         
     def myAtA(self,img):
@@ -88,7 +89,7 @@ class Aclass:
         """
         # Pending mask
         sinogram = self.radon.forward(img)
-        iradon = self.radon.backward(self.radon.filtered_sinogram(sinogram))
+        iradon = self.radon.backward(self.radon.filter_sinogram(sinogram))
         output = iradon+self.lam*img
 
         return output
@@ -100,7 +101,8 @@ def myCG(A,rhs):
     
     i = 0
     x = torch.zeros_like(rhs)
-    r, p = rhs 
+    r = rhs 
+    p = rhs 
     rTr = torch.sum(r*r)
 
     while((i<10) or (rTr<1e-10)):
@@ -112,22 +114,20 @@ def myCG(A,rhs):
         rTrNew = torch.sum(r*r)
         beta = rTrNew/rTr
         p = r + beta * p
-    
+        i += 1
+
     return x
 
-def dc(rhs, lam, maxAngle):
+def dc(Aobj, rhs):
     """
     Applies CG on each image on the batch
     """
     
     y = torch.zeros_like(rhs)
-    nAngles = rhs.shape[1]   #Check this!!
-    imageSize = rhs.shape[2]
-    Aobj = Aclass(maxAngle, nAngles, imageSize, None, lam)
 
     for (i, image) in enumerate(rhs):
 
-        y[i,:,:] = myCG(Aobj, rhs) # This indexing may fail
+        y[i,0,:,:] = myCG(Aobj, image) # This indexing may fail
 
     return y
 

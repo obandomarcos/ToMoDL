@@ -9,6 +9,8 @@ import torch.nn.functional as F
 import numpy as np
 from torch_radon import Radon, RadonFanbeam
 
+dev=torch.device("cuda") 
+
 class dwLayer(nn.Module):
     
     def __init__(self, szW, lastLayer):
@@ -58,11 +60,11 @@ class dw(nn.Module):
 
             self.nw['c'+str(i)] = dwLayer(self.szW[i], self.lastLayer)
 
-    def forward(x):
+    def forward(self, x):
         
         residual = x    # Ojo con esto por las copias
         
-        for layer in self.nw.items():
+        for layer in self.nw.values():
 
             x = layer(x)
         
@@ -74,13 +76,13 @@ class Aclass:
     """
     This class is created to do the data-consistency (DC) step as described in paper.
     """
-    def __init__(self, maxAngle, nAngles, image_size, mask,lam):
+    def __init__(self, maxAngle, nAngles, imageSize, mask,lam):
     
         self.mask=mask
-        self.image_size = image_size
+        self.imageSize = imageSize
         self.angles = np.linspace(0,maxAngle,nAngles,endpoint = False)
-        self.det_count = int(np.sqrt(2)*self.image_size+0.5)
-        self.radon = Radon(self.image_size, self.angles, clip_to_circle = False, det_count = self.det_count)
+        self.det_count = int(np.sqrt(2)*self.imageSize+0.5)
+        self.radon = Radon(self.imageSize, self.angles, clip_to_circle = False, det_count = self.det_count)
         self.lam = lam
         
     def myAtA(self,img):
@@ -131,18 +133,38 @@ def dc(Aobj, rhs):
 
     return y
 
-def makeModel(atb, nLayer, K, lam, maxAngle):
+class OPTmodl(nn.Module):
+  
+  def __init__(self, nLayer, K, maxAngle, nAngles, imageSize, mask, lam, shared = True):
     """
     Main function that creates the model
     """
-    out = {}
-    out['dc0'] = atb
+    super(OPTmodl, self).__init__()
+    self.out = {}
 
-    for i in range(1, K+1):
+    if shared == True:
+      self.dw = dw(nLayer)
+    else:
+      self.dw = nn.ModuleList([dw(nLayer) for _ in range(K)])
+    
+    if torch.cuda.is_available():
+      self.dw.cuda(dev)
+
+    self.imageSize = imageSize
+    self.K = K
+    self.AtA = Aclass(maxAngle, nAngles, imageSize, mask, lam) 
+
+  def forward(self, atb):
+    """
+    - Reusing weights for pytorch seems o be different than TF
+    """
+    self.out['dc0'] = atb
+
+    for i in range(1,self.K+1):
         
         j = str(i)
-        out['dw'+j] = dw(nLayer).forward(out['dc'+str(i-1)])
-        rhs = atb+lam*out['dw'+j]
-        out['dc'+j] = dc(rhs, lam, maxAngle)
+        self.out['dw'+j] = self.dw.forward(self.out['dc'+str(i-1)])
+        rhs = atb+lam*self.out['dw'+j]
+        self.out['dc'+j] = dc(self.AtA, rhs)
     
     return out

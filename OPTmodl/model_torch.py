@@ -19,7 +19,7 @@ class dwLayer(nn.Module):
         """
         super().__init__()
         self.lastLayer = lastLayer
-        self.conv = nn.Conv2d(*szW)
+        self.conv = nn.Conv2d(*szW, padding = (int(szW[2]/2),int(szW[2]/2)))
         self.batchNorm = nn.BatchNorm2d(szW[1])
     
     def forward(self, x):
@@ -27,11 +27,11 @@ class dwLayer(nn.Module):
         Forward pass for block
         """
         x = self.conv(x)
-        x = self.batchNorm(x)
+        output = self.batchNorm(x)
         
         if self.lastLayer != True:
             
-            output = F.relu(x)
+            output = F.relu(output)
         
         return output
 
@@ -49,9 +49,10 @@ class dw(nn.Module):
         self.features = 64
         self.inChannels = 1
         self.outChannels = 1
-        self.szW = {key: (self.features,self.features,self.kernelSize,self.kernelSize) for key in range(2,nLayer)}   # Intermediate layers (in_channels, out_channels, kernel_size_x, kernel_size_y)
-        self.szW[1] = (self.inChannels, self.features, self.kernelSize, self.kernelSize)
-        self.szW[nLayer] = (self.features, self.outChannels, self.kernelSize, self.kernelSize)
+        self.stride = 1
+        self.szW = {key: (self.features,self.features,self.kernelSize,self.stride) for key in range(2,nLayer)}   # Intermediate layers (in_channels, out_channels, kernel_size_x, kernel_size_y)
+        self.szW[1] = (self.inChannels, self.features, self.kernelSize, self.stride)
+        self.szW[nLayer] = (self.features, self.outChannels, self.kernelSize, self.stride)
 
         for i in np.arange(1,nLayer+1):
             
@@ -59,7 +60,8 @@ class dw(nn.Module):
                 self.lastLayer = True
 
             self.nw['c'+str(i)] = dwLayer(self.szW[i], self.lastLayer)
-
+            self.nw['c'+str(i)].cuda(dev)
+            
     def forward(self, x):
         
         residual = x    # Ojo con esto por las copias
@@ -68,7 +70,7 @@ class dw(nn.Module):
 
             x = layer(x)
         
-        output = x_n + residual
+        output = x + residual
 
         return output
  
@@ -141,6 +143,7 @@ class OPTmodl(nn.Module):
     """
     super(OPTmodl, self).__init__()
     self.out = {}
+    self.lam = lam
 
     if shared == True:
       self.dw = dw(nLayer)
@@ -152,7 +155,7 @@ class OPTmodl(nn.Module):
 
     self.imageSize = imageSize
     self.K = K
-    self.AtA = Aclass(maxAngle, nAngles, imageSize, mask, lam) 
+    self.AtA = Aclass(maxAngle, nAngles, imageSize, mask, self.lam) 
 
   def forward(self, atb):
     """
@@ -164,7 +167,8 @@ class OPTmodl(nn.Module):
         
         j = str(i)
         self.out['dw'+j] = self.dw.forward(self.out['dc'+str(i-1)])
-        rhs = atb+lam*self.out['dw'+j]
-        self.out['dc'+j] = dc(self.AtA, rhs)
-    
-    return out
+        rhs = atb+self.lam*self.out['dw'+j]
+        # self.out['dc'+j] = dc(self.AtA, rhs)
+        self.out['dc'+j] = rhs
+        
+    return self.out

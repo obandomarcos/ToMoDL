@@ -61,7 +61,9 @@ class dw(nn.Module):
 
             self.nw['c'+str(i)] = dwLayer(self.szW[i], self.lastLayer)
             self.nw['c'+str(i)].cuda(dev)
-            
+
+        self.nw = nn.ModuleDict(self.nw)
+          
     def forward(self, x):
         
         residual = x    # Ojo con esto por las copias
@@ -119,7 +121,8 @@ def myCG(A,rhs):
         beta = rTrNew/rTr
         p = r + beta * p
         i += 1
-
+        rTr = rTrNew
+        
     return x
 
 def dc(Aobj, rhs):
@@ -129,9 +132,9 @@ def dc(Aobj, rhs):
     
     y = torch.zeros_like(rhs)
 
-    for (i, image) in enumerate(rhs):
+    for i in range(rhs.shape[0]):
 
-        y[i,0,:,:] = myCG(Aobj, image) # This indexing may fail
+        y[i,0,:,:] = myCG(Aobj, rhs[i,0,:,:]) # This indexing may fail
 
     return y
 
@@ -168,7 +171,7 @@ class OPTmodl(nn.Module):
         j = str(i)
         self.out['dw'+j] = self.dw.forward(self.out['dc'+str(i-1)])
         rhs = atb+self.lam*self.out['dw'+j]
-        # self.out['dc'+j] = dc(self.AtA, rhs)
-        self.out['dc'+j] = rhs
+        self.out['dc'+j] = dc(self.AtA, rhs)
+        # self.out['dc'+j] = rhs
         
     return self.out

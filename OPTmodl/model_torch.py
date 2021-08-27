@@ -147,6 +147,7 @@ class OPTmodl(nn.Module):
     super(OPTmodl, self).__init__()
     self.out = {}
     self.lam = lam
+    self.epochs_save = 0
 
     if shared == True:
       self.dw = dw(nLayer)

@@ -13,10 +13,14 @@ import matplotlib.pyplot as plt
 import pathlib
 from PIL import Image
 import re
+import torch, torchvision
 from tqdm import tqdm
 import SimpleITK as sitk
+from torch_radon import Radon, RadonFanbeam
 import pickle
 import h5py
+
+device = torch.device('cuda')
 
 class ZebraDataset:
   '''
@@ -395,6 +399,46 @@ def getDataset(sample, experimentName, randomChoice = True, datasetFilename = 'D
     volume, angles = f[experimentName][randomFolder][sample][:], f[experimentName][randomFolder][sample+'_angles'][:]
 
   return volume, angles
+
+def formDatasets(sino_dataset, num_beams, size):
+  """
+  This function receives a sinogram dataset and returns two FBP reconstructed datasets,
+  one with the full span of angles and one reconstructed with num_beams
+  """
+  # Angles
+  n_angles = sino_dataset.shape[0]
+  angles_full = np.linspace(0, np.pi, n_angles, endpoint=False)
+  angles_under = np.linspace(0, np.pi, num_beams, endpoint=False)
+
+  projs = np.linspace(0, n_angles, num_beams, endpoint=False).astype(int)
+
+  det_count = sino_dataset.shape[1]
+  image_size = int(det_count/np.sqrt(2)-0.5) 
+  # Datasets undersampled with projs
+  under_sino = sino_dataset[projs,:,:]
+
+  rad_full = Radon(image_size, angles_full, clip_to_circle=False, det_count=det_count)
+  rad_under = Radon(image_size, angles_under, clip_to_circle=False, det_count=det_count)
+  
+  undersampled = []
+  desired = []
+  # retrieve random z-slices to train
+  rand = np.random.choice(range(under_sino.shape[2]), size, replace=False)
+  
+  # Undersampled
+  for img in np.rollaxis(under_sino[:,:,rand], 2):
+    
+    undersampled.append(rad_under.backward(rad_under.filter_sinogram(torch.FloatTensor(img).to(device))))
+  
+  # Full
+  for img in np.rollaxis(sino_dataset[:,:,rand], 2):
+     
+    desired.append(rad_full.backward(rad_full.filter_sinogram(torch.FloatTensor(img).to(device))))
+
+  desired = torch.unsqueeze(torch.stack(desired), 1)
+  undersampled = torch.unsqueeze(torch.stack(undersampled), 1)
+
+  return desired, undersampled
 
 def subsample(volume, max_angle, angle_step, subsampling_type = 'linear'):
   '''

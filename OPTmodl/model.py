@@ -37,7 +37,7 @@ def createLayer(x, szW, trainning,lastLayer):
             - ReLu: rectified linear (max(features, 0))
     """
 
-    W=tf.compat.v1.get_variable('W',shape=szW,initializer=tf.contrib.layers.xavier_initializer())
+    W=tf.compat.v1.get_variable('W',shape=szW,initializer=tf.initializers.GlorotUniform())
     x = tf.nn.conv2d(x, W, strides=[1, 1, 1, 1], padding='SAME')
     xbn=tf.keras.layers.BatchNormalization(trainable=trainning,fused=True,name='BN')(x)
 
@@ -94,26 +94,25 @@ class Aclass:
         - A class depicts the model, here we should discard csm (coil sensitivity maps), specifical to MRI reconstruction
         - 
     """
-    def __init__(self, csm,mask,lam):
+    def __init__(self, hR, hRT, lam):
         with tf.name_scope('Ainit'):
-            s=tf.shape(mask)
-            self.nrow,self.ncol=s[0],s[1]
-            self.pixels=self.nrow*self.ncol
-            self.mask=mask                          # Masking method should be modified
-            self.csm=csm                            # This isn't part of OPT modelling
-            self.SF=tf.complex(tf.sqrt(tf.cast(self.pixels, dtype = float)),0.)   # Scale Factor also should be disabled
-            self.lam=lam                            # Don't know what's this
+            
+            self.hR = hR
+            self.hRT = hRT
+            
             #self.cgIter=cgIter
             #self.tol=tol
 
-    def myAtA(self,img, mode='MultiMRI'):
+    def myAtA(self,img, mode='OPT'):
         # For OPT tentative
 
         if mode == 'OPT':
             with tf.name_scope('AtA'):
-                img = self.mask(img)        # masking actually subsamples images
+                img = img       # masking actually subsamples images
+                sino = hR(img)
+                iradon = hRT(sino)
                 
-                return img
+                return iradon
 
         if mode == 'MultiMRI':
             # For MRI

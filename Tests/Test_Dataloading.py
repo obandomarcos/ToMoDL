@@ -3,6 +3,24 @@ Testing for data loading
 1 - Test registration functions
 2 - Test correct volume loading 
 '''
+import os
+import os,time, sys
+os.chdir('/home/marcos/DeepOPT/')
+sys.path.append('Utilities/')
+sys.path.append('OPTmodl/')
+
+import numpy as np
+import random
+import matplotlib.pyplot as plt
+import pandas as pd
+import DataLoading as DL
+
+import torch
+from torch_radon import Radon, RadonFanbeam
+from skimage.transform import radon, iradon
+import phantominator as ph
+import torchvision
+import model_torch as modl
 
 f140114_5dpf = "/home/marcos/DeepOPT/DataOPT/140114_5dpf"  # 5 days post-fertilization
 f140117_3dpf = "/home/marcos/DeepOPT/DataOPT/140117_3dpf"  # 3 days post-fertilization
@@ -38,4 +56,4 @@ test_measurement = test_volume[:,:,100] # Random sinogram
 
 fig, ax = plt.subplots(1,1)
 ax.imshow(test_measurement)
-ax.savefig(results_folder+'Test_measurement_1.pdf')
+fig.savefig(results_folder+'Test_measurement.pdf')

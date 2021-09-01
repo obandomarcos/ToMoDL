@@ -7,6 +7,8 @@ from torch_radon import Radon, RadonFanbeam
 import torch
 from skimage.transform import radon, iradon
 import numpy as np
+import phantominator as ph
+import matplotlib.pyplot as plt
 
 device = torch.device('cuda')
 results_folder = '/home/marcos/DeepOPT/Resultados/'
@@ -24,8 +26,8 @@ sino_gpu = rad.forward(phant_gpu)
 
 fig, ax = plt.subplots(1,1)
 
-ax[0].imshow(sino_gpu.cpu())
-ax[0].set_title('Sinogram GPU')
+ax.imshow(sino_gpu.cpu())
+ax.set_title('Sinogram GPU')
 
 fig.savefig(results_folder+'Test_TorchRadon_1.pdf')
 

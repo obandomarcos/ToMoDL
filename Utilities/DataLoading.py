@@ -233,7 +233,7 @@ class ZebraDataset:
   
   def applyRegistration(self, sample):
     """
-    Applies registration for dataset from registration params
+    Applies mean registration for dataset from registration params
     """
 
     assert(self.Tparams is not None)
@@ -250,7 +250,7 @@ class ZebraDataset:
     angles = np.arange(0, self.maxAngle//2, 1).astype(float)
 
     self.registeredDataset = pd.DataFrame(columns = ['Image', 'Angle', 'Sample'])
-
+    
     for angle in tqdm(angles):
 
       fixed =  dataset[dataset.Angle == angle].iloc[0]['Image'].astype(float)
@@ -259,11 +259,10 @@ class ZebraDataset:
       fixed_s = sitk.Cast(sitk.GetImageFromArray(fixed), sitk.sitkFloat32)
       moving_s = sitk.Cast(sitk.GetImageFromArray(moving), sitk.sitkFloat32)
 
-      params = self.Tparams[self.Tparams.Angle == angle].iloc[0]['Ty']
       
       # setting moving transform
       transform = sitk.TranslationTransform(2)
-      transform.SetParameters((0, -params/2))  # Fixed image to center
+      transform.SetParameters((0, -self.meanDisplacement/2))  # Fixed image to center
       
       fixed_s_T = sitk.Resample(fixed_s, 
                                     transform, 
@@ -303,8 +302,8 @@ class ZebraDataset:
     self.registeredAngles = np.stack(self.registeredDataset[self.registeredDataset.Sample == sample]['Angle'].to_numpy())
     
     # Calculates non-zero boundary limit for segmenting the volume
-    self.upperLimit = np.argmin(self.registeredVolume.sum(axis = (0,2)))-margin
-    self.lowerLimit = self.registeredVolume.shape[1] - self.upperLimit
+    self.upperLimit = self.registeredVolume.shape[1]-margin
+    self.lowerLimit = margin
     
     # save dataset in HDF5
     if saveDataset == True:
@@ -342,7 +341,9 @@ class ZebraDataset:
 
     with open(str(self.folderPath)+'transform.pickle', 'rb') as h:
       self.Tparams = pickle.load(h)
-
+    # save mean displacement for operations
+    self.meanDisplacement = self.Tparams['Ty'].mean()
+  
   def saveRegisteredDataset(self, name = '', mode = 'hdf5'):
     '''
     Saves registered dataset for DL usage (HDF5) or just pickle for binary storage
@@ -379,6 +380,7 @@ class ZebraDataset:
       self.registeredDataset = reg['reg_dataset']
       self.Tparams = reg['reg_transform']
 
+
 def getDataset(sample, experimentName, randomChoice = True, datasetFilename = 'Datasets/OPTdatasets.hdf5'):
   '''
   Gets specific(s) dataset(s) from the box.
@@ -403,7 +405,7 @@ def getDataset(sample, experimentName, randomChoice = True, datasetFilename = 'D
 def formDatasets(sino_dataset, num_beams, size):
   """
   This function receives a sinogram dataset and returns two FBP reconstructed datasets,
-  one with the full span of angles and one reconstructed with num_beams
+  ocan't multiply sequence by non-int of type 'floatne with the full span of angles and one reconstructed with num_beams
   """
   # Angles
   n_angles = sino_dataset.shape[0]

@@ -20,6 +20,7 @@ from skimage.transform import radon, iradon
 import phantominator as ph
 import torchvision
 import model_torch as modl
+import pickle
 
 # Using CPU or GPU
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -32,12 +33,11 @@ train_dataset, test_dataset = modutils.formRegDatasets(folder_paths, umbral_reg)
 # Training with more than one dataset
 number_projections = [20, 30, 40, 60, 90, 120, 180]
 train_size = 200
-test_size = 200
-batch_size = 5
+test_size = 50
+batch_size = 1
 img_size = 200
 
-mean_error_fbp = []
-mean_error_modl = []
+train_infos = {}
     
 for proj_num in number_projections:
     
@@ -46,8 +46,8 @@ for proj_num in number_projections:
     
     #%% Model Settings
     nLayer = 4
-    K = 10 
-    epochs = 25
+    K = 10
+    epochs = 20
     lam = 45.0
     maxAngle = 360
     
@@ -56,22 +56,20 @@ for proj_num in number_projections:
     loss_fbp_fn = torch.nn.MSELoss(reduction = 'sum') 
     lr = 1e-3
     optimizer = torch.optim.RMSprop(model.parameters())
+
+    model, train_info = modutils.model_training(model, loss_fn, loss_fbp_fn, optimizer, dataloaders, device, model_folder, num_epochs = epochs, disp = True, do_checkpoint = 0)
+     
+    train_infos[proj_num] = train_info
     
-    model, train_info = modutils.model_training(model, loss_fn, loss_fbp_fn, optimizer, dataloaders, device, model_folder, num_epochs = epochs, disp = True, do_checkpoint = 4)
+    print('Test MODL loss {}'.format(train_infos[proj_num]['train'][-1]))
+    print('Test FBP loss {}'.format(train_infos[proj_num]['train_fbp'][-1]))
 
-    mean_error_fbp.append(train_info['test_fbp'][-1])
-    mean_error_modl.append(train_info['test'][-1])
+    #%% save loss for fbp and modl network
+    with open(results_folder+'FBP_error_projections.pkl', 'wb') as f:
     
-    print('Test FBP loss {}'.format(mean_error_fbp))
-    print('Test MODL loss {}'.format(mean_error_modl))
-
-#%% save loss for fbp and modl network
-mean_error_fbp = np.array(mean_error_fbp)
-mean_error_modl = np.array(mean_error_modl)
-
-with open(results_folder+'FBP_error_projections.npy', 'wb') as f:
-    np.save(f, mean_error_fbp)
-
-with open(results_folder+'MODL_error_projections.npy', 'wb') as f:
-    np.save(f, mean_error_modl)
-
+        pickle.dump(train_infos, f)
+        print('Diccionario salvado para proyección {}'.format(proj_num))
+    
+    modutils.save_net(model_folder+'K_{}_lam_{}_nlay_{}_proj_{}'.format(K, lam, nLayer, proj_num), model)
+    
+    del model

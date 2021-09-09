@@ -95,7 +95,8 @@ class Aclass:
         """
         # Pending mask
         sinogram = self.radon.forward(img)
-        iradon = self.radon.backward(self.radon.filter_sinogram(sinogram))
+        iradon = self.radon.backprojection(self.radon.filter_sinogram(sinogram))
+        del sinogram
         output = iradon+self.lam*img
 
         return output
@@ -104,15 +105,14 @@ def myCG(A,rhs):
     """
     My implementation of conjugate gradients in PyTorch
     """
-    
     i = 0
     x = torch.zeros_like(rhs)
     r = rhs 
     p = rhs 
     rTr = torch.sum(r*r)
-
-    while((i<10) or (rTr<1e-10)):
-
+         
+    while((i<8) and torch.ge(rTr, 1e-2)):
+            
         Ap = A.myAtA(p)
         alpha = rTr/torch.sum(p*Ap)
         x = x + alpha*p
@@ -123,6 +123,9 @@ def myCG(A,rhs):
         i += 1
         rTr = rTrNew
         
+    del r, p, Ap
+    torch.cuda.empty_cache()
+
     return x
 
 def dc(Aobj, rhs):
@@ -174,5 +177,6 @@ class OPTmodl(nn.Module):
         rhs = atb+self.lam*self.out['dw'+j]
         self.out['dc'+j] = dc(self.AtA, rhs)
         # self.out['dc'+j] = rhs
+        torch.cuda.empty_cache()
         
     return self.out

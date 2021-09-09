@@ -229,14 +229,18 @@ def model_training(model, criterion, crit_fbp, optimizer, dataloaders, device, r
                    if phase == 'train':
                        
                        loss.backward()
+                       torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm = 1.0, norm_type =2.0)
                        optimizer.step()
-               
+                
+
                # los desvios se pueden sumar en cuadratura
                running_loss += loss.item()*inputs.size(0)
                running_std_loss += loss_std*inputs.size(0)
 
                fbp_loss += loss_fbp.item()*inputs.size(0)
                fbp_std_loss += loss_std_fbp*inputs.size(0)
+               
+               del inputs, outputs
 
                if torch.cuda.is_available():
                    torch.cuda.empty_cache()
@@ -246,8 +250,10 @@ def model_training(model, criterion, crit_fbp, optimizer, dataloaders, device, r
                    batches_done = epoch * len(dataloaders[phase]['x']) + batch_i
                    batches_left = num_epochs * len(dataloaders[phase]['x']) - batches_done
                    time_left = datetime.timedelta(seconds=batches_left * (time.time() - prev_time))
+                   print(time.time()-prev_time)
                    prev_time = time.time()
-
+                   
+                   
 
                    sys.stdout.write(
                            "\r[%s] [Epoch %d/%d] [Batch %d/%d] [Loss: %f] ETA: %s "

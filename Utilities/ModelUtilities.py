@@ -238,9 +238,7 @@ def model_training(model, criterion, crit_fbp, optimizer, dataloaders, device, r
                running_std_loss += loss_std*inputs.size(0)
 
                fbp_loss += loss_fbp.item()*inputs.size(0)
-               fbp_std_loss += loss_std_fbp*inputs.size(0)
-               
-               del inputs, outputs
+               fbp_std_loss += loss_std_fbp*inputs.size(0)      
 
                if torch.cuda.is_available():
                    torch.cuda.empty_cache()
@@ -253,8 +251,6 @@ def model_training(model, criterion, crit_fbp, optimizer, dataloaders, device, r
                    print(time.time()-prev_time)
                    prev_time = time.time()
                    
-                   
-
                    sys.stdout.write(
                            "\r[%s] [Epoch %d/%d] [Batch %d/%d] [Loss: %f] ETA: %s "
                            % (
@@ -267,7 +263,8 @@ def model_training(model, criterion, crit_fbp, optimizer, dataloaders, device, r
                                time_left,
                            )
                        )
-            
+                
+               del inputs, outputs, loss
             
             epoch_loss = running_loss/len(dataloaders[phase]['x'])
             epoch_loss_std = running_std_loss/len(dataloaders[phase]['x'])

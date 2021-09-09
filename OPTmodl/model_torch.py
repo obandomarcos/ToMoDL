@@ -178,5 +178,6 @@ class OPTmodl(nn.Module):
         self.out['dc'+j] = dc(self.AtA, rhs)
         # self.out['dc'+j] = rhs
         torch.cuda.empty_cache()
+        del rhs
         
     return self.out

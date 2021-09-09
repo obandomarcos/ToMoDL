@@ -35,7 +35,7 @@ number_projections = [20, 30, 40, 60, 90, 120, 180]
 train_size = 200
 test_size = 50
 batch_size = 1
-img_size = 200
+img_size = 64
 
 train_infos = {}
     
@@ -46,7 +46,7 @@ for proj_num in number_projections:
     
     #%% Model Settings
     nLayer = 4
-    K = 10
+    K = 5
     epochs = 20
     lam = 45.0
     maxAngle = 360

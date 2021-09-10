@@ -27,27 +27,27 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 folder_paths = [f140115_1dpf, f140315_3dpf, f140419_5dpf, f140714_5dpf] # Folders to be used
 
 umbral_reg = 50
-train_dataset, test_dataset = modutils.formRegDatasets(folder_paths, umbral_reg)
+train_dataset, val_dataset = modutils.formRegDatasets(folder_paths, umbral_reg)
 
 #%% Datasets 
 # Training with more than one dataset
 number_projections = [20, 30, 40, 60, 90, 120, 180]
-train_size = 200
-test_size = 50
-batch_size = 1
-img_size = 64
+train_size = 480
+test_size = 120
+batch_size = 5
+img_size = 200
 
 train_infos = {}
     
 for proj_num in number_projections:
     
     # Load desired and undersampled datasets, on image space. Testing on Test Dataset
-    dataloaders = modutils.formDataloaders(train_dataset, test_dataset, proj_num, train_size, test_size, batch_size, img_size)
+    dataloaders = modutils.formDataloaders(train_dataset, val_dataset, proj_num, train_size, test_size, batch_size, img_size)
     
     #%% Model Settings
     nLayer = 4
     K = 5
-    epochs = 20
+    epochs = 100
     lam = 45.0
     maxAngle = 360
     
@@ -65,7 +65,7 @@ for proj_num in number_projections:
     print('Test FBP loss {}'.format(train_infos[proj_num]['train_fbp'][-1]))
 
     #%% save loss for fbp and modl network
-    with open(results_folder+'FBP_error_projections.pkl', 'wb') as f:
+    with open(results_folder+'FBP_error_projections_K{}_lam{}.pkl'.format(K, lam), 'wb') as f:
     
         pickle.dump(train_infos, f)
         print('Diccionario salvado para proyección {}'.format(proj_num))

@@ -19,7 +19,7 @@ error_fbp_test_std = []
 for train_proj in train_info.values():
     
    error_test.append(train_proj['test'][-1])
-   error_test_std.append(train_proj['test_std'][-1])
+   #error_test_std.append(train_proj['test_std'][-1])
    
    error_fbp_test.append(train_proj['test_fbp'][-1])
    error_fbp_test_std.append(train_proj['test_fbp_std'][-1])

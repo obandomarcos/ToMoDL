@@ -75,7 +75,7 @@ class dw(nn.Module):
         output = x + residual
 
         return output
- 
+
 class Aclass:
     """
     This class is created to do the data-consistency (DC) step as described in paper.
@@ -166,7 +166,7 @@ class OPTmodl(nn.Module):
 
   def forward(self, atb):
     """
-    - Reusing weights for pytorch seems o be different than TF
+        
     """
     self.out['dc0'] = atb
 

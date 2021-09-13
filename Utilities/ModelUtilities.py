@@ -70,8 +70,7 @@ def formMaskDataset(sino_dataset, dataset_size, slice_idx, num_beams):
         dataset_size (int): number of images
         slice_num (int): slice index to be grabbed
         projection_num (int): 
-    '''
-    
+    ''' 
     target_img = sino_dataset[:,:,slice_idx]
     train_dataset = np.repeat(target_img[...,None], dataset_size, axis = 2)
 
@@ -84,9 +83,9 @@ def formMaskDataset(sino_dataset, dataset_size, slice_idx, num_beams):
     
     return train_dataset, target_img
 
-def formUniqueDataset(sino_dataset, dataset_size, num_beams, slice_idx, img_resize):
+def formUniqueDataset(sino_datasets, dataset_size, num_beams, slice_idx, img_resize):
     """
-    Routine for training with a unique image
+    Routine for training with a unique image. Returns a training dataset with random subsampling (num_beams used for reconstruction), a target image and the maximum number of projections taken.
     params:
         sino_dataset (ndarray): sinogram volume
         dataset_size (int): number of images in training dataset
@@ -94,19 +93,21 @@ def formUniqueDataset(sino_dataset, dataset_size, num_beams, slice_idx, img_resi
         slice_idx (int): slice index 
         img_resize (int): image resizing, squared
     """
-    
+    # Choose one of the datasets
+    sino_dataset = sino_datasets[np.random.choice(range(3), 1).astype(int)[0]]
+
     train_dataset, target_img = formMaskDataset(sino_dataset, dataset_size, slice_idx, num_beams)
-    img_range = np.linspace(0, train_dataset.shape[1], int(img_resize*np.sqrt(2)-0.5), endpoint = False).astype(int)
+    det_range = np.linspace(0, train_dataset.shape[1], int((img_resize+0.5)*np.sqrt(2)), endpoint = False).astype(int)
 
     # Resize sinogram
-    train_dataset = train_dataset[:, img_range, :]
-    target_img = target_img[:,img_range,:]
+    train_dataset = train_dataset[:, det_range, :]
+    target_img = target_img[:,det_range]
 
     n_angles = sino_dataset.shape[0]
-    angles_full = np.linspace(0, np.pi, n_angles, endpoint=False)
+    angles_full = np.linspace(0, 2*np.pi, n_angles, endpoint=False)
     
     det_count = train_dataset.shape[1]
-    image_size = int(det_count/np.sqrt(2)-0.5)
+    image_size = int(det_count/np.sqrt(2)+0.5)
         
     radon = Radon(image_size, angles_full, clip_to_circle = False, det_count = det_count)
     
@@ -116,8 +117,7 @@ def formUniqueDataset(sino_dataset, dataset_size, num_beams, slice_idx, img_resi
         
         training_Atb.append(radon.backward(radon.filter_sinogram(torch.FloatTensor(img).to(device))))
 
-    target_img = radon.backward(radon.filter_sinogram(torch.FloatTensor(img).to(device))))
-    
+    target_img = radon.backward(radon.filter_sinogram(torch.FloatTensor(target_img).to(device)))
     training_Atb = torch.unsqueeze(torch.stack(training_Atb), 1)
     
     # Image resize
@@ -125,9 +125,9 @@ def formUniqueDataset(sino_dataset, dataset_size, num_beams, slice_idx, img_resi
   
     transform = torch.jit.script(transform)
     training_Atb = transform.forward(training_Atb)
-    target_img = transform.forward(target_img)
+    target_img = transform.forward(torch.unsqueeze(target_img, 0))
 
-    return training_Atb, target_img
+    return training_Atb, target_img, n_angles
 
 def formDatasets(sino_dataset, num_beams, size, img_size):
   """
@@ -136,8 +136,8 @@ def formDatasets(sino_dataset, num_beams, size, img_size):
   """
   # Angles
   n_angles = sino_dataset.shape[0]
-  angles_full = np.linspace(0, np.pi, n_angles, endpoint=False)
-  angles_under = np.linspace(0, np.pi, num_beams, endpoint=False)
+  angles_full = np.linspace(0, 2*np.pi, n_angles, endpoint=False)
+  angles_under = np.linspace(0, 2*np.pi, num_beams, endpoint=False)
 
   projs = np.linspace(0, n_angles, num_beams, endpoint=False).astype(int)
 
@@ -231,7 +231,115 @@ def formDataloaders(train_dataset, test_dataset, number_projections, train_size,
 
     return dataloaders
 
- # Training function
+def unique_model_training(model, criterion, criterion_fbp, optimizer, dataloaders, target_image, num_epochs, device, batch_size, disp = True):
+    
+    # configure labels 
+    labels = torch.unsqueeze(target_image, 0).repeat(batch_size, 1, 1, 1)
+    since = time.time()
+    best_loss = float('inf')
+    best_model_wts = copy.deepcopy(model.state_dict())
+
+    train_info = {}
+    train_info['train'] = []
+    train_info['train_fbp'] = []
+    
+    train_info['val'] = []
+    train_info['val_fbp'] = []
+    
+    for epoch in range(num_epochs):
+        
+        prev_time = time.time()
+                                        
+        for phase in ['train', 'val']:
+            
+            if phase == 'train':
+                model.train()
+            else:
+                model.eval()
+                                        
+            running_loss = 0.0
+            running_std_loss = 0.0
+                                        
+            fbp_loss = 0.0
+            fbp_std_loss = 0.0
+
+            for batch_i, inputs in enumerate(dataloaders[phase]):
+                                                                                           
+               inputs.to(device)
+               labels.to(device)
+                                                                                           
+               optimizer.zero_grad() #zero the parameter gradients
+                
+               #forward pass
+               # Track history in training only
+               with torch.set_grad_enabled(phase=='train'):
+                   
+                   outputs = model(inputs)
+
+                   loss = criterion(outputs['dc'+str(model.K-1)], labels) 
+                   loss_fbp = criterion_fbp(inputs, labels)
+              
+                   if phase == 'train':
+                    
+                       loss.backward()
+                       torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm = 1.0, norm_type =2.0)
+                       optimizer.step()
+
+               running_loss += loss.item()*inputs.size(0) 
+               fbp_loss += loss_fbp.item()*inputs.size(0)
+                                                                                                    
+               if torch.cuda.is_available():
+                   torch.cuda.empty_cache()
+                                                                                                    
+               if disp:
+                                                                                                    
+                   batches_done = epoch * len(dataloaders[phase]) + batch_i
+                   batches_left = num_epochs * len(dataloaders[phase]) - batches_done
+                   time_left = datetime.timedelta(seconds=batches_left * (time.time() - prev_time))
+               #    print(time.time()-prev_time)
+                   prev_time = time.time()
+                   
+                   sys.stdout.write(
+                           "\r[%s] [Epoch %d/%d] [Batch %d/%d] [Loss: %f] ETA: %s "
+                           % (
+                               phase,
+                               epoch+1,
+                               num_epochs,
+                               batch_i+1,
+                               len(dataloaders[phase]),
+                               loss.item(),
+                               time_left,
+                           )
+                       )
+            epoch_loss = running_loss/len(dataloaders[phase])
+            epoch_loss_fbp = fbp_loss/len(dataloaders[phase])
+
+            train_info[phase].append(epoch_loss)
+            train_info[phase+'_fbp'].append(epoch_loss_fbp)
+
+            if disp:
+                print('')
+                print('{} Loss: {:.4f} '.format(phase, epoch_loss))
+                print('{} Loss FBP: {:.4f} '.format(phase, epoch_loss_fbp))
+
+            if phase == 'val' and epoch_loss < best_loss:
+                
+                best_loss = epoch_loss
+                best_model_wts = copy.deepcopy(model.state_dict())
+        
+#        checkpoint_plot(outputs, root, epoch)
+    
+    time_elapsed = time.time()-since                                                                              
+    if disp:
+        print('Training complete in {:.0f}m {:.0f}s'.format(time_elapsed // 60, time_elapsed % 60))
+        print('Best val Loss: {:4f}'.format(best_loss))
+
+    # load best model weights
+    model.load_state_dict(best_model_wts)
+
+    return model , train_info
+
+# Training function
 def model_training(model, criterion, crit_fbp, optimizer, dataloaders, device, root, num_epochs = 25, disp=False, do_checkpoint = 0):
     """
     Trains pytorch model

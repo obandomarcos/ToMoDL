@@ -13,6 +13,7 @@ import torchvision
 import DataLoading as DL
 import math
 import matplotlib.pyplot as plt
+import cv2 
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 # Torch dataset tidying
@@ -94,7 +95,7 @@ def formUniqueDataset(sino_datasets, dataset_size, num_beams, slice_idx, img_res
         img_resize (int): image resizing, squared
     """
     # Choose one of the datasets
-    sino_dataset = sino_datasets[np.random.choice(range(3), 1).astype(int)[0]]
+    sino_dataset = sino_datasets[np.random.choice(range(len(sino_datasets)), 1).astype(int)[0]]
 
     train_dataset, target_img = formMaskDataset(sino_dataset, dataset_size, slice_idx, num_beams)
     det_range = np.linspace(0, train_dataset.shape[1], int((img_resize+0.5)*np.sqrt(2)), endpoint = False).astype(int)
@@ -114,19 +115,39 @@ def formUniqueDataset(sino_datasets, dataset_size, num_beams, slice_idx, img_res
     training_Atb = []
 
     for img in np.rollaxis(train_dataset, 2):
+    
+        # Normalization
+        #img = cv2.normalize(img, None, alpha = 0, beta = 1, norm_type = cv2.NORM_MINMAX, dtype = cv2.CV_32F)
+        img = radon.backward(radon.filter_sinogram(torch.FloatTensor(img).to(device)))
+        mn = torch.min(img)
+        mx = torch.max(img)
+        norm = (img-mn)*(1.0/(mx-mn))
         
-        training_Atb.append(radon.backward(radon.filter_sinogram(torch.FloatTensor(img).to(device))))
+        training_Atb.append(norm)
 
+    #target_img = cv2.normalize(target_img, None, alpha = 0, beta = 1, norm_type = cv2.NORM_MINMAX, dtype = cv2.CV_32F)
+    
     target_img = radon.backward(radon.filter_sinogram(torch.FloatTensor(target_img).to(device)))
+    mn = torch.min(target_img)
+    mx = torch.max(target_img)
+    target_img = (target_img-mn)*(1.0/(mx-mn)) 
+
     training_Atb = torch.unsqueeze(torch.stack(training_Atb), 1)
     
     # Image resize
-    transform = torch.nn.Sequential(torchvision.transforms.Normalize([0.5], [0.5]))
-  
-    transform = torch.jit.script(transform)
-    training_Atb = transform.forward(training_Atb)
-    target_img = transform.forward(torch.unsqueeze(target_img, 0))
-
+#    transform = torch.nn.Sequential(torchvision.transforms.Normalize([0.5], [0.5]))
+    
+    #with torch.no_grad():
+    #    
+    #    train_Atb_sub = training_Atb - training_Atb.min(0, keepdim = True)[0]
+    #    train_Atb_sub /= training_Atb.max(0, keepdim = True)[0]
+    #    target_img_sub = target_img - target_img.min(0, keepdim = True)[0]
+    #    target_img_sub /= target_img.max(0, keepdim = True)[0]
+    #
+    #transform = torch.jit.script(transform)
+    #training_Atb = transform.forward(train_Atb_sub)
+    #target_img = transform.forward(torch.unsqueeze(target_img_sub, 0))
+    
     return training_Atb, target_img, n_angles
 
 def formDatasets(sino_dataset, num_beams, size, img_size):
@@ -516,3 +537,35 @@ def load_net(title, model, device):
     model_out_path = "{}.pth".format(title)
     model.load_state_dict(torch.load(model_out_path, map_location=torch.device(device)))
     print("Model Loaded: {}".format(title))
+
+def plot_outputs(target, prediction, path):
+    
+    fig, ax = plt.subplots(1, len(prediction.keys())+1, figsize = (16,6))
+    
+    ax[0].imshow(target.detach().cpu().numpy()[0,0,:,:])
+    ax[0].set_title('Target')
+
+    for a, (key, image) in zip(ax[1:], prediction.items()):
+
+        a.imshow(image.detach().cpu().numpy()[0,0,:,:])
+        a.set_title(key)
+    
+    fig.savefig(path, bbox_inches = 'tight')
+
+def plot_histogram(dictionary, img_size, path):
+    """
+    Plot histograms 
+    """
+    fig, ax = plt.subplots(1, 2, figsize = (6,6))
+
+    ax[0].hist(20*np.log(img_size**2/np.array(dictionary['loss_net'])), color = 'orange')
+    ax[0].grid(True)
+    ax[0].set_xlabel('MSE Network')
+
+    ax[1].hist(20*np.log(img_size**2/np.array(dictionary['loss_fbp'])))
+    ax[1].grid(True)
+    ax[1].set_xlabel('MSE FBP')
+    
+    fig.savefig(path)
+
+

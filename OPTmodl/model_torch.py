@@ -80,13 +80,13 @@ class Aclass:
     """
     This class is created to do the data-consistency (DC) step as described in paper.
     """
-    def __init__(self, maxAngle, nAngles, imageSize, mask,lam):
+    def __init__(self, nAngles, imageSize, mask,lam):
     
         self.mask=mask
-        self.imageSize = imageSize
-        self.angles = np.linspace(0,maxAngle,nAngles,endpoint = False)
-        self.det_count = int(np.sqrt(2)*self.imageSize+0.5)
-        self.radon = Radon(self.imageSize, self.angles, clip_to_circle = False, det_count = self.det_count)
+        self.img_size = imageSize
+        self.angles = np.linspace(0, 2*np.pi, nAngles,endpoint = False)
+        self.det_count = int(np.sqrt(2)*self.img_size+0.5)
+        self.radon = Radon(self.img_size, self.angles, clip_to_circle = False, det_count = self.det_count)
         self.lam = lam
         
     def myAtA(self,img):
@@ -111,7 +111,7 @@ def myCG(A,rhs):
     p = rhs 
     rTr = torch.sum(r*r)
          
-    while((i<8) and torch.ge(rTr, 1e-2)):
+    while((i<8) and torch.ge(rTr, 1e-10)):
             
         Ap = A.myAtA(p)
         alpha = rTr/torch.sum(p*Ap)
@@ -123,7 +123,6 @@ def myCG(A,rhs):
         i += 1
         rTr = rTrNew
         
-    del r, p, Ap
     torch.cuda.empty_cache()
 
     return x
@@ -143,12 +142,13 @@ def dc(Aobj, rhs):
 
 class OPTmodl(nn.Module):
   
-  def __init__(self, nLayer, K, maxAngle, nAngles, imageSize, mask, lam, shared = True):
+  def __init__(self, nLayer, K, nAngles, imageSize, mask, lam, shared = True):
     """
     Main function that creates the model
     """
     super(OPTmodl, self).__init__()
     self.out = {}
+    #self.lam = torch.nn.Parameter(torch.tensor([lam], requires_grad = True, device = dev))
     self.lam = lam
     self.epochs_save = 0
 
@@ -162,7 +162,8 @@ class OPTmodl(nn.Module):
 
     self.imageSize = imageSize
     self.K = K
-    self.AtA = Aclass(maxAngle, nAngles, imageSize, mask, self.lam) 
+    self.nAngles = nAngles
+    self.AtA = Aclass(nAngles, imageSize, mask, self.lam) 
 
   def forward(self, atb):
     """

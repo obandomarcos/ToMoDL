@@ -37,11 +37,12 @@ val_size = int(total_size*0.2)
 test_size = int(total_size*0.1)
 batch_size = 5
 
-img_resize = 200
+img_resize = 100
 slice_idx = 200
 
 slice_test = 100
 test_loss_dict = {}
+test_loss_dict['img_size'] = img_resize
 
 for proj_num in number_projections:
 
@@ -50,9 +51,9 @@ for proj_num in number_projections:
     ### TRAIN
     #%% Model Settings
     nLayer = 4
-    K = 5
-    epochs = 1
-    lam = 45.0
+    K = 2
+    epochs = 50
+    lam = 0.05
     
     model = modl.OPTmodl(nLayer, K, maxAngle, img_resize, None, lam)
     loss_fn = torch.nn.MSELoss(reduction = 'sum')
@@ -65,14 +66,16 @@ for proj_num in number_projections:
 
     dataloader = {'train':trainX, 'val':valX}
     
-    # Train network with same dat
+    # Train network with same data
     model, train_info = modutils.unique_model_training(model, loss_fn, loss_fbp_fn, optimizer, dataloader, train_target, epochs, device, batch_size, disp = True)
 
-    with open(results_folder+'trainInfo_Proj_{}_K{}_lam{}.pkl'.format(proj_num, K, lam), 'wb') as f:
+    with open(results_folder+'trainInfo_Proj{}_K{}_lam{}.pkl'.format(proj_num, K, lam), 'wb') as f:
         
         pickle.dump(train_info, f)
         print('Diccionario de entrenamiento salvado para proyección {}'.format(proj_num))
-    
+ 
+    del dataloader
+
     ### TEST
     # Agarro un test dataset con otra imagen
     # Random slices
@@ -84,33 +87,35 @@ for proj_num in number_projections:
     # por cada slice, formo un dataset y reconstruyo con el denoiser aprendido
     for slice_test in tqdm(random_slices):
 
-        test_dataset, test_target, _ = modutils.formUniqueDataset(train_unique_dataset, test_size, proj_num, slice_test, img_resize)
-        test_dataset = torch.utils.data.DataLoader(test_dataset, batch_size = batch_size, shuffle = False, num_workers = 0)
-        test_target = torch.unsqueeze(target_image, 0).repeat(batch_size, 1, 1, 1)
+        test_dataset, test_target, _ = modutils.formUniqueDataset(train_dataset, 1, proj_num, slice_test, img_resize)
+        test_dataset = torch.utils.data.DataLoader(test_dataset, batch_size = 1, shuffle = False, num_workers = 0)
+        test_target = torch.unsqueeze(torch.unsqueeze(test_target, 0), 0)
         
         loss_test_sum = 0.0
         loss_test_fbp_sum = 0.0
 
-        # paso los inputs y luego comparo con el objetivo
+        # paso los inputs y luego comparo con el objetivo SOLO HAY UN INPUT
         for inputs in test_dataset:
-
+            
             pred = model(inputs)
             loss_test = loss_fn(pred['dc'+str(K-1)], test_target)
             loss_test_fbp = loss_fbp_fn(inputs, test_target)
+            
+            test_loss_total.append(loss_test.item()) 
+            test_loss_fbp_total.append(loss_test_fbp.item())
 
-            loss_test_sum += loss_test.item()*inputs.size(0)
-            loss_test_fbp_sum += loss_test_fbp.item()*inputs.size(0)
-
-        # loss de los ejemplos de testeo. 
-        test_loss_total.append(loss_test_sum/len(test_dataset)) 
-        test_loss_fbp_total.append(loss_test_fbp_sum/len(test_dataset))
+    # loss de los ejemplos de testeo. 
     
-        test_loss_dict[proj_num] = {'loss_net': test_loss_total, 'loss_fbp':test_loss_fbp_total}
-
-    with open(results_folder+'Unique_Proj_{}_K{}_lam{}.pkl'.format(proj_num, K, lam), 'wb') as f:
+    test_loss_dict[proj_num] = {'loss_net': test_loss_total, 'loss_fbp':test_loss_fbp_total}
         
-        pickle.dump(test_loss_total, f)
+    modutils.plot_outputs(test_target,pred, results_folder+'Test_Unique_slice{}_proj_{}.pdf'.format(slice_test, proj_num))
+
+    with open(results_folder+'Unique_Proj{}_K{}_lam{}.pkl'.format(proj_num, K, lam), 'wb') as f:
+        
+        pickle.dump(test_loss_dict, f)
         print('Diccionario salvado para proyección {}'.format(proj_num))
-        print(test_loss_total)
+        #print(test_loss_dict)
         
     modutils.save_net(model_folder+'Unique_K_{}_lam_{}_nlay_{}_proj_{}'.format(K, lam, nLayer, proj_num), model)
+
+    modutils.plot_histogram(test_loss_dict[proj_num], test_loss_dict['img_size'], results_folder+'Histogram_proj{}.pdf'.format(proj_num))

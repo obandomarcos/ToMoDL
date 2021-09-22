@@ -54,11 +54,9 @@ def formRegDatasets(folder_paths, umbral, sample = 'head', experiment = 'Bassi')
             print("Loaded train dataset")
             train_dataset.append(df.getRegisteredVolume('head', margin = disp_reg//2, saveDataset = False, useSegmented = True))                                                
         # Borro el dataframe                                                                               
-            print(train_dataset[-1].shape)
         else:
             print("Loaded test dataset")
             test_dataset.append(df.getRegisteredVolume('head', margin = disp_reg//2, saveDataset = False, useSegmented = True))
-            print(test_dataset[-1].shape)
       del df
 
     return train_dataset, test_dataset
@@ -150,55 +148,110 @@ def formUniqueDataset(sino_datasets, dataset_size, num_beams, slice_idx, img_res
     
     return training_Atb, target_img, n_angles
 
+def maskDatasets(full_sino, num_beams, dataset_size, img_size):
+    '''
+    Evolution of form datasets, masking them fully 
+    '''
+    # Subsample detector range 
+    det_count = int((img_size+0.5)*np.sqrt(2))
+    det_range = np.linspace(0, full_sino.shape[1], det_count, endpoint = False).astype(int)
+    full_sino = full_sino[:, det_range, :]
+    undersampled_sino = np.copy(full_sino)
+
+    # Clamp to zero projections
+    zeros_idx = np.linspace(0, full_sino.shape[0], num_beams, endpoint = False).astype(int)
+    zeros_mask = np.full(full_sino.shape[0], True, dtype = bool)
+    zeros_mask[zeros_idx] = False
+    undersampled_sino[zeros_mask, :, :] = 0
+
+    # Grab number of angles
+    n_angles = full_sino.shape[0]
+    angles = np.linspace(0, 2*np.pi, n_angles, endpoint = False)
+     
+    radon = Radon(img_size, angles, clip_to_circle = False, det_count = det_count)
+    
+    undersampled = []
+    desired = []
+ 
+    # Grab random slices
+    assert(dataset_size <= full_sino.shape[2])
+    rand = np.random.choice(range(full_sino.shape[2]), dataset_size, replace=False)
+    
+    # Normalize
+    for img in np.rollaxis(undersampled_sino[:,:,rand], 2):
+        
+        img = radon.backward(radon.filter_sinogram(torch.FloatTensor(img).to(device)))
+        mn = torch.min(img)
+        mx = torch.max(img)
+        norm = (img-mn)*(1.0/(mx-mn))
+        
+        undersampled.append(norm)
+
+    for img in np.rollaxis(full_sino[:,:,rand], 2):
+
+        img = radon.backward(radon.filter_sinogram(torch.FloatTensor(img).to(device)))
+        mn = torch.min(img)
+        mx = torch.max(img)
+        norm = (img-mn)*(1.0/(mx-mn))
+        
+        desired.append(norm)
+
+    desired = torch.unsqueeze(torch.stack(desired), 1)
+    undersampled = torch.unsqueeze(torch.stack(undersampled), 1)
+    
+    return desired, undersampled
+
+
 def formDatasets(sino_dataset, num_beams, size, img_size):
-  """
-  This function receives a sinogram dataset and returns two FBP reconstructed datasets,
-  ocan't multiply sequence by non-int of type 'floatne with the full span of angles and one reconstructed with num_beams
-  """
-  # Angles
-  n_angles = sino_dataset.shape[0]
-  angles_full = np.linspace(0, 2*np.pi, n_angles, endpoint=False)
-  angles_under = np.linspace(0, 2*np.pi, num_beams, endpoint=False)
-
-  projs = np.linspace(0, n_angles, num_beams, endpoint=False).astype(int)
-
-  det_count = sino_dataset.shape[1]
-  image_size = int(det_count/np.sqrt(2)-0.5)
-  # Datasets undersampled with projs
-  under_sino = sino_dataset[projs,:,:]
-
-  rad_full = Radon(image_size, angles_full, clip_to_circle=False, det_count=det_count)
-  rad_under = Radon(image_size, angles_under, clip_to_circle=False, det_count=det_count)
-
-  undersampled = []
-  desired = []
-  # retrieve random z-slices to train
-  rand = np.random.choice(range(under_sino.shape[2]), size, replace=False)
-
-  # Undersampled
-  for img in np.rollaxis(under_sino[:,:,rand], 2):
-
-    undersampled.append(rad_under.backward(rad_under.filter_sinogram(torch.FloatTensor(img).to(device))))
-
-  # Full
-  for img in np.rollaxis(sino_dataset[:,:,rand], 2):
-
-    desired.append(rad_full.backward(rad_full.filter_sinogram(torch.FloatTensor(img).to(device))))
-
-  desired = torch.unsqueeze(torch.stack(desired), 1)
-  undersampled = torch.unsqueeze(torch.stack(undersampled), 1)
+    
+    """
+    This function receives a sinogram dataset and returns two FBP reconstructed datasets,
+    ocan't multiply sequence by non-int of type 'floatne with the full span of angles and one reconstructed with num_beams
+    """ 
+    # Angles
+    n_angles = sino_dataset.shape[0]
+    angles_full = np.linspace(0, 2*np.pi, n_angles, endpoint=False)
+    angles_under = np.linspace(0, 2*np.pi, num_beams, endpoint=False)
   
-  # Image resize
-  transform = torch.nn.Sequential(torchvision.transforms.Resize((img_size, img_size)),
-      torchvision.transforms.Normalize([0.5], [0.5]))
+    projs = np.linspace(0, n_angles, num_beams, endpoint=False).astype(int)
   
-  transform = torch.jit.script(transform)
-  desired = transform.forward(desired)
-  undersampled = transform.forward(undersampled)
+    det_count = sino_dataset.shape[1]
+    image_size = int(det_count/np.sqrt(2)-0.5)
+    # Datasets undersampled with projs
+    under_sino = sino_dataset[projs,:,:]
+  
+    rad_full = Radon(image_size, angles_full, clip_to_circle=False, det_count=det_count)
+    rad_under = Radon(image_size, angles_under, clip_to_circle=False, det_count=det_count)
+  
+    undersampled = []
+    desired = []
+    # retrieve random z-slices to train
+    rand = np.random.choice(range(under_sino.shape[2]), size, replace=False)
+  
+    # Undersampled
+    for img in np.rollaxis(under_sino[:,:,rand], 2):
+  
+      undersampled.append(rad_under.backward(rad_under.filter_sinogram(torch.FloatTensor(img).to(device))))
+  
+    # Full
+    for img in np.rollaxis(sino_dataset[:,:,rand], 2):
+  
+      desired.append(rad_full.backward(rad_full.filter_sinogram(torch.FloatTensor(img).to(device))))
+  
+    desired = torch.unsqueeze(torch.stack(desired), 1)
+    undersampled = torch.unsqueeze(torch.stack(undersampled), 1)
+    
+    # Image resize
+    transform = torch.nn.Sequential(torchvision.transforms.Resize((img_size, img_size)),
+        torchvision.transforms.Normalize([0.5], [0.5]))
+    
+    transform = torch.jit.script(transform)
+    desired = transform.forward(desired)
+    undersampled = transform.forward(undersampled)
+  
+    return desired, undersampled
 
-  return desired, undersampled
-
-def formDataloaders(train_dataset, test_dataset, number_projections, train_size, test_size, batch_size, img_size):
+def formDataloaders(train_dataset, test_dataset, number_projections, train_size, val_size, test_size, batch_size, img_size):
     """
     Form torch dataloaders for training and testing, full and undersampled
     params:
@@ -214,28 +267,50 @@ def formDataloaders(train_dataset, test_dataset, number_projections, train_size,
     trainY = []
     testX = []
     testY = []
-    # Datasets settings
+    valX = []
+    valY = []
+
+    # Dataset train
     for dataset in train_dataset:
     
-      l = len(train_dataset)
-      tY, tX = formDatasets(dataset, number_projections, train_size//l, img_size)
-      trainX.append(tX)
-      trainY.append(tY)
+        l = len(train_dataset)
+        tY, tX = maskDatasets(dataset, number_projections, (train_size+val_size)//l, img_size)
+        trainX.append(tX)
+        trainY.append(tY)
     
+    # Dataset validation
+    #for dataset in val_dataset:
+    #    
+    #    l = len(val_dataset)
+    #    tY, tX = maskDatasets(dataset, number_projections, val_size//l, img_size)
+    #    valX.append(tX)
+    #    valY.append(tY)
+
     for dataset in test_dataset:
     
-      l = len(test_dataset)
-      
-      tY, tX = formDatasets(dataset, number_projections, test_size//l, img_size)
-      testX.append(tX)
-      testY.append(tY)
+        l = len(test_dataset)
+        tY, tX = maskDatasets(dataset, number_projections, test_size//l, img_size)
+        testX.append(tX)
+        testY.append(tY)
 
     # Build dataloaders
     trainX = torch.vstack(trainX)
     trainY = torch.vstack(trainY)
     testX = torch.vstack(testX)
-    testY = torch.vstack(testY)
+    testY = torch.vstack(testY) 
 
+    valX = torch.clone(trainX[:val_size,...])
+    valY = torch.clone(trainY[:val_size,...])
+    
+    trainX = torch.clone(trainX[val_size:,...])
+    trainY = torch.clone(trainY[val_size:,...])
+    
+    #print('TrainX shape', trainX.shape)
+    #print('ValY shape', valX.shape)
+    
+    #plot_data(trainX, trainY, '/home/marcos/DeepOPT/Resultados/Train_comparison.pdf')
+    #plot_data(testX, testY, '/home/marcos/DeepOPT/Resultados/Test_comparison.pdf')
+    
     trainX = torch.utils.data.DataLoader(trainX,
                                           batch_size=batch_size,
                                           shuffle=False, num_workers=0)
@@ -243,12 +318,17 @@ def formDataloaders(train_dataset, test_dataset, number_projections, train_size,
                                       batch_size=batch_size,                                           
                                       shuffle=False, num_workers=0)                                    
 
-    testX = torch.utils.data.DataLoader(testX, batch_size=batch_size,
+    testX = torch.utils.data.DataLoader(testX, batch_size=1,
                                                 shuffle=False, num_workers=0)
-    testY = torch.utils.data.DataLoader(testY, batch_size=batch_size,
+    testY = torch.utils.data.DataLoader(testY, batch_size=1,
                                                 shuffle=False, num_workers=0)
     
-    dataloaders = {'train':{'x':trainX, 'y':trainY}, 'test':{'x':testX,'y':testY}}
+    valX = torch.utils.data.DataLoader(valX, batch_size=batch_size,
+                                                 shuffle=False, num_workers=0)
+    valY = torch.utils.data.DataLoader(valY, batch_size=batch_size,
+                                                 shuffle=False, num_workers=0)
+
+    dataloaders = {'train':{'x':trainX, 'y':trainY}, 'val':{'x':valX, 'y':valY}, 'test':{'x':testX,'y':testY}}
 
     return dataloaders
 
@@ -297,7 +377,7 @@ def unique_model_training(model, criterion, criterion_fbp, optimizer, dataloader
                    
                    outputs = model(inputs)
 
-                   loss = criterion(outputs['dc'+str(model.K-1)], labels) 
+                   loss = criterion(outputs['dc'+str(model.K)], labels) 
                    loss_fbp = criterion_fbp(inputs, labels)
               
                    if phase == 'train':
@@ -372,27 +452,23 @@ def model_training(model, criterion, crit_fbp, optimizer, dataloaders, device, r
  
     train_x = dataloaders['train']['x']   
     train_y = dataloaders['train']['y']
-    test_x = dataloaders['test']['x']
-    test_y = dataloaders['test']['y']
+    val_x = dataloaders['val']['x']
+    val_y = dataloaders['val']['y']
     
     train_info = {}
     train_info['train'] = []
-    train_info['train_std'] = []
     train_info['train_fbp'] = []
-    train_info['train_fbp_std'] = []
     
-    train_info['test'] = []
-    train_info['test_fbp'] = []
-    train_info['test_std'] = []
-    train_info['test_fbp_std'] = []
+    train_info['val'] = []
+    train_info['val_fbp'] = []
 
     loss_std = []
     loss_std_fbp = []
 
     for epoch in range(num_epochs):
         prev_time = time.time()
- 
-        for phase in ['train', 'test']:
+        
+        for phase in ['train', 'val']:
             
             if phase == 'train':
                 model.train()
@@ -408,8 +484,8 @@ def model_training(model, criterion, crit_fbp, optimizer, dataloaders, device, r
             for batch_i, (inputs, labels) in enumerate(zip(*dataloaders[phase].values())):
 
                inputs.to(device)
-               labels.to(device)
- 
+               labels.to(device) 
+
                optimizer.zero_grad() #zero the parameter gradients
                 
                #forward pass
@@ -417,7 +493,7 @@ def model_training(model, criterion, crit_fbp, optimizer, dataloaders, device, r
                with torch.set_grad_enabled(phase=='train'):
                    
                    outputs = model(inputs)
-                   loss = criterion(outputs['dc'+str(model.K-1)], labels)
+                   loss = criterion(outputs['dc'+str(model.K)], labels)
                    #loss_std = torch.std(torch.sum((outputs['dc'+str(model.K-1)]-labels)**2, dim = (1,2,3)))
                    loss_fbp = crit_fbp(inputs, labels)
                    #loss_std_fbp = torch.std(torch.sum((inputs-labels)**2, dim = (1,2,3)))
@@ -427,7 +503,11 @@ def model_training(model, criterion, crit_fbp, optimizer, dataloaders, device, r
                        loss.backward()
                        torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm = 1.0, norm_type =2.0)
                        optimizer.step()
-                
+
+               #if epoch == num_epochs-1:
+                    
+               #     print('Plot outputs')
+               #     plot_outputs(labels, outputs, root+'Train_images_epoch{}_proj{}.pdf'.format(epoch, model.nAngles))
 
                # los desvios se pueden sumar en cuadratura
                running_loss += loss.item()*inputs.size(0)
@@ -460,25 +540,19 @@ def model_training(model, criterion, crit_fbp, optimizer, dataloaders, device, r
                            )
                        )
                 
-               del inputs, outputs
-            
             epoch_loss = running_loss/len(dataloaders[phase]['x'])
-            #epoch_loss_std = running_std_loss/len(dataloaders[phase]['x'])
             epoch_loss_fbp = fbp_loss/len(dataloaders[phase]['x'])
-            #epoch_loss_fbp_std = fbp_std_loss/len(dataloaders[phase]['x'])           
 
             train_info[phase].append(epoch_loss)
-            #train_info[phase+'_std'].append(epoch_loss_std)
 
             train_info[phase+'_fbp'].append(epoch_loss_fbp)
-            #train_info[phase+'_fbp_std'].append(epoch_loss_fbp_std)
 
             if disp:
                 print('')
                 print('{} Loss: {:.4f} '.format(phase, epoch_loss))
                 print('{} Loss FBP: {:.4f} '.format(phase, epoch_loss_fbp))
 
-            if phase == 'test' and epoch_loss < best_loss:
+            if phase == 'val' and epoch_loss < best_loss:
                 
                 best_loss = epoch_loss
                 best_model_wts = copy.deepcopy(model.state_dict())
@@ -488,15 +562,34 @@ def model_training(model, criterion, crit_fbp, optimizer, dataloaders, device, r
         if do_checkpoint>0:
             if epoch%do_checkpoint==0:
                  checkpoint(root, epoch, model)
-    
+        
+        if epoch in [0, num_epochs-1]:
+ 
+            print('Plotted test')
+            plot_outputs(labels, outputs, root+'Val_images_epoch{}_proj{}.pdf'.format(epoch, model.nAngles))
+
     time_elapsed = time.time()-since
+    
     if disp:
+        
         print('Training complete in {:.0f}m {:.0f}s'.format(time_elapsed // 60, time_elapsed % 60))
         print('Best val Loss: {:4f}'.format(best_loss))
 
     # load best model weights
     model.load_state_dict(best_model_wts)
+
     return model , train_info
+
+def plot_data(x, y, root):
+
+    fig, ax = plt.subplots(1,2)
+
+    ax[0].imshow(x[0,0,:,:].detach().cpu().numpy())
+    ax[1].imshow(y[0,0,:,:].detach().cpu().numpy())
+    ax[0].set_title('X')
+    ax[1].set_title('Y')
+
+    fig.savefig(root)
 
 def checkpoint_plot(outputs, root, epoch):
     # outputs
@@ -542,15 +635,21 @@ def plot_outputs(target, prediction, path):
     
     fig, ax = plt.subplots(1, len(prediction.keys())+1, figsize = (16,6))
     
-    ax[0].imshow(target.detach().cpu().numpy()[0,0,:,:])
+    ax[0].imshow(target.detach().cpu().numpy()[0,0,:,:], cmap = 'gray')
     ax[0].set_title('Target')
+    ax[0].axis('off')
 
     for a, (key, image) in zip(ax[1:], prediction.items()):
 
-        a.imshow(image.detach().cpu().numpy()[0,0,:,:])
+        a.imshow(image.detach().cpu().numpy()[0,0,:,:], cmap = 'gray')
         a.set_title(key)
+        a.axis('off')
     
     fig.savefig(path, bbox_inches = 'tight')
+
+def psnr(img_size, mse):
+
+    return 20*np.log10(1.0/(mse/(img_size*img_size)))
 
 def plot_histogram(dictionary, img_size, path):
     """
@@ -558,11 +657,11 @@ def plot_histogram(dictionary, img_size, path):
     """
     fig, ax = plt.subplots(1, 2, figsize = (6,6))
 
-    ax[0].hist(20*np.log(img_size**2/np.array(dictionary['loss_net'])), color = 'orange')
+    ax[0].hist(dictionary['loss_net'], color = 'orange')
     ax[0].grid(True)
     ax[0].set_xlabel('MSE Network')
 
-    ax[1].hist(20*np.log(img_size**2/np.array(dictionary['loss_fbp'])))
+    ax[1].hist(dictionary['loss_fbp'])
     ax[1].grid(True)
     ax[1].set_xlabel('MSE FBP')
     

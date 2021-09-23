@@ -163,7 +163,7 @@ def maskDatasets(full_sino, num_beams, dataset_size, img_size):
     zeros_mask = np.full(full_sino.shape[0], True, dtype = bool)
     zeros_mask[zeros_idx] = False
     undersampled_sino[zeros_mask, :, :] = 0
-
+    
     # Grab number of angles
     n_angles = full_sino.shape[0]
     angles = np.linspace(0, 2*np.pi, n_angles, endpoint = False)
@@ -278,13 +278,6 @@ def formDataloaders(train_dataset, test_dataset, number_projections, train_size,
         trainX.append(tX)
         trainY.append(tY)
     
-    # Dataset validation
-    #for dataset in val_dataset:
-    #    
-    #    l = len(val_dataset)
-    #    tY, tX = maskDatasets(dataset, number_projections, val_size//l, img_size)
-    #    valX.append(tX)
-    #    valY.append(tY)
 
     for dataset in test_dataset:
     
@@ -304,12 +297,6 @@ def formDataloaders(train_dataset, test_dataset, number_projections, train_size,
     
     trainX = torch.clone(trainX[val_size:,...])
     trainY = torch.clone(trainY[val_size:,...])
-    
-    #print('TrainX shape', trainX.shape)
-    #print('ValY shape', valX.shape)
-    
-    #plot_data(trainX, trainY, '/home/marcos/DeepOPT/Resultados/Train_comparison.pdf')
-    #plot_data(testX, testY, '/home/marcos/DeepOPT/Resultados/Test_comparison.pdf')
     
     trainX = torch.utils.data.DataLoader(trainX,
                                           batch_size=batch_size,
@@ -486,8 +473,8 @@ def model_training(model, criterion, crit_fbp, optimizer, dataloaders, device, r
                inputs.to(device)
                labels.to(device) 
 
-               optimizer.zero_grad() #zero the parameter gradients
-                
+               optimizer.zero_grad() #zero the parameter gradients 
+
                #forward pass
                # Track history in training only
                with torch.set_grad_enabled(phase=='train'):
@@ -503,7 +490,11 @@ def model_training(model, criterion, crit_fbp, optimizer, dataloaders, device, r
                        loss.backward()
                        torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm = 1.0, norm_type =2.0)
                        optimizer.step()
-
+               
+               if (epoch in [0, num_epochs-1]) and batch_i==0:
+                                                                                                         
+                   print('Plotted {}'.format(phase))
+                   plot_outputs(labels, outputs, root+'{}_images_epoch{}_proj{}.pdf'.format(phase, epoch, model.nAngles))
                #if epoch == num_epochs-1:
                     
                #     print('Plot outputs')
@@ -563,10 +554,10 @@ def model_training(model, criterion, crit_fbp, optimizer, dataloaders, device, r
             if epoch%do_checkpoint==0:
                  checkpoint(root, epoch, model)
         
-        if epoch in [0, num_epochs-1]:
+        
  
-            print('Plotted test')
-            plot_outputs(labels, outputs, root+'Val_images_epoch{}_proj{}.pdf'.format(epoch, model.nAngles))
+        
+        
 
     time_elapsed = time.time()-since
     
@@ -648,7 +639,8 @@ def plot_outputs(target, prediction, path):
     fig.savefig(path, bbox_inches = 'tight')
 
 def psnr(img_size, mse):
-
+    
+    mse = np.array(mse)
     return 20*np.log10(1.0/(mse/(img_size*img_size)))
 
 def plot_histogram(dictionary, img_size, path):

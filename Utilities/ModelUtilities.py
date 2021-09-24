@@ -148,7 +148,7 @@ def formUniqueDataset(sino_datasets, dataset_size, num_beams, slice_idx, img_res
     
     return training_Atb, target_img, n_angles
 
-def maskDatasets(full_sino, num_beams, dataset_size, img_size):
+def maskDatasets(full_sino, num_beams, dataset_size, img_size, angle_seed = 0):
     '''
     Evolution of form datasets, masking them fully 
     '''
@@ -158,8 +158,9 @@ def maskDatasets(full_sino, num_beams, dataset_size, img_size):
     full_sino = full_sino[:, det_range, :]
     undersampled_sino = np.copy(full_sino)
 
-    # Clamp to zero projections
+    # Clamp to zero projections, 
     zeros_idx = np.linspace(0, full_sino.shape[0], num_beams, endpoint = False).astype(int)
+    zeros_idx = (zeros_idx+angle_seed)%full_sino.shape[0]
     zeros_mask = np.full(full_sino.shape[0], True, dtype = bool)
     zeros_mask[zeros_idx] = False
     undersampled_sino[zeros_mask, :, :] = 0
@@ -202,56 +203,7 @@ def maskDatasets(full_sino, num_beams, dataset_size, img_size):
     return desired, undersampled
 
 
-def formDatasets(sino_dataset, num_beams, size, img_size):
-    
-    """
-    This function receives a sinogram dataset and returns two FBP reconstructed datasets,
-    ocan't multiply sequence by non-int of type 'floatne with the full span of angles and one reconstructed with num_beams
-    """ 
-    # Angles
-    n_angles = sino_dataset.shape[0]
-    angles_full = np.linspace(0, 2*np.pi, n_angles, endpoint=False)
-    angles_under = np.linspace(0, 2*np.pi, num_beams, endpoint=False)
-  
-    projs = np.linspace(0, n_angles, num_beams, endpoint=False).astype(int)
-  
-    det_count = sino_dataset.shape[1]
-    image_size = int(det_count/np.sqrt(2)-0.5)
-    # Datasets undersampled with projs
-    under_sino = sino_dataset[projs,:,:]
-  
-    rad_full = Radon(image_size, angles_full, clip_to_circle=False, det_count=det_count)
-    rad_under = Radon(image_size, angles_under, clip_to_circle=False, det_count=det_count)
-  
-    undersampled = []
-    desired = []
-    # retrieve random z-slices to train
-    rand = np.random.choice(range(under_sino.shape[2]), size, replace=False)
-  
-    # Undersampled
-    for img in np.rollaxis(under_sino[:,:,rand], 2):
-  
-      undersampled.append(rad_under.backward(rad_under.filter_sinogram(torch.FloatTensor(img).to(device))))
-  
-    # Full
-    for img in np.rollaxis(sino_dataset[:,:,rand], 2):
-  
-      desired.append(rad_full.backward(rad_full.filter_sinogram(torch.FloatTensor(img).to(device))))
-  
-    desired = torch.unsqueeze(torch.stack(desired), 1)
-    undersampled = torch.unsqueeze(torch.stack(undersampled), 1)
-    
-    # Image resize
-    transform = torch.nn.Sequential(torchvision.transforms.Resize((img_size, img_size)),
-        torchvision.transforms.Normalize([0.5], [0.5]))
-    
-    transform = torch.jit.script(transform)
-    desired = transform.forward(desired)
-    undersampled = transform.forward(undersampled)
-  
-    return desired, undersampled
-
-def formDataloaders(train_dataset, test_dataset, number_projections, train_size, val_size, test_size, batch_size, img_size):
+def formDataloaders(train_dataset, test_dataset, number_projections, train_size, val_size, test_size, batch_size, img_size, augmentFactor = 1):
     """
     Form torch dataloaders for training and testing, full and undersampled
     params:
@@ -269,22 +221,26 @@ def formDataloaders(train_dataset, test_dataset, number_projections, train_size,
     testY = []
     valX = []
     valY = []
+    
+    # Augment factor iterates over the datasets for data augmentation
+    for i in range(augmentFactor):
 
-    # Dataset train
-    for dataset in train_dataset:
-    
-        l = len(train_dataset)
-        tY, tX = maskDatasets(dataset, number_projections, (train_size+val_size)//l, img_size)
-        trainX.append(tX)
-        trainY.append(tY)
-    
+        rand_angle = np.random.randint(0, number_projections)
 
-    for dataset in test_dataset:
+        # Dataset train
+        for dataset in train_dataset:
     
-        l = len(test_dataset)
-        tY, tX = maskDatasets(dataset, number_projections, test_size//l, img_size)
-        testX.append(tX)
-        testY.append(tY)
+            l = len(train_dataset)
+            tY, tX = maskDatasets(dataset, number_projections, (train_size+val_size)//l, img_size, rand_angle)
+            trainX.append(tX)
+            trainY.append(tY)
+    
+        for dataset in test_dataset:
+    
+            l = len(test_dataset)
+            tY, tX = maskDatasets(dataset, number_projections, test_size//l, img_size, rand_angle)
+            testX.append(tX)
+            testY.append(tY)
 
     # Build dataloaders
     trainX = torch.vstack(trainX)
@@ -488,7 +444,7 @@ def model_training(model, criterion, crit_fbp, optimizer, dataloaders, device, r
                    if phase == 'train':
                        
                        loss.backward()
-                       torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm = 1.0, norm_type =2.0)
+                       #torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm = 1.0, norm_type =2.0)
                        optimizer.step()
                
                if (epoch in [0, num_epochs-1]) and batch_i==0:
@@ -509,6 +465,7 @@ def model_training(model, criterion, crit_fbp, optimizer, dataloaders, device, r
 
                if torch.cuda.is_available():
                    torch.cuda.empty_cache()
+                   del inputs, outputs
 
                if disp:
 
@@ -659,4 +616,52 @@ def plot_histogram(dictionary, img_size, path):
     
     fig.savefig(path)
 
-
+# Deprecated
+def formDatasets(sino_dataset, num_beams, size, img_size):
+    
+    """
+    This function receives a sinogram dataset and returns two FBP reconstructed datasets,
+    ocan't multiply sequence by non-int of type 'floatne with the full span of angles and one reconstructed with num_beams
+    """ 
+    # Angles
+    n_angles = sino_dataset.shape[0]
+    angles_full = np.linspace(0, 2*np.pi, n_angles, endpoint=False)
+    angles_under = np.linspace(0, 2*np.pi, num_beams, endpoint=False)
+  
+    projs = np.linspace(0, n_angles, num_beams, endpoint=False).astype(int)
+  
+    det_count = sino_dataset.shape[1]
+    image_size = int(det_count/np.sqrt(2)-0.5)
+    # Datasets undersampled with projs
+    under_sino = sino_dataset[projs,:,:]
+  
+    rad_full = Radon(image_size, angles_full, clip_to_circle=False, det_count=det_count)
+    rad_under = Radon(image_size, angles_under, clip_to_circle=False, det_count=det_count)
+  
+    undersampled = []
+    desired = []
+    # retrieve random z-slices to train
+    rand = np.random.choice(range(under_sino.shape[2]), size, replace=False)
+  
+    # Undersampled
+    for img in np.rollaxis(under_sino[:,:,rand], 2):
+  
+      undersampled.append(rad_under.backward(rad_under.filter_sinogram(torch.FloatTensor(img).to(device))))
+  
+    # Full
+    for img in np.rollaxis(sino_dataset[:,:,rand], 2):
+  
+      desired.append(rad_full.backward(rad_full.filter_sinogram(torch.FloatTensor(img).to(device))))
+  
+    desired = torch.unsqueeze(torch.stack(desired), 1)
+    undersampled = torch.unsqueeze(torch.stack(undersampled), 1)
+    
+    # Image resize
+    transform = torch.nn.Sequential(torchvision.transforms.Resize((img_size, img_size)),
+        torchvision.transforms.Normalize([0.5], [0.5]))
+    
+    transform = torch.jit.script(transform)
+    desired = transform.forward(desired)
+    undersampled = transform.forward(undersampled)
+  
+    return desired, undersampled

@@ -34,20 +34,20 @@ train_dataset, test_dataset = modutils.formRegDatasets(folder_paths, umbral_reg)
 # Training with more than one dataset
 number_projections = [72]
 
-train_size = 1800
-val_size = 200
-test_size = 200
+train_size = 100
+val_size = 100
+test_size = 20
 
 batch_size = 5
 img_size = 100
-
+augment_factor = 1
 train_infos = {}
 test_loss_dict = {}
 
 for proj_num in number_projections:
     
     # Load desired and undersampled datasets, on image space. Testing on Test Dataset
-    dataloaders = modutils.formDataloaders(train_dataset, test_dataset, proj_num, train_size, val_size, test_size, batch_size, img_size)
+    dataloaders = modutils.formDataloaders(train_dataset, test_dataset, proj_num, train_size, val_size, test_size, batch_size, img_size, augment_factor)
     
     #%% Model Settings
     nLayer = 3
@@ -95,7 +95,7 @@ for proj_num in number_projections:
 
     test_loss_dict[proj_num] = {'loss_net': test_loss_total, 'loss_fbp': test_loss_fbp_total}
 
-    with open(results_folder+'Unique_Proj{}_nLay{}_epochs{}_K{}_lam{}_trnSize{}.pkl'.format(proj_num, nLayer, epochs, K, lam), 'wb') as f:
+    with open(results_folder+'Unique_Proj{}_nLay{}_epochs{}_K{}_lam{}_trnSize{}.pkl'.format(proj_num, nLayer, epochs, K, lam, trnSize), 'wb') as f:
         
         pickle.dump(test_loss_dict, f)
         print('Diccionario salvado para proyección {}'.format(proj_num))

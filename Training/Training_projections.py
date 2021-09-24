@@ -34,7 +34,7 @@ train_dataset, test_dataset = modutils.formRegDatasets(folder_paths, umbral_reg)
 # Training with more than one dataset
 number_projections = [72]
 
-train_size = 1000
+train_size = 1800
 val_size = 200
 test_size = 200
 
@@ -53,7 +53,7 @@ for proj_num in number_projections:
     nLayer = 3
     K = 5
     epochs = 50
-    lam = 0.1
+    lam = 0.05
     max_angle = 720
     
     model = modl.OPTmodl(nLayer, K, max_angle, img_size, None, lam)
@@ -71,12 +71,12 @@ for proj_num in number_projections:
     print('Train FBP loss {}'.format(train_infos[proj_num]['train_fbp'][-1]))
 
     #%% save loss for fbp and modl network
-    with open(results_folder+'FBP_error_projections_Proj{}_nlay{}_epochs{}_K{}_lam{}.pkl'.format(proj_num, nLayer, epochs, K, lam), 'wb') as f:
+    with open(results_folder+'FBP_error_projections_Proj{}_nlay{}_epochs{}_K{}_lam{}_trnSize{}.pkl'.format(proj_num, nLayer, epochs, K, lam, train_size), 'wb') as f:
     
         pickle.dump(train_infos, f)
         print('Diccionario salvado para proyección {}'.format(proj_num))
     
-    modutils.save_net(model_folder+'K_{}_lam_{}_nlay_{}_proj_{}'.format(K, lam, nLayer, proj_num), model)
+    modutils.save_net(model_folder+'K_{}_lam_{}_nlay_{}_proj_{}_trnSize{}'.format(K, lam, nLayer, proj_num, train_size), model)
    
     ### Testing part
     test_loss_total = []
@@ -95,7 +95,7 @@ for proj_num in number_projections:
 
     test_loss_dict[proj_num] = {'loss_net': test_loss_total, 'loss_fbp': test_loss_fbp_total}
 
-    with open(results_folder+'Unique_Proj{}_nLay{}_epochs{}_K{}_lam{}.pkl'.format(proj_num, nLayer, epochs, K, lam), 'wb') as f:
+    with open(results_folder+'Unique_Proj{}_nLay{}_epochs{}_K{}_lam{}_trnSize{}.pkl'.format(proj_num, nLayer, epochs, K, lam), 'wb') as f:
         
         pickle.dump(test_loss_dict, f)
         print('Diccionario salvado para proyección {}'.format(proj_num))

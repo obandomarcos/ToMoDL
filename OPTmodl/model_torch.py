@@ -66,7 +66,7 @@ class dw(nn.Module):
           
     def forward(self, x):
         
-        residual = x    # Ojo con esto por las copias
+        residual = torch.clone(x)    # Ojo con esto por las copias
         
         for layer in self.nw.values():
 
@@ -75,6 +75,99 @@ class dw(nn.Module):
         output = x + residual
 
         return output
+
+
+class Unet(nn.Module):
+    def __init__(self, in_channel=1, out_channel=1):
+        super(Unet, self).__init__()
+        #Descending branch
+        self.conv_encode1 = self.contract(in_channels=in_channel, out_channels=16)
+        self.conv_maxpool1 = torch.nn.MaxPool2d(kernel_size=2)
+        self.conv_encode2 = self.contract(16, 32)
+        self.conv_maxpool2 = torch.nn.MaxPool2d(kernel_size=2)
+        self.conv_encode3 = self.contract(32, 64)
+        self.conv_maxpool3 = torch.nn.MaxPool2d(kernel_size=2)
+        #Bottleneck
+        self.bottleneck = self.bottle_neck(64)
+        #Decode branch
+        self.conv_decode4 = self.expans(64,64,64)
+        self.conv_decode3 = self.expans(128, 64, 32)
+        self.conv_decode2 = self.expans(64, 32, 16)
+        self.final_layer = self.final_block(32, 16, out_channel)
+        
+    
+    def contract(self, in_channels, out_channels, kernel_size=3, padding=1):
+        block = torch.nn.Sequential(
+                    torch.nn.Conv2d(kernel_size=kernel_size, in_channels=in_channels, out_channels=out_channels, padding=padding),
+                    torch.nn.ReLU(),
+                    torch.nn.BatchNorm2d(out_channels),
+                    torch.nn.Conv2d(kernel_size=kernel_size, in_channels=out_channels, out_channels=out_channels, padding=padding),
+                    torch.nn.ReLU(),
+                    torch.nn.BatchNorm2d(out_channels),
+                    )
+        return block
+    
+    def expans(self, in_channels, mid_channel, out_channels, kernel_size=3,padding=1):
+            block = torch.nn.Sequential(
+                    torch.nn.Conv2d(kernel_size=kernel_size, in_channels=in_channels, out_channels=mid_channel, padding=padding),
+                    torch.nn.ReLU(),
+                    torch.nn.BatchNorm2d(mid_channel),
+                    torch.nn.Conv2d(kernel_size=kernel_size, in_channels=mid_channel, out_channels=mid_channel, padding=padding),
+                    torch.nn.ReLU(),
+                    torch.nn.BatchNorm2d(mid_channel),
+                    torch.nn.ConvTranspose2d(in_channels=mid_channel, out_channels=out_channels, kernel_size=kernel_size, stride=2,padding=padding, output_padding=1)
+                    )
+
+            return  block
+    
+
+    def concat(self, upsampled, bypass):
+        out = torch.cat((upsampled,bypass),1)
+        return out
+    
+    def bottle_neck(self,in_channels, kernel_size=3, padding=1):
+        bottleneck = torch.nn.Sequential(
+            torch.nn.Conv2d(kernel_size=kernel_size, in_channels=in_channels, out_channels=2*in_channels, padding=padding),
+            torch.nn.ReLU(),
+            torch.nn.Conv2d(kernel_size=kernel_size, in_channels=2*in_channels, out_channels=in_channels, padding=padding),
+            torch.nn.ReLU(),
+            )
+        return bottleneck
+    
+    def final_block(self, in_channels, mid_channel, out_channels, kernel_size=3):
+            block = torch.nn.Sequential(
+                    torch.nn.Conv2d(kernel_size=kernel_size, in_channels=in_channels, out_channels=mid_channel,padding=1),
+                    torch.nn.ReLU(),
+                    torch.nn.BatchNorm2d(mid_channel),
+                    torch.nn.Conv2d(kernel_size=kernel_size, in_channels=mid_channel, out_channels=mid_channel,padding=1),
+                    torch.nn.ReLU(),
+                    torch.nn.BatchNorm2d(mid_channel),
+                    torch.nn.Conv2d(kernel_size=kernel_size, in_channels=mid_channel, out_channels=out_channels, padding=1),
+                    )
+            return  block
+    
+    def forward(self, x ,b,c,h,w,x0, var):
+        
+        #Encode
+        encode_block1 = self.conv_encode1(x)
+        x = self.conv_maxpool1(encode_block1)
+        encode_block2 = self.conv_encode2(x)
+        x = self.conv_maxpool2(encode_block2)
+        encode_block3 = self.conv_encode3(x)
+        x = self.conv_maxpool3(encode_block3)
+        
+        # Bottleneck
+        x = self.bottleneck(x)
+        
+        # Decode
+        x = self.conv_decode4(x)
+        x = self.concat(x, encode_block3)
+        x = self.conv_decode3(x)
+        x = self.concat(x, encode_block2)
+        x = self.conv_decode2(x)
+        x = self.concat(x, encode_block1)
+        x = self.final_layer(x)      
+        return x
 
 class Aclass:
     """
@@ -169,16 +262,26 @@ class OPTmodl(nn.Module):
     """
         
     """
+    # cambio linea
     self.out['dc0'] = atb
+    #self.out['dw0'] = atb
 
     for i in range(1,self.K+1):
-        
+        # CAMBIO linea 
         j = str(i)
         self.out['dw'+j] = self.dw.forward(self.out['dc'+str(i-1)])
         rhs = atb+self.lam*self.out['dw'+j]
         self.out['dc'+j] = dc(self.AtA, rhs)
-        # self.out['dc'+j] = rhs
+        
+        # NO DC
+        #self.out['dw'+str(i)] = self.dw.forward(self.out['dw'+str(i-1)])
         torch.cuda.empty_cache()
         del rhs
-        
+        # NO DW  
+        #rhs = atb+self.lam*self.out['dc'+str(i-1)] 
+        #self.out['dc'+str(i)] = dc(self.AtA, rhs)
+
+    # agrego esta linea para no tener que modificar otra parte del entrenamiento
+    #self.out['dc'+str(i)] = self.out['dw'+str(i)]
+
     return self.out

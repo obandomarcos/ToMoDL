@@ -35,12 +35,12 @@ train_dataset, test_dataset = modutils.formRegDatasets(folder_paths, umbral_reg)
 number_projections = [72]
 
 train_size = 100
-val_size = 100
+val_size = 20
 test_size = 20
 
 batch_size = 5
 img_size = 100
-augment_factor = 1
+augment_factor = 15
 train_infos = {}
 test_loss_dict = {}
 
@@ -50,16 +50,16 @@ for proj_num in number_projections:
     dataloaders = modutils.formDataloaders(train_dataset, test_dataset, proj_num, train_size, val_size, test_size, batch_size, img_size, augment_factor)
     
     #%% Model Settings
-    nLayer = 3
-    K = 5
-    epochs = 50
+    nLayer = 4
+    K = 10
+    epochs = 25
     lam = 0.05
     max_angle = 720
     
     model = modl.OPTmodl(nLayer, K, max_angle, img_size, None, lam)
     loss_fn = torch.nn.MSELoss(reduction = 'sum')
     loss_fbp_fn = torch.nn.MSELoss(reduction = 'sum') 
-    lr = 1e-4
+    lr = 1e-3
     optimizer = torch.optim.Adam(model.parameters(), lr = lr)
     
     ### Training
@@ -85,17 +85,17 @@ for proj_num in number_projections:
     for inp, target in tqdm(zip(dataloaders['test']['x'], dataloaders['test']['y'])): 
         
         pred = model(inp)
-        loss_test = loss_fn(pred['dc'+str(K-1)], target)
+        loss_test = loss_fn(pred['dc'+str(K)], target)
         loss_test_fbp = loss_fbp_fn(inp, target)
 
         test_loss_total.append(modutils.psnr(img_size, loss_test.item()))
         test_loss_fbp_total.append(modutils.psnr(img_size, loss_test_fbp.item()))
     
-    modutils.plot_outputs(target, pred, results_folder+'Test_images_proj{}.pdf'.format(proj_num))
+    modutils.plot_outputs(target, pred, results_folder+'Test_images_proj{}_noDW.pdf'.format(proj_num))
 
     test_loss_dict[proj_num] = {'loss_net': test_loss_total, 'loss_fbp': test_loss_fbp_total}
 
-    with open(results_folder+'Unique_Proj{}_nLay{}_epochs{}_K{}_lam{}_trnSize{}.pkl'.format(proj_num, nLayer, epochs, K, lam, trnSize), 'wb') as f:
+    with open(results_folder+'Unique_Proj{}_nLay{}_epochs{}_K{}_lam{}_trnSize{}.pkl'.format(proj_num, nLayer, epochs, K, lam, train_size), 'wb') as f:
         
         pickle.dump(test_loss_dict, f)
         print('Diccionario salvado para proyección {}'.format(proj_num))

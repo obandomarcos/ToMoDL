@@ -28,7 +28,6 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 folder_paths = [ f140315_3dpf, f140419_5dpf, f140115_1dpf,f140714_5dpf] # Folders to be used
 
 umbral_reg = 50
-train_dataset, test_dataset = modutils.formRegDatasets(folder_paths, umbral_reg)
 
 #%% Datasets 
 # Training with more than one dataset
@@ -43,6 +42,8 @@ img_size = 100
 augment_factor = 15
 train_infos = {}
 test_loss_dict = {}
+
+train_dataset, test_dataset = modutils.formRegDatasets(folder_paths, umbral_reg, img_resize = img_size)
 
 for proj_num in number_projections:
     

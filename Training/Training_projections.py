@@ -31,7 +31,7 @@ umbral_reg = 50
 
 #%% Datasets 
 # Training with more than one dataset
-number_projections = [72]
+number_projections = [20]
 
 train_size = 100
 val_size = 20
@@ -57,26 +57,26 @@ for proj_num in number_projections:
     lam = 0.05
     max_angle = 720
     
-    model = modl.OPTmodl(nLayer, K, max_angle, img_size, None, lam)
+    model = modl.OPTmodl(nLayer, K, max_angle, proj_num, img_size, None, lam)
     loss_fn = torch.nn.MSELoss(reduction = 'sum')
     loss_fbp_fn = torch.nn.MSELoss(reduction = 'sum') 
-    lr = 1e-3
+    lr = 1e-4
     optimizer = torch.optim.Adam(model.parameters(), lr = lr)
     
-    ### Training
+    #### Training
     model, train_info = modutils.model_training(model, loss_fn, loss_fbp_fn, optimizer, dataloaders, device, results_folder, num_epochs = epochs, disp = True, do_checkpoint = 0)
-     
+    # 
     train_infos[proj_num] = train_info
-    
+    #
     print('Train MODL loss {}'.format(train_infos[proj_num]['train'][-1]))
     print('Train FBP loss {}'.format(train_infos[proj_num]['train_fbp'][-1]))
 
-    #%% save loss for fbp and modl network
+    ##%% save loss for fbp and modl network
     with open(results_folder+'FBP_error_projections_Proj{}_nlay{}_epochs{}_K{}_lam{}_trnSize{}.pkl'.format(proj_num, nLayer, epochs, K, lam, train_size), 'wb') as f:
-    
+    #
         pickle.dump(train_infos, f)
         print('Diccionario salvado para proyección {}'.format(proj_num))
-    
+    #
     modutils.save_net(model_folder+'K_{}_lam_{}_nlay_{}_proj_{}_trnSize{}'.format(K, lam, nLayer, proj_num, train_size), model)
    
     ### Testing part
@@ -88,7 +88,7 @@ for proj_num in number_projections:
         pred = model(inp)
         loss_test = loss_fn(pred['dc'+str(K)], target)
         loss_test_fbp = loss_fbp_fn(inp, target)
-
+        
         test_loss_total.append(modutils.psnr(img_size, loss_test.item()))
         test_loss_fbp_total.append(modutils.psnr(img_size, loss_test_fbp.item()))
     

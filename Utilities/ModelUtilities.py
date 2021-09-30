@@ -167,6 +167,9 @@ def maskDatasets(full_sino, num_beams, dataset_size, img_size, angle_seed = 0):
     zeros_idx = np.linspace(0, full_sino.shape[0], num_beams, endpoint = False).astype(int)
     zeros_idx = (zeros_idx+angle_seed)%full_sino.shape[0]
     zeros_mask = np.full(full_sino.shape[0], True, dtype = bool)
+    zeros_mask[zeros_idx] = False
+    undersampled_sino[zeros_mask, :, :] = 0
+
     # Grab number of angles
     n_angles = full_sino.shape[0]
     angles = np.linspace(0, 2*np.pi, n_angles, endpoint = False)
@@ -450,7 +453,7 @@ def model_training(model, criterion, crit_fbp, optimizer, dataloaders, device, r
                if (epoch in [0, num_epochs-1]) and (batch_i in [0, 10, 20]):
                                                                                                          
                    print('Plotted {}'.format(phase))
-                   plot_outputs(labels, outputs, root+'{}_images_epoch{}_proj{}_batch{}.pdf'.format(phase, epoch, model.nAngles, batch_i))
+                   plot_outputs(labels, outputs, root+'{}_images_epoch{}_proj{}_batch{}_K{}.pdf'.format(phase, epoch, model.nAngles, batch_i, model.K))
 
                # los desvios se pueden sumar en cuadratura
                running_loss += loss.item()*inputs.size(0)
@@ -580,10 +583,12 @@ def plot_outputs(target, prediction, path):
 
     for a, (key, image) in zip(ax[1:], prediction.items()):
 
-        a.imshow(image.detach().cpu().numpy()[0,0,:,:], cmap = 'gray')
+        im = a.imshow(image.detach().cpu().numpy()[0,0,:,:], cmap = 'gray')
         a.set_title(key)
         a.axis('off')
     
+    cax = fig.add_axes([a.get_position().x1+0.01,a.get_position().y0,0.02,a.get_position().height])
+    plt.colorbar(im, cax = cax)
     fig.savefig(path, bbox_inches = 'tight')
 
 def psnr(img_size, mse):

@@ -235,14 +235,21 @@ def dc(Aobj, rhs):
 
 class OPTmodl(nn.Module):
   
-  def __init__(self, nLayer, K, nAngles, imageSize, mask, lam, shared = True):
+  def __init__(self, nLayer, K, nAngles, proj_num, imageSize, mask, lam, shared = True):
     """
     Main function that creates the model
+    Params : 
+
+        - nLayer (int) : Number of layers
+        - K (int): unrolled network number of iterations
+        - 
+
     """
     super(OPTmodl, self).__init__()
     self.out = {}
     #self.lam = torch.nn.Parameter(torch.tensor([lam], requires_grad = True, device = dev))
     self.lam = lam
+    self.proj_num = proj_num
     self.epochs_save = 0
 
     if shared == True:
@@ -283,5 +290,16 @@ class OPTmodl(nn.Module):
 
     # agrego esta linea para no tener que modificar otra parte del entrenamiento
     #self.out['dc'+str(i)] = self.out['dw'+str(i)]
+    self.out['dc'+j] = normalize01(self.out['dc'+j])
 
     return self.out
+
+def normalize01(images):
+
+    for img in images:
+        
+        img = (img - img.min())/(img.max()-img.min())
+
+    return images
+
+

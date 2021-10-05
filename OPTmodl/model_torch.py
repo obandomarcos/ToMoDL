@@ -8,6 +8,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
 from torch_radon import Radon, RadonFanbeam
+import matplotlib.pyplot as plt 
 
 dev=torch.device("cuda") 
 
@@ -194,7 +195,25 @@ class Aclass:
         iradon = self.radon.backprojection(self.radon.filter_sinogram(sinogram))
         del sinogram
         output = iradon+self.lam*img
-
+        
+        return output
+    
+    def myAtA_quotient(self, img, results_folder):
+       
+        # Pending mask
+        sinogram = self.radon.forward(img)
+        iradon = self.radon.backprojection(self.radon.filter_sinogram(sinogram))
+        del sinogram
+        output = iradon+self.lam*img
+        
+        quotient = torch.divide(iradon, self.lam*img+1e-5)
+        
+        fig, ax = plt.subplots(1,1)
+                                                                                             
+        ax.hist(quotient.cpu().numpy())
+        ax.set_title('AtA/lam*I')
+        fig.savefig(results_folder+'Quotient_AtA_lamI.pdf')
+         
         return output
 
 def myCG(A,rhs):
@@ -238,7 +257,7 @@ def dc(Aobj, rhs):
 
 class OPTmodl(nn.Module):
   
-  def __init__(self, nLayer, K, nAngles, proj_num, imageSize, mask, lam, shared = True):
+  def __init__(self, nLayer, K, nAngles, proj_num, imageSize, mask, lam, shared, results_folder):
     """
     Main function that creates the model
     Params : 
@@ -262,12 +281,16 @@ class OPTmodl(nn.Module):
     
     if torch.cuda.is_available():
       self.dw.cuda(dev)
+    
+    self.results_folder = results_folder
+    self.print_quot = False
+    self.print_epoch = 0
 
     self.imageSize = imageSize
     self.K = K
     self.nAngles = nAngles
     self.AtA = Aclass(nAngles, imageSize, mask, self.lam) 
-
+    
   def forward(self, atb):
     """
         
@@ -281,6 +304,16 @@ class OPTmodl(nn.Module):
         j = str(i)
         self.out['dw'+j] = self.dw.forward(self.out['dc'+str(i-1)])
         rhs = atb+self.lam*self.out['dw'+j]
+ 
+        if (self.print_quot == True) and (i==self.K):
+
+            quot = torch.div(atb[0,0,:,:], self.lam*self.out['dw'+j][0,0,:,:])
+            print(quot.detach().cpu().numpy())
+            self.plot_histogram(quot.detach().cpu().numpy())
+            self.print_epoch += 1
+            self.print_quot = False
+            print('Quotient printed')
+
         self.out['dc'+j] = dc(self.AtA, rhs)
         
         # NO DC
@@ -296,6 +329,15 @@ class OPTmodl(nn.Module):
     self.out['dc'+j] = normalize01(self.out['dc'+j])
 
     return self.out
+  
+  def plot_histogram(x):
+
+    fig, ax = plt.subplots(1,1)
+    
+    title = 'Atb/lam*Zn'
+    ax.hist(x)
+    ax.set_title(title)
+    fig.savefig(self.results_folder+'Quotient_Atb_lamZn_{}.pdf'.format(self.print_epoch))
 
 def normalize01(images):
 

@@ -453,7 +453,7 @@ def model_training(model, criterion, crit_fbp, optimizer, dataloaders, device, r
                if (epoch in [0, num_epochs-1]) and (batch_i in [0, 10, 20]):
                                                                                                          
                    print('Plotted {}'.format(phase))
-                   plot_outputs(labels, outputs, root+'{}_images_epoch{}_proj{}_batch{}_K{}.pdf'.format(phase, epoch, model.nAngles, batch_i, model.K))
+                   plot_outputs(labels, outputs, root+'{}_images_epoch{}_proj{}_batch{}_K{}.pdf'.format(phase, epoch, model.proj_num, batch_i, model.K))
 
                # los desvios se pueden sumar en cuadratura
                running_loss += loss.item()*inputs.size(0)
@@ -591,10 +591,10 @@ def plot_outputs(target, prediction, path):
     plt.colorbar(im, cax = cax)
     fig.savefig(path, bbox_inches = 'tight')
 
-def psnr(img_size, mse):
+def psnr(img_size, mse, batch):
     
     mse = np.array(mse)
-    return 20*np.log10(1.0/(mse/(img_size*img_size)))
+    return 10*np.log10(1.0*batch/(mse/(img_size*img_size)))
 
 def plot_histogram(dictionary, img_size, path):
     """

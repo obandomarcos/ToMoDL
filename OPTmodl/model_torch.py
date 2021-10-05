@@ -20,6 +20,8 @@ class dwLayer(nn.Module):
         super().__init__()
         self.lastLayer = lastLayer
         self.conv = nn.Conv2d(*szW, padding = (int(szW[2]/2),int(szW[2]/2)))
+        #torch.nn.init.constant_(self.conv.weight, 0.001)
+        #torch.nn.init.constant_(self.conv.bias, 0.001)
         self.batchNorm = nn.BatchNorm2d(szW[1])
     
     def forward(self, x):
@@ -40,7 +42,7 @@ class dw(nn.Module):
     def __init__(self, nLayer):
         """
         Initialises dw block
-        """
+        :"""
         super(dw, self).__init__()
 
         self.lastLayer = False
@@ -73,7 +75,8 @@ class dw(nn.Module):
             x = layer(x)
         
         output = x + residual
-
+        #output = residual
+        
         return output
 
 
@@ -204,7 +207,7 @@ def myCG(A,rhs):
     p = rhs 
     rTr = torch.sum(r*r)
          
-    while((i<8) and torch.ge(rTr, 1e-10)):
+    while((i<8) and torch.ge(rTr, 1e-6)):
             
         Ap = A.myAtA(p)
         alpha = rTr/torch.sum(p*Ap)

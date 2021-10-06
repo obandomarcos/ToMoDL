@@ -178,15 +178,17 @@ def maskDatasets(full_sino, num_beams, dataset_size, img_size, angle_seed = 0):
     
     undersampled = []
     desired = []
- 
+    not_norm = []
+
     # Grab random slices
     assert(dataset_size <= full_sino.shape[2])
     rand = np.random.choice(range(full_sino.shape[2]), dataset_size, replace=False)
     
     # Normalize
-    for img in np.rollaxis(undersampled_sino[:,:,rand], 2):
-        
-        img = radon.backward(radon.filter_sinogram(torch.FloatTensor(img).to(device)))
+    for i, img in enumerate(np.rollaxis(undersampled_sino[:,:,rand], 2)):
+
+        # without filtering
+        img = radon.backward(torch.FloatTensor(img).to(device))
         mn = torch.min(img)
         mx = torch.max(img)
         norm = (img-mn)*(1.0/(mx-mn))
@@ -194,7 +196,8 @@ def maskDatasets(full_sino, num_beams, dataset_size, img_size, angle_seed = 0):
         undersampled.append(norm)
 
     for img in np.rollaxis(full_sino[:,:,rand], 2):
-
+        
+        # with filtering
         img = radon.backward(radon.filter_sinogram(torch.FloatTensor(img).to(device)))
         mn = torch.min(img)
         mx = torch.max(img)
@@ -435,7 +438,13 @@ def model_training(model, criterion, crit_fbp, optimizer, dataloaders, device, r
                labels.to(device) 
 
                optimizer.zero_grad() #zero the parameter gradients 
+               
+               # Callback quotient
+               #if (epoch in [0, num_epochs-1] and batch_i == 0):
 
+               #    print('Printing quotient Atb/lambdaZn...')
+               #    model.print_quot = True
+                 
                #forward pass
                # Track history in training only
                with torch.set_grad_enabled(phase=='train'):
@@ -447,20 +456,17 @@ def model_training(model, criterion, crit_fbp, optimizer, dataloaders, device, r
                    if phase == 'train':
                        
                        loss.backward()
-                       #torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm = 1.0, norm_type =2.0)
+                       torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm = 1.0, norm_type =2.0)
                        optimizer.step()
                
-               if (epoch in [0, num_epochs-1]) and (batch_i in [0, 10, 20]):
-                                                                                                         
+               # Plot images
+               if (epoch in [0, num_epochs-1]) and (batch_i in [0, 10, 20]):                                                                                           
                    print('Plotted {}'.format(phase))
                    plot_outputs(labels, outputs, root+'{}_images_epoch{}_proj{}_batch{}_K{}_lam{}.pdf'.format(phase, epoch, model.proj_num, batch_i, model.K, model.lam))
 
                # los desvios se pueden sumar en cuadratura
                running_loss += loss.item()*inputs.size(0)
-               #running_std_loss += loss_std*inputs.size(0)
-
                fbp_loss += loss_fbp.item()*inputs.size(0)
-               #fbp_std_loss += loss_std_fbp*inputs.size(0)      
 
                if torch.cuda.is_available():
                    torch.cuda.empty_cache()

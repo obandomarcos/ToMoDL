@@ -30,7 +30,7 @@ umbral_reg = 50
 
 #%% Datasets 
 # Training with more than one dataset
-number_projections = [90]
+proj_num = 72
 
 train_size = 100
 val_size = 20
@@ -44,22 +44,23 @@ test_loss_dict = {}
 
 train_dataset, test_dataset = modutils.formRegDatasets(folder_paths, umbral_reg, img_resize = img_size)
 
-for proj_num in number_projections:
+lambdas = [50000]
+
+for lam in lambdas:
     
     # Load desired and undersampled datasets, on image space. Testing on Test Dataset
     dataloaders = modutils.formDataloaders(train_dataset, test_dataset, proj_num, train_size, val_size, test_size, batch_size, img_size, augment_factor)
     
     #%% Model Settings
-    nLayer = 4
+    nLayer= 4
     K = 10
-    epochs = 50
-    lam = 50
+    epochs = 30
     max_angle = 720
     
-    model = modl.OPTmodl(nLayer, K, max_angle, proj_num, img_size, None, lam)
+    model = modl.OPTmodl(nLayer, K, max_angle, proj_num, img_size, None, lam, True, results_folder)
     loss_fn = torch.nn.MSELoss(reduction = 'sum')
     loss_fbp_fn = torch.nn.MSELoss(reduction = 'sum') 
-    lr = 1e-4
+    lr = 1e-3
     optimizer = torch.optim.Adam(model.parameters(), lr = lr)
     
     #### Training
@@ -79,12 +80,12 @@ for proj_num in number_projections:
     #train_infos[K] = train_info
 
     ##%% save loss for fbp and modl network
-    with open(results_folder+'TwoStep_TestCG_Proj{}_nlay{}_epochs{}_K{}_lam{}_trnSize{}.pkl'.format(proj_num, nLayer, epochs, K, lam, train_size), 'wb') as f:
+    with open(results_folder+'Lambdas_Proj{}_nlay{}_epochs{}_K{}_lam{}_trnSize{}.pkl'.format(proj_num, nLayer, epochs, K, lam, train_size), 'wb') as f:
     #
         pickle.dump(train_infos, f)
         print('Diccionario salvado para proyección {}'.format(proj_num))
     #
-    modutils.save_net(model_folder+'TwoStep_K_{}_lam_{}_nlay_{}_proj_{}_trnSize{}'.format(K, lam, nLayer, proj_num, train_size), model)
+    modutils.save_net(model_folder+'Lambdas_K_{}_lam_{}_nlay_{}_proj_{}_trnSize{}'.format(K, lam, nLayer, proj_num, train_size), model)
 
     ### Testing part
     test_loss_total = []
@@ -96,14 +97,14 @@ for proj_num in number_projections:
         loss_test = loss_fn(pred['dc'+str(K)], target)
         loss_test_fbp = loss_fbp_fn(inp, target)
         
-        test_loss_total.append(modutils.psnr(img_size, loss_test.item()))
-        test_loss_fbp_total.append(modutils.psnr(img_size, loss_test_fbp.item()))
+        test_loss_total.append(modutils.psnr(img_size, loss_test.item(), 1))
+        test_loss_fbp_total.append(modutils.psnr(img_size, loss_test_fbp.item(), 1))
     
     modutils.plot_outputs(target, pred, results_folder+'Test_images_proj{}_noDW.pdf'.format(proj_num))
 
     test_loss_dict[proj_num] = {'loss_net': test_loss_total, 'loss_fbp': test_loss_fbp_total}
 
-    with open(results_folder+'TwoStep_Proj{}_nLay{}_epochs{}_K{}_lam{}_trnSize{}.pkl'.format(proj_num, nLayer, epochs, K, lam, train_size), 'wb') as f:
+    with open(results_folder+'Lambdas_Proj{}_nLay{}_epochs{}_K{}_lam{}_trnSize{}.pkl'.format(proj_num, nLayer, epochs, K, lam, train_size), 'wb') as f:
         
         pickle.dump(test_loss_dict, f)
         print('Diccionario salvado para proyección {}'.format(proj_num))

@@ -192,7 +192,8 @@ class Aclass:
         """
         # Pending mask
         sinogram = self.radon.forward(img)
-        iradon = self.radon.backprojection(self.radon.filter_sinogram(sinogram))
+        #iradon = self.radon.backprojection(self.radon.filter_sinogram(sinogram))
+        iradon = self.radon.backprojection(sinogram)
         del sinogram
         output = iradon+self.lam*img
         
@@ -202,12 +203,28 @@ class Aclass:
        
         # Pending mask
         sinogram = self.radon.forward(img)
-        iradon = self.radon.backprojection(self.radon.filter_sinogram(sinogram))
-        del sinogram
+        iradon = self.radon.backprojection(sinogram)
         output = iradon+self.lam*img
         
-        quotient = torch.divide(iradon, self.lam*img+1e-5)
+        print(iradon)
+        fig, ax = plt.subplots(1,1)
+        ax.hist(iradon.cpu().numpy())
+        ax.set_title('Iradon histogram')
+        fig.savefig(results_folder+'Iradon_Hist.pdf')
         
+        print(img)
+        fig, ax = plt.subplots(1,1)
+        ax.hist(self.lam*img.cpu().numpy())
+        ax.set_title('Image histogram')
+        fig.savefig(results_folder+'Image_Hist.pdf')
+
+        fig, ax = plt.subplots(1,1)
+        ax.hist(sinogram.cpu().numpy())
+        ax.set_title('Sinogram histogram')
+        fig.savefig(results_folder+'Sinogram_Hist.pdf')
+
+        quotient = torch.divide(iradon, self.lam*img+1e-5)
+         
         fig, ax = plt.subplots(1,1)
                                                                                              
         ax.hist(quotient.cpu().numpy())
@@ -305,14 +322,14 @@ class OPTmodl(nn.Module):
         self.out['dw'+j] = self.dw.forward(self.out['dc'+str(i-1)])
         rhs = atb+self.lam*self.out['dw'+j]
  
-        if (self.print_quot == True) and (i==self.K):
+        #if (self.print_quot == True) and (i==self.K):
 
-            quot = torch.div(atb[0,0,:,:], self.lam*self.out['dw'+j][0,0,:,:])
-            print(quot.detach().cpu().numpy())
-            self.plot_histogram(quot.detach().cpu().numpy())
-            self.print_epoch += 1
-            self.print_quot = False
-            print('Quotient printed')
+        #    quot = torch.div(atb[0,0,:,:], self.lam*self.out['dw'+j][0,0,:,:])
+        #    print(quot.detach().cpu().numpy())
+        #    self.plot_histogram(quot.detach().cpu().numpy())
+        #    self.print_epoch += 1
+        #    self.print_quot = False
+        #    print('Quotient printed')
 
         self.out['dc'+j] = dc(self.AtA, rhs)
         
@@ -330,7 +347,7 @@ class OPTmodl(nn.Module):
 
     return self.out
   
-  def plot_histogram(x):
+  def plot_histogram(self,x):
 
     fig, ax = plt.subplots(1,1)
     

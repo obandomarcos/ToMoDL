@@ -192,10 +192,10 @@ class Aclass:
         """
         # Pending mask
         sinogram = self.radon.forward(img)
-        #iradon = self.radon.backprojection(self.radon.filter_sinogram(sinogram))
         iradon = self.radon.backprojection(sinogram)
+        #iradon = self.radon.backprojection(sinogram)
         del sinogram
-        output = iradon+self.lam*img
+        output = iradon/self.lam+img
         
         return output
     
@@ -243,8 +243,8 @@ def myCG(A,rhs):
     p = rhs 
     rTr = torch.sum(r*r)
          
-    while((i<8) and torch.ge(rTr, 1e-6)):
-            
+    while((i<3) and torch.ge(rTr, 1e-6)):
+        
         Ap = A.myAtA(p)
         alpha = rTr/torch.sum(p*Ap)
         x = x + alpha*p
@@ -253,8 +253,9 @@ def myCG(A,rhs):
         beta = rTrNew/rTr
         p = r + beta * p
         i += 1
-        rTr = rTrNew
-        
+        rTr = rTrNew 
+       # print(i, rTr)
+
     torch.cuda.empty_cache()
 
     return x
@@ -320,7 +321,7 @@ class OPTmodl(nn.Module):
         # CAMBIO linea 
         j = str(i)
         self.out['dw'+j] = self.dw.forward(self.out['dc'+str(i-1)])
-        rhs = atb+self.lam*self.out['dw'+j]
+        rhs = atb/self.lam+self.out['dw'+j]
  
         #if (self.print_quot == True) and (i==self.K):
 

@@ -197,7 +197,7 @@ def maskDatasets(full_sino, num_beams, dataset_size, img_size, angle_seed = 0):
 
     for img in np.rollaxis(full_sino[:,:,rand], 2):
         
-        # with filtering
+         # with filtering
         img = radon.backward(radon.filter_sinogram(torch.FloatTensor(img).to(device)))
         mn = torch.min(img)
         mx = torch.max(img)

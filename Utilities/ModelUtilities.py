@@ -13,10 +13,11 @@ import DataLoading as DL
 import math
 import matplotlib.pyplot as plt
 import cv2 
+import torchvision.transforms as T
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 # Torch dataset tidying
-def formRegDatasets(folder_paths, umbral, img_resize = 100, sample = 'head', experiment = 'Bassi'):
+def formRegDatasets(folder_paths, umbral, img_resize = 100, n_proy = 640,sample = 'head', experiment = 'Bassi'):
     
     train_dataset = []
     test_dataset = []
@@ -52,17 +53,36 @@ def formRegDatasets(folder_paths, umbral, img_resize = 100, sample = 'head', exp
         if dataset_num <= 2: 
             print("Loaded train dataset")
             
+            # NO ANDA
             dataset = df.getRegisteredVolume('head', margin = disp_reg//2, saveDataset = False, useSegmented = True)
-            det_range = np.linspace(0, dataset.shape[1], int((img_resize+0.5)*np.sqrt(2)), endpoint = False).astype(int)
-            dataset = dataset[:,det_range,:]
-            train_dataset.append(dataset)                                                
+            # muevo ejes a (N_projections, n_detector, n_slices)
+            dataset = np.rollaxis(dataset, 2)
+            # Resize a numero de proyecciones % 16
+            dataset_size = dataset.shape
 
+            det_count = int((img_resize+0.5)*np.sqrt(2))
+            dataset = np.array([cv2.resize(img, (det_count, n_proy)) for img in dataset])
+
+            #Cambio a resize del volumen
+            #det_range = np.linspace(0, dataset.shape[1], int((img_resize+0.5)*np.sqrt(2)), endpoint = False).astype(int)
+            #dataset = dataset[:,det_range,:]
+            train_dataset.append(np.rollaxis(dataset, 0))                                                
+            
         # Borro el dataframe                                                                               
         else:
             print("Loaded test dataset")
             dataset = df.getRegisteredVolume('head', margin = disp_reg//2, saveDataset = False, useSegmented = True)
-            det_range = np.linspace(0, dataset.shape[1], int((img_resize+0.5)*np.sqrt(2)), endpoint = False).astype(int)
-            dataset = dataset[:,det_range,:]
+            dataset = np.rollaxis(dataset, 2)
+            # Resize a numero de proyecciones % 16
+            dataset_size = dataset.shape
+            
+            det_count = int((img_resize+0.5)*np.sqrt(2))
+            dataset = np.array([cv2.resize(img, (det_count, n_proy)) for img in dataset])
+            
+            # Cambio a resize del volumen
+            #det_range = np.linspace(0, dataset.shape[1], int((img_resize+0.5)*np.sqrt(2)), endpoint = False).astype(int)
+            #dataset = dataset[:,det_range,:]
+
             test_dataset.append(dataset)
 
       del df
@@ -178,27 +198,33 @@ def maskDatasets(full_sino, num_beams, dataset_size, img_size, angle_seed = 0):
     
     undersampled = []
     desired = []
-    not_norm = []
 
     # Grab random slices
     assert(dataset_size <= full_sino.shape[2])
     rand = np.random.choice(range(full_sino.shape[2]), dataset_size, replace=False)
-    
+
     # Normalize
     for i, img in enumerate(np.rollaxis(undersampled_sino[:,:,rand], 2)):
-
-        # without filtering
-        img = radon.backward(torch.FloatTensor(img).to(device))
-        mn = torch.min(img)
-        mx = torch.max(img)
-        norm = (img-mn)*(1.0/(mx-mn))
         
-        undersampled.append(norm)
+        #sino = torch.FloatTensor(img).to(device)
+        #img = radon.backward(radon.filter_sinogram(sino))
+        # without filtering
+        sino = torch.FloatTensor(img).to(device)
+        sino = (sino - sino.min())/(sino.max()-sino.min())
+        img = radon.backward(sino)*np.pi/n_angles 
+        
+        #print('image values', img.max(), img.min())
+        #mn = torch.min(img)
+        #mx = torch.max(img)
+        #norm = (img-mn)*(1.0/(mx-mn))
+        
+        undersampled.append(img)
 
     for img in np.rollaxis(full_sino[:,:,rand], 2):
         
          # with filtering
         img = radon.backward(radon.filter_sinogram(torch.FloatTensor(img).to(device)))
+        
         mn = torch.min(img)
         mx = torch.max(img)
         norm = (img-mn)*(1.0/(mx-mn))
@@ -334,7 +360,7 @@ def unique_model_training(model, criterion, criterion_fbp, optimizer, dataloader
                    if phase == 'train':
                     
                        loss.backward()
-                       torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm = 1.0, norm_type =2.0)
+                       #torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm = 1.0, norm_type =2.0)
                        optimizer.step()
 
                running_loss += loss.item()*inputs.size(0) 
@@ -592,9 +618,9 @@ def plot_outputs(target, prediction, path):
         im = a.imshow(image.detach().cpu().numpy()[0,0,:,:], cmap = 'gray')
         a.set_title(key)
         a.axis('off')
-    
-    cax = fig.add_axes([a.get_position().x1+0.01,a.get_position().y0,0.02,a.get_position().height])
-    plt.colorbar(im, cax = cax)
+        cax = fig.add_axes([a.get_position().x1+0.01,a.get_position().y0,0.02,a.get_position().height])
+        plt.colorbar(im, cax = cax)
+
     fig.savefig(path, bbox_inches = 'tight')
 
 def psnr(img_size, mse, batch):
@@ -793,5 +819,3 @@ def model_training_unet(model, criterion, crit_fbp, optimizer, dataloaders, devi
 
     # load best model weights
     model.load_state_dict(best_model_wts)
-
-    return model , train_info

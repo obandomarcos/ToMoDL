@@ -59,23 +59,23 @@ def formRegDatasets(folder_paths, umbral, img_resize = 100, n_proy = 640,sample 
             dataset = np.rollaxis(dataset, 2)
             # Resize a numero de proyecciones % 16
             dataset_size = dataset.shape
-
+            
             det_count = int((img_resize+0.5)*np.sqrt(2))
             dataset = np.array([cv2.resize(img, (det_count, n_proy)) for img in dataset])
-
-            #Cambio a resize del volumen
-            #det_range = np.linspace(0, dataset.shape[1], int((img_resize+0.5)*np.sqrt(2)), endpoint = False).astype(int)
-            #dataset = dataset[:,det_range,:]
-            train_dataset.append(np.rollaxis(dataset, 0))                                                
             
-        # Borro el dataframe                                                                               
+            # de vuelta a (N_projections, n_detector, n_slices)
+            train_dataset.append(np.moveaxis(dataset, 0,-1))                                                
+            
+            #Cambio a resize del volumen                                                                                            
+            #det_range = np.linspace(0, dataset.shape[1], int((img_resize+0.5)*np.sqrt(2)), endpoint = False).astype(int)
+            #dataset = dataset[:,det_range,:]                                                                                   # Borro el dataframe                                                                               
         else:
             print("Loaded test dataset")
             dataset = df.getRegisteredVolume('head', margin = disp_reg//2, saveDataset = False, useSegmented = True)
             dataset = np.rollaxis(dataset, 2)
             # Resize a numero de proyecciones % 16
             dataset_size = dataset.shape
-            
+
             det_count = int((img_resize+0.5)*np.sqrt(2))
             dataset = np.array([cv2.resize(img, (det_count, n_proy)) for img in dataset])
             
@@ -83,7 +83,7 @@ def formRegDatasets(folder_paths, umbral, img_resize = 100, n_proy = 640,sample 
             #det_range = np.linspace(0, dataset.shape[1], int((img_resize+0.5)*np.sqrt(2)), endpoint = False).astype(int)
             #dataset = dataset[:,det_range,:]
 
-            test_dataset.append(dataset)
+            test_dataset.append(np.moveaxis(dataset, 0,-1))
 
       del df
 

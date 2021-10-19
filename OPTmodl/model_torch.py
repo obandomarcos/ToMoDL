@@ -8,6 +8,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
 from torch_radon import Radon, RadonFanbeam
+from torch_radon.solvers import cg
 import matplotlib.pyplot as plt 
 
 dev=torch.device("cuda") 
@@ -181,6 +182,7 @@ class Aclass:
     
         self.mask=mask
         self.img_size = imageSize
+        self.num_angles = nAngles
         self.angles = np.linspace(0, 2*np.pi, nAngles,endpoint = False)
         self.det_count = int(np.sqrt(2)*self.img_size+0.5)
         self.radon = Radon(self.img_size, self.angles, clip_to_circle = False, det_count = self.det_count)
@@ -190,10 +192,14 @@ class Aclass:
         """
         Image is already in device as a Tensor
         """
-        # Pending mask
-        sinogram = self.radon.forward(img)
-        iradon = self.radon.backprojection(sinogram)
-        #iradon = self.radon.backprojection(sinogram)
+        
+        #sinogram = self.radon.forward(img)
+        #iradon = self.radon.backprojection(self.radon.filter_sinogram(sinogram))
+
+        #img = (img-img.min())/(img.max()-img.min())         #normalize
+        sinogram = self.radon.forward(img)/self.img_size    
+        iradon = self.radon.backprojection(sinogram)*np.pi/self.num_angles
+        
         del sinogram
         output = iradon/self.lam+img
         
@@ -243,24 +249,26 @@ def myCG(A,rhs):
     p = rhs 
     rTr = torch.sum(r*r)
          
-    while((i<3) and torch.ge(rTr, 1e-6)):
+    while((i<5) and torch.ge(rTr, 1e-6)):
         
         Ap = A.myAtA(p)
+       # print('Ap', Ap.max(), Ap.min())
         alpha = rTr/torch.sum(p*Ap)
+       # print('Alpha', alpha)
         x = x + alpha*p
         r = r - alpha*Ap
         rTrNew = torch.sum(r*r)
         beta = rTrNew/rTr
         p = r + beta * p
         i += 1
-        rTr = rTrNew 
+        rTr = rTrNew
        # print(i, rTr)
 
     torch.cuda.empty_cache()
 
     return x
 
-def dc(Aobj, rhs):
+def dc(Aobj, rhs, useTorchRadon = False):
     """
     Applies CG on each image on the batch
     """
@@ -269,7 +277,11 @@ def dc(Aobj, rhs):
 
     for i in range(rhs.shape[0]):
 
-        y[i,0,:,:] = myCG(Aobj, rhs[i,0,:,:]) # This indexing may fail
+        if useTorchRadon == False:
+            y[i,0,:,:] = myCG(Aobj, rhs[i,0,:,:]) # This indexing may fail
+        
+        else:
+            y[i,0,:,:] = cg(Aobj.myAtA, torch.zeros_like(rhs[i,0,:,:]), rhs[i, 0, :,:])
 
     return y
 

@@ -44,7 +44,8 @@ test_loss_dict = {}
 
 train_dataset, test_dataset = modutils.formRegDatasets(folder_paths, umbral_reg, img_resize = img_size)
 
-lambdas = [50000]
+lambdas = [10]
+train_name = 'TwoStepTraining_'
 
 for lam in lambdas:
     
@@ -54,33 +55,33 @@ for lam in lambdas:
     #%% Model Settings
     nLayer= 4
     K = 10
-    epochs = 30
-    max_angle = 720
+    epochs = 20
+    max_angle = 640
     
     model = modl.OPTmodl(nLayer, K, max_angle, proj_num, img_size, None, lam, True, results_folder)
     loss_fn = torch.nn.MSELoss(reduction = 'sum')
     loss_fbp_fn = torch.nn.MSELoss(reduction = 'sum') 
     lr = 1e-3
     optimizer = torch.optim.Adam(model.parameters(), lr = lr)
-    
+        
     #### Training
-    model, train_info = modutils.model_training(model, loss_fn, loss_fbp_fn, optimizer, dataloaders, device, results_folder, num_epochs = epochs, disp = True, do_checkpoint = 0)
+    model, train_info = modutils.model_training(model, loss_fn, loss_fbp_fn, optimizer, dataloaders, device, results_folder+train_name, num_epochs = epochs, disp = True, do_checkpoint = 0)
     # 
     train_infos[K] = train_info
     #
     print('Train MODL loss {}'.format(train_infos[K]['train'][-1]))
     print('Train FBP loss {}'.format(train_infos[K]['train_fbp'][-1]))
     
-    #print('Second training, K = 10')
-    #model.K = 5
-    #K = 5
+    print('Second training, K = 10')
+    #model.K = 10
+    #K = 10
     #epochs = 30
     #model, train_info = modutils.model_training(model, loss_fn, loss_fbp_fn, optimizer, dataloaders, device, results_folder, num_epochs = epochs, disp = True, do_checkpoint = 0)
     
     #train_infos[K] = train_info
 
     ##%% save loss for fbp and modl network
-    with open(results_folder+'Lambdas_Proj{}_nlay{}_epochs{}_K{}_lam{}_trnSize{}.pkl'.format(proj_num, nLayer, epochs, K, lam, train_size), 'wb') as f:
+    with open(results_folder+train_name+'Dict_Proj{}_nlay{}_epochs{}_K{}_lam{}_trnSize{}.pkl'.format(proj_num, nLayer, epochs, K, lam, train_size), 'wb') as f:
     #
         pickle.dump(train_infos, f)
         print('Diccionario salvado para proyección {}'.format(proj_num))
@@ -100,11 +101,11 @@ for lam in lambdas:
         test_loss_total.append(modutils.psnr(img_size, loss_test.item(), 1))
         test_loss_fbp_total.append(modutils.psnr(img_size, loss_test_fbp.item(), 1))
     
-    modutils.plot_outputs(target, pred, results_folder+'Test_images_proj{}_noDW.pdf'.format(proj_num))
+    modutils.plot_outputs(target, pred, results_folder+train_name+'Test_images_proj{}.pdf'.format(proj_num))
 
     test_loss_dict[proj_num] = {'loss_net': test_loss_total, 'loss_fbp': test_loss_fbp_total}
 
-    with open(results_folder+'Lambdas_Proj{}_nLay{}_epochs{}_K{}_lam{}_trnSize{}.pkl'.format(proj_num, nLayer, epochs, K, lam, train_size), 'wb') as f:
+    with open(results_folder+train_name+'Proj{}_nLay{}_epochs{}_K{}_lam{}_trnSize{}.pkl'.format(proj_num, nLayer, epochs, K, lam, train_size), 'wb') as f:
         
         pickle.dump(test_loss_dict, f)
         print('Diccionario salvado para proyección {}'.format(proj_num))

@@ -618,8 +618,9 @@ def plot_outputs(target, prediction, path):
         im = a.imshow(image.detach().cpu().numpy()[0,0,:,:], cmap = 'gray')
         a.set_title(key)
         a.axis('off')
-        cax = fig.add_axes([a.get_position().x1+0.01,a.get_position().y0,0.02,a.get_position().height])
-        plt.colorbar(im, cax = cax)
+    
+    cax = fig.add_axes([a.get_position().x1+0.01,a.get_position().y0,0.02,a.get_position().height])
+    plt.colorbar(im, cax = cax)
 
     fig.savefig(path, bbox_inches = 'tight')
 

@@ -3,7 +3,7 @@ Model Based Deep Learning Architecture for Optical Tomography Projection 3D reco
 
 ### What does this code do:
 
-Based in MoDL architecture developed in [[1]], this code provides a technique to reconstruct OPT images solving an optimization problem.
+Based in MoDL architecture developed in [1], this code provides a technique to reconstruct OPT images solving an optimization problem.
 
 As in [[1]], this code solves the optimization problem 
 

@@ -32,5 +32,6 @@ In order to keep images compatible with Torch Radon operators, sinograms are res
 ## References
 <a id="1">[1]</a>
 MoDL: Model Based Deep Learning Architecture for Inverse Problems  by H.K. Aggarwal, M.P Mani, and Mathews Jacob in IEEE Transactions on Medical Imaging, 2018 
+
 <a id="2">[2]</a>
 Ronchetti, M. (2020). Torchradon: Fast differentiable routines for computed tomography. arXiv preprint arXiv:2009.14788.

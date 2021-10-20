@@ -15,7 +15,8 @@ Where 'A' can be any measurement operator, and in our case we considered the Rad
 
 Radon forward and backward operators used for this code are implemented on Torch Radon library, written by Matteo Ronchetti [2]. It can be installed using:
 
-́́́́```shell script
+́́́́```
+shell script
 wget -qO- https://raw.githubusercontent.com/matteo-ronchetti/torch-radon/master/auto_install.py  | python -
 ```
 

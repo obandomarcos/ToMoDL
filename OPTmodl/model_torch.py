@@ -14,11 +14,17 @@ import matplotlib.pyplot as plt
 dev=torch.device("cuda") 
 
 class dwLayer(nn.Module):
-    
+    """
+    Creates denoiser singular layer
+    """
     def __init__(self, szW, lastLayer):
         """
-        Dw component
+        Dw component initializer
+        Params:
+            - szW (tuple): convolutional neural network size (in_channels, out_channels, kernel_size)
+            - lastLayer (bool): if True, Relu is not applied 
         """
+
         super().__init__()
         self.lastLayer = lastLayer
         self.conv = nn.Conv2d(*szW, padding = (int(szW[2]/2),int(szW[2]/2)))
@@ -29,6 +35,8 @@ class dwLayer(nn.Module):
     def forward(self, x):
         """
         Forward pass for block
+        Params: 
+            - x (torch.Tensor): Image batch to be processed
         """
         output = self.conv(x)
         #output = self.batchNorm(x)
@@ -44,7 +52,9 @@ class dw(nn.Module):
     def __init__(self, nLayer):
         """
         Initialises dw block
-        :"""
+        Params:
+            - nLayer (int): Number of layers 
+        """
         super(dw, self).__init__()
 
         self.lastLayer = False
@@ -54,7 +64,9 @@ class dw(nn.Module):
         self.inChannels = 1
         self.outChannels = 1
         self.stride = 1
-        self.szW = {key: (self.features,self.features,self.kernelSize,self.stride) for key in range(2,nLayer)}   # Intermediate layers (in_channels, out_channels, kernel_size_x, kernel_size_y)
+
+        # Intermediate layers (in_channels, out_channels, kernel_size_x, kernel_size_y)
+        self.szW = {key: (self.features,self.features,self.kernelSize,self.stride) for key in range(2,nLayer)}   
         self.szW[1] = (self.inChannels, self.features, self.kernelSize, self.stride)
         self.szW[nLayer] = (self.features, self.outChannels, self.kernelSize, self.stride)
 
@@ -69,15 +81,18 @@ class dw(nn.Module):
         self.nw = nn.ModuleDict(self.nw)
           
     def forward(self, x):
-        
-        residual = torch.clone(x)    # Ojo con esto por las copias
+        """
+        Forward pass
+        Params:
+            - x (torch.Tensor): Image batch to be processed
+        """
+        residual = torch.clone(x)    
         
         for layer in self.nw.values():
 
             x = layer(x)
         
         output = x + residual
-        #output = residual
         
         return output
 

@@ -30,8 +30,8 @@ class dwLayer(nn.Module):
         """
         Forward pass for block
         """
-        x = self.conv(x)
-        output = self.batchNorm(x)
+        output = self.conv(x)
+        #output = self.batchNorm(x)
         
         if self.lastLayer != True:
             

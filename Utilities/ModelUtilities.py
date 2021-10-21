@@ -204,12 +204,12 @@ def maskDatasets(full_sino, num_beams, dataset_size, img_size, angle_seed = 0):
     rand = np.random.choice(range(full_sino.shape[2]), dataset_size, replace=False)
 
     # Normalize
-    for i, img in enumerate(np.rollaxis(undersampled_sino[:,:,rand], 2)):
+    for i, sino in enumerate(np.rollaxis(undersampled_sino[:,:,rand], 2)):
         
         #sino = torch.FloatTensor(img).to(device)
         #img = radon.backward(radon.filter_sinogram(sino))
         # without filtering
-        sino = torch.FloatTensor(img).to(device)
+        sino = torch.FloatTensor(sino).to(device)
         sino = (sino - sino.min())/(sino.max()-sino.min())
         img = radon.backward(sino)*np.pi/n_angles 
         
@@ -220,16 +220,18 @@ def maskDatasets(full_sino, num_beams, dataset_size, img_size, angle_seed = 0):
         
         undersampled.append(img)
 
-    for img in np.rollaxis(full_sino[:,:,rand], 2):
+    for sino in np.rollaxis(full_sino[:,:,rand], 2):
         
          # with filtering
-        img = radon.backward(radon.filter_sinogram(torch.FloatTensor(img).to(device)))
         
-        mn = torch.min(img)
-        mx = torch.max(img)
-        norm = (img-mn)*(1.0/(mx-mn))
+        sino = (sino - sino.min())/(sino.max()-sino.min())
+        img = radon.backward(radon.filter_sinogram(torch.FloatTensor(sino).to(device)))
         
-        desired.append(norm)
+        #mn = torch.min(img)
+        #mx = torch.max(img)
+        #norm = (img-mn)*(1.0/(mx-mn))
+        
+        desired.append(img)
 
     desired = torch.unsqueeze(torch.stack(desired), 1)
     undersampled = torch.unsqueeze(torch.stack(undersampled), 1)

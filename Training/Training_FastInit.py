@@ -44,8 +44,8 @@ test_loss_dict = {}
 
 train_dataset, test_dataset = modutils.formRegDatasets(folder_paths, umbral_reg, img_resize = img_size)
 
-lambdas = [10]
-train_name = 'TwoStepTraining_'
+lambdas = [0.05]
+train_name = 'Lambdas'
 
 for lam in lambdas:
     
@@ -54,7 +54,7 @@ for lam in lambdas:
     
     #%% Model Settings
     nLayer= 4
-    K = 10
+    K = 1
     epochs = 20
     max_angle = 640
     

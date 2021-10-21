@@ -262,7 +262,7 @@ def myCG(A,rhs):
         p = r + beta * p
         i += 1
         rTr = rTrNew
-       # print(i, rTr)
+        #print(i, rTr)
 
     torch.cuda.empty_cache()
 
@@ -356,7 +356,7 @@ class OPTmodl(nn.Module):
 
     # agrego esta linea para no tener que modificar otra parte del entrenamiento
     #self.out['dc'+str(i)] = self.out['dw'+str(i)]
-    self.out['dc'+j] = normalize01(self.out['dc'+j])
+    #self.out['dc'+j] = normalize01(self.out['dc'+j])
 
     return self.out
   

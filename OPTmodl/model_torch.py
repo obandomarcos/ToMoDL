@@ -24,7 +24,7 @@ class dwLayer(nn.Module):
         self.conv = nn.Conv2d(*szW, padding = (int(szW[2]/2),int(szW[2]/2)))
         #torch.nn.init.constant_(self.conv.weight, 0.001)
         #torch.nn.init.constant_(self.conv.bias, 0.001)
-        self.batchNorm = nn.BatchNorm2d(szW[1])
+        #self.batchNorm = nn.BatchNorm2d(szW[1])
     
     def forward(self, x):
         """

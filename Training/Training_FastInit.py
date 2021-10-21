@@ -45,7 +45,7 @@ test_loss_dict = {}
 train_dataset, test_dataset = modutils.formRegDatasets(folder_paths, umbral_reg, img_resize = img_size)
 
 lambdas = [0.05]
-train_name = 'Lambdas'
+train_name = 'No_Batch_Normalization_'
 
 for lam in lambdas:
     

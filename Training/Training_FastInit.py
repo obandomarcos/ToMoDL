@@ -30,7 +30,7 @@ umbral_reg = 50
 
 #%% Datasets 
 # Training with more than one dataset
-proj_num = 72
+proj_num = 320
 
 train_size = 100
 val_size = 20
@@ -44,8 +44,8 @@ test_loss_dict = {}
 
 train_dataset, test_dataset = modutils.formRegDatasets(folder_paths, umbral_reg, img_resize = img_size)
 
-lambdas = [0.05]
-train_name = 'No_Batch_Normalization_'
+lambdas = [10]
+train_name = 'Test_Batch_AccFactor'
 
 for lam in lambdas:
     
@@ -54,7 +54,7 @@ for lam in lambdas:
     
     #%% Model Settings
     nLayer= 4
-    K = 1
+    K = 10
     epochs = 20
     max_angle = 640
     

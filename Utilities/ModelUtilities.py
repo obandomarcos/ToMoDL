@@ -104,10 +104,15 @@ def formDataloaders(train_dataset, test_dataset, number_projections, train_size,
     """
     
     trainX = []
+    filtTrainX = []
     trainY = []
+    
     testX = []
+    filtTestX = []
     testY = []
+    
     valX = []
+    filtValX = []
     valY = []
     
     # Augment factor iterates over the datasets for data augmentation
@@ -120,52 +125,69 @@ def formDataloaders(train_dataset, test_dataset, number_projections, train_size,
         for dataset in train_dataset:
             
             l = len(train_dataset)
-            tY, tX = maskDatasets(dataset, number_projections, (train_size+val_size)//l, img_size, rand_angle)
+            tY, tX, filtX = maskDatasets(dataset, number_projections, (train_size+val_size)//l, img_size, rand_angle)
+            
             trainX.append(tX)
             trainY.append(tY)
+            filtTrainX.append(filtX)
 
         # Dataset test
         for dataset in test_dataset:
             
             l = len(test_dataset)
-            tY, tX = maskDatasets(dataset, number_projections, test_size//l, img_size, rand_angle)
+            tY, tX, filtX = maskDatasets(dataset, number_projections, test_size//l, img_size, rand_angle)
+            
             testX.append(tX)
             testY.append(tY)
+            filtTestX.append(filtX)
 
     # Stack augmented datasets
     trainX = torch.vstack(trainX)
+    filtTrainX = torch.vstack(filtTrainX)
     trainY = torch.vstack(trainY)
+
     testX = torch.vstack(testX)
+    filtTestX = torch.vstack(filtTestX)
     testY = torch.vstack(testY) 
     
     # Grab validation slice 
     valX = torch.clone(trainX[:int(augment_factor*val_size),...])
+    filtValX = torch.clone(filtTrainX[:int(augment_factor*val_size),...])
     valY = torch.clone(trainY[:int(augment_factor*val_size),...])
     
     # Grab train slice
     trainX = torch.clone(trainX[int(augment_factor*val_size):,...])
+    filtTrainX = torch.clone(filtTrainX[int(augment_factor*val_size):,...])
     trainY = torch.clone(trainY[int(augment_factor*val_size):,...])
     
     # Build dataloaders
     trainX = torch.utils.data.DataLoader(trainX,
                                           batch_size=batch_size,
                                           shuffle=False, num_workers=0)
-    trainY = torch.utils.data.DataLoader(trainY,                                                    
-                                      batch_size=batch_size,                                           
-                                      shuffle=False, num_workers=0)                                    
+
+    filtTrainX = torch.utils.data.DataLoader(filtTrainX,
+                                              batch_size=batch_size,
+                                              shuffle=False, num_workers=0)
+
+    trainY = torch.utils.data.DataLoader(trainY,                                                                              batch_size=batch_size,
+                                          shuffle=False, num_workers=0)                                 
 
     testX = torch.utils.data.DataLoader(testX, batch_size=1,
                                                 shuffle=False, num_workers=0)
+    filtTestX = torch.utils.data.DataLoader(filtTestX, batch_size=1,
+                                                     shuffle=False, num_workers=0)
     testY = torch.utils.data.DataLoader(testY, batch_size=1,
                                                 shuffle=False, num_workers=0)
     
     valX = torch.utils.data.DataLoader(valX, batch_size=batch_size,
                                                  shuffle=False, num_workers=0)
+    filtValX = torch.utils.data.DataLoader(filtValX, batch_size=batch_size,
+                                                      shuffle=False, num_workers=0)
     valY = torch.utils.data.DataLoader(valY, batch_size=batch_size,
                                                  shuffle=False, num_workers=0)
 
     # Dictionary reshape
-    dataloaders = {'train':{'x':trainX, 'y':trainY}, 'val':{'x':valX, 'y':valY}, 'test':{'x':testX,'y':testY}}
+    dataloaders = {'train':{'x':trainX, 'filtX':filtTrainX, 'y':trainY}, 'val':{'x':valX, 'filtX':filtValX, 'y':valY}, 'test':{'x':testX, 'filtX':filtTestX, 'y':testY}}
 
     return dataloaders
 
@@ -198,6 +220,7 @@ def maskDatasets(full_sino, num_beams, dataset_size, img_size, angle_seed = 0):
     radon = Radon(img_size, angles, clip_to_circle = False, det_count = det_count)
     
     undersampled = []
+    undersampled_filtered = []
     desired = []
 
     # Grab random slices
@@ -211,26 +234,39 @@ def maskDatasets(full_sino, num_beams, dataset_size, img_size, angle_seed = 0):
         sino = torch.FloatTensor(sino).to(device)
         sino = (sino - sino.min())/(sino.max()-sino.min())
         img = radon.backward(sino)*np.pi/n_angles 
-        
+        img = (img-img.min())-(img.max()-img.min())
+
         undersampled.append(img)
+
+    # Grab filtered backprojection
+    for sino in np.rollaxis(undersampled_sino[:,:,rand],2):
+
+        sino = torch.FloatTensor(sino).to(device)
+        sino = (sino - sino.min())/(sino.max()-sino.min())
+        img = radon.backward(radon.filter_sinogram(sino))
+        del sino
+        
+        undersampled_filtered.append(img)
 
     for sino in np.rollaxis(full_sino[:,:,rand], 2):
         
         # Normalization of input sinogram
         sino = torch.FloatTensor(sino).to(device)
         sino = (sino - sino.min())/(sino.max()-sino.min())
-        img = radon.backward(radon.filter_sinogram(torch.FloatTensor(sino).to(device)))
-        
+        img = radon.backward(radon.filter_sinogram(sino))
+        img = (img - img.min())/(img.max()-img.min())
+
         desired.append(img)
 
     # Format dataset to feed network
     desired = torch.unsqueeze(torch.stack(desired), 1)
     undersampled = torch.unsqueeze(torch.stack(undersampled), 1)
-    
-    return desired, undersampled
+    undersampled_filtered = torch.unsqueeze(torch.stack(undersampled_filtered), 1)
+
+    return desired, undersampled, undersampled_filtered
 
 # Training function
-def model_training(model, criterion, crit_fbp, optimizer, dataloaders, device, root, num_epochs = 25, disp=False, do_checkpoint = 0):
+def model_training(model, criterion, crit_backproj, crit_fbp, optimizer, dataloaders, device, root, num_epochs = 25, disp=False, do_checkpoint = 0, title = ''):
     """
     Training routine for model
     Params:
@@ -244,7 +280,7 @@ def model_training(model, criterion, crit_fbp, optimizer, dataloaders, device, r
         - num_epochs (int): number of epochs to run the training
         - disp (bool): display training progress
         - do_checkpoint (int): checkpoint every do_checkpoint epoch
-
+        - title (string): plot title
     """
  
     since = time.time()
@@ -252,15 +288,20 @@ def model_training(model, criterion, crit_fbp, optimizer, dataloaders, device, r
     best_model_wts = copy.deepcopy(model.state_dict())
  
     train_x = dataloaders['train']['x']   
+    filtTrain_x = dataloaders['train']['filtX']
     train_y = dataloaders['train']['y']
+    
     val_x = dataloaders['val']['x']
+    filtVal_x = dataloaders['val']['filtX']
     val_y = dataloaders['val']['y']
     
     train_info = {}
     train_info['train'] = []
+    train_info['train_backproj'] = []
     train_info['train_fbp'] = []
     
     train_info['val'] = []
+    train_info['val_backproj'] = []
     train_info['val_fbp'] = []
 
     loss_std = []
@@ -276,25 +317,27 @@ def model_training(model, criterion, crit_fbp, optimizer, dataloaders, device, r
             else:
                 model.eval()
  
-            running_loss = 0.0
-            running_std_loss = 0.0
-
+            running_loss = 0.0    
             fbp_loss = 0.0
-            fbp_std_loss = 0.0
+            backproj_loss = 0.0
  
-            for batch_i, (inputs, labels) in enumerate(zip(*dataloaders[phase].values())):
+            for batch_i, (inputs, inputs_fbp, labels) in enumerate(zip(*dataloaders[phase].values())):
 
                inputs.to(device)
+               inputs_fbp.to(device)
                labels.to(device) 
 
                optimizer.zero_grad() #zero the parameter gradients 
                
                # Track history in training only
                with torch.set_grad_enabled(phase=='train'):
-                   
+                    
+                   inputs = (model.nAngles/model.proj_num)*inputs
+
                    outputs = model(inputs)
                    loss = criterion(outputs['dc'+str(model.K)], labels)
-                   loss_fbp = crit_fbp(inputs, labels)
+                   loss_backproj = crit_backproj(inputs, labels)
+                   loss_fbp = crit_fbp(inputs_fbp, labels)
 
                    if phase == 'train':
                        
@@ -305,9 +348,12 @@ def model_training(model, criterion, crit_fbp, optimizer, dataloaders, device, r
                # Plot images
                if (epoch in [0, num_epochs-1]) and (batch_i in [0, 10, 20]):                                                                                           
                    print('Plotted {}'.format(phase))
-                   plot_outputs(labels, outputs, root+'{}_images_epoch{}_proj{}_batch{}_K{}_lam{}.pdf'.format(phase, epoch, model.proj_num, batch_i, model.K, model.lam))
+                   path_plot = '{}_images_epoch{}_proj{}_batch{}_K{}_lam{}.pdf'.format(phase, epoch, model.proj_num, batch_i, model.K, model.lam)
+                   title_plot = title+'{} images epoch{} proj{} batch{} K{} lam{}'.format(phase, epoch, model.proj_num, batch_i, model.K, model.lam)
+                   plot_outputs(labels, outputs, root+title_plot, title_plot)
 
                running_loss += loss.item()*inputs.size(0)
+               backproj_loss += loss_backproj.item()*inputs.size(0)
                fbp_loss += loss_fbp.item()*inputs.size(0)
 
                if torch.cuda.is_available():
@@ -337,15 +383,17 @@ def model_training(model, criterion, crit_fbp, optimizer, dataloaders, device, r
                 
             epoch_loss = running_loss/len(dataloaders[phase]['x'])
             epoch_loss_fbp = fbp_loss/len(dataloaders[phase]['x'])
+            epoch_loss_backproj = backproj_loss/len(dataloaders[phase]['x'])
 
             train_info[phase].append(epoch_loss)
-
             train_info[phase+'_fbp'].append(epoch_loss_fbp)
+            train_info[phase+'_backproj'].append(epoch_loss_backproj)
 
             if disp:
                 print('')
                 print('{} Loss: {:.4f} '.format(phase, epoch_loss))
                 print('{} Loss FBP: {:.4f} '.format(phase, epoch_loss_fbp))
+                print('{} Loss Backprojection: {:.4f} '.format(phase, epoch_loss_backproj))
 
             if phase == 'val' and epoch_loss < best_loss:
                 
@@ -421,13 +469,16 @@ def load_net(title, model, device):
     model.load_state_dict(torch.load(model_out_path, map_location=torch.device(device)))
     print("Model Loaded: {}".format(title))
 
-def plot_outputs(target, prediction, path):
+def plot_outputs(target, prediction, path, title = ''):
     
     fig, ax = plt.subplots(1, len(prediction.keys())+1, figsize = (16,6))
     
-    ax[0].imshow(target.detach().cpu().numpy()[0,0,:,:], cmap = 'gray')
+    im = ax[0].imshow(target.detach().cpu().numpy()[0,0,:,:], cmap = 'gray')
     ax[0].set_title('Target')
-    ax[0].axis('off')
+    ax[0].axis('off') 
+    plt.suptitle(title)
+    #cax = fig.add_axes([ax[0].get_position().x1+0.01,ax[0].get_position().y0,0.02,ax[0].get_position().height])
+    #plt.colorbar(im, cax = cax)
 
     for a, (key, image) in zip(ax[1:], prediction.items()):
 

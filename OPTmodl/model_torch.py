@@ -30,7 +30,7 @@ class dwLayer(nn.Module):
         self.conv = nn.Conv2d(*szW, padding = (int(szW[2]/2),int(szW[2]/2)))
         #torch.nn.init.constant_(self.conv.weight, 0.001)
         #torch.nn.init.constant_(self.conv.bias, 0.001)
-        #self.batchNorm = nn.BatchNorm2d(szW[1])
+        self.batchNorm = nn.BatchNorm2d(szW[1])
     
     def forward(self, x):
         """
@@ -39,7 +39,7 @@ class dwLayer(nn.Module):
             - x (torch.Tensor): Image batch to be processed
         """
         output = self.conv(x)
-        #output = self.batchNorm(x)
+        output = self.batchNorm(output)
         
         if self.lastLayer != True:
             
@@ -96,8 +96,6 @@ class dw(nn.Module):
         
         return output
 
-
-
 class Aclass:
     """
     This class is created to do the data-consistency (DC) step as described in paper.
@@ -120,10 +118,12 @@ class Aclass:
         #sinogram = self.radon.forward(img)
         #iradon = self.radon.backprojection(self.radon.filter_sinogram(sinogram))
 
-        #img = (img-img.min())/(img.max()-img.min())         #normalize
+        #img = (abs(img)-abs(img).min())/(abs(img).max()-abs(img).min())         #normalize
         sinogram = self.radon.forward(img)/self.img_size    
         iradon = self.radon.backprojection(sinogram)*np.pi/self.num_angles
-        
+        #iradon = (iradon-iradon.min())/(iradon.max()-iradon.min())
+        #print('img', img.max(), img.min())
+        #print('iradon', iradon.max(), iradon.min())
         del sinogram
         output = iradon/self.lam+img
         
@@ -269,7 +269,8 @@ class OPTmodl(nn.Module):
         torch.cuda.empty_cache()
         del rhs
 
-    
+    self.out['dc'+j] = normalize01(self.out['dc'+j])    
+
     return self.out
   
   def plot_histogram(self,x):

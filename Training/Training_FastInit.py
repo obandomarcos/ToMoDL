@@ -30,7 +30,7 @@ umbral_reg = 50
 
 #%% Datasets 
 # Training with more than one dataset
-proj_num = 320
+proj_num = 72
 
 train_size = 100
 val_size = 20
@@ -45,7 +45,7 @@ test_loss_dict = {}
 train_dataset, test_dataset = modutils.formRegDatasets(folder_paths, umbral_reg, img_resize = img_size)
 
 lambdas = [10]
-train_name = 'Test_Batch_AccFactor'
+train_name = 'Test_BatchNorm'
 
 for lam in lambdas:
     
@@ -54,25 +54,26 @@ for lam in lambdas:
     
     #%% Model Settings
     nLayer= 4
-    K = 10
+    K = 5
     epochs = 20
     max_angle = 640
     
     model = modl.OPTmodl(nLayer, K, max_angle, proj_num, img_size, None, lam, True, results_folder)
     loss_fn = torch.nn.MSELoss(reduction = 'sum')
-    loss_fbp_fn = torch.nn.MSELoss(reduction = 'sum') 
+    loss_fbp_fn = torch.nn.MSELoss(reduction = 'sum')
+    loss_backproj_fn = torch.nn.MSELoss(reduction = 'sum')
     lr = 1e-3
     optimizer = torch.optim.Adam(model.parameters(), lr = lr)
         
     #### Training
-    model, train_info = modutils.model_training(model, loss_fn, loss_fbp_fn, optimizer, dataloaders, device, results_folder+train_name, num_epochs = epochs, disp = True, do_checkpoint = 0)
+    model, train_info = modutils.model_training(model, loss_fn, loss_backproj_fn, loss_fbp_fn, optimizer, dataloaders, device, results_folder+train_name, num_epochs = epochs, disp = True, do_checkpoint = 0, title = train_name)
     # 
     train_infos[K] = train_info
     #
     print('Train MODL loss {}'.format(train_infos[K]['train'][-1]))
     print('Train FBP loss {}'.format(train_infos[K]['train_fbp'][-1]))
-    
-    print('Second training, K = 10')
+
+    #print('Second training, K = 10')
     #model.K = 10
     #K = 10
     #epochs = 30

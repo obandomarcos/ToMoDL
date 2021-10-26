@@ -30,7 +30,7 @@ class dwLayer(nn.Module):
         self.conv = nn.Conv2d(*szW, padding = (int(szW[2]/2),int(szW[2]/2)))
         #torch.nn.init.constant_(self.conv.weight, 0.001)
         #torch.nn.init.constant_(self.conv.bias, 0.001)
-        self.batchNorm = nn.BatchNorm2d(szW[1])
+        #self.batchNorm = nn.BatchNorm2d(szW[1])
     
     def forward(self, x):
         """
@@ -39,7 +39,7 @@ class dwLayer(nn.Module):
             - x (torch.Tensor): Image batch to be processed
         """
         output = self.conv(x)
-        output = self.batchNorm(output)
+        #output = self.batchNorm(output)
         
         if self.lastLayer != True:
             
@@ -269,7 +269,7 @@ class OPTmodl(nn.Module):
         torch.cuda.empty_cache()
         del rhs
 
-    self.out['dc'+j] = normalize01(self.out['dc'+j])    
+    #self.out['dc'+j] = normalize01(self.out['dc'+j])    
 
     return self.out
   

@@ -227,7 +227,7 @@ def maskDatasets(full_sino, num_beams, dataset_size, img_size, angle_seed = 0):
     assert(dataset_size <= full_sino.shape[2])
     rand = np.random.choice(range(full_sino.shape[2]), dataset_size, replace=False)
 
-    # Normalize
+    # Inputs
     for i, sino in enumerate(np.rollaxis(undersampled_sino[:,:,rand], 2)):
         
         # Normalization of input sinogram
@@ -242,17 +242,18 @@ def maskDatasets(full_sino, num_beams, dataset_size, img_size, angle_seed = 0):
     for sino in np.rollaxis(undersampled_sino[:,:,rand],2):
 
         sino = torch.FloatTensor(sino).to(device)
-        sino = (sino - sino.min())/(sino.max()-sino.min())
+        #sino = (sino - sino.min())/(sino.max()-sino.min())
         img = radon.backward(radon.filter_sinogram(sino))
+        img = (img - img.min())/(img.max()-img.min())
         del sino
         
         undersampled_filtered.append(img)
-
+    # Target
     for sino in np.rollaxis(full_sino[:,:,rand], 2):
         
         # Normalization of input sinogram
         sino = torch.FloatTensor(sino).to(device)
-        sino = (sino - sino.min())/(sino.max()-sino.min())
+        #sino = (sino - sino.min())/(sino.max()-sino.min())
         img = radon.backward(radon.filter_sinogram(sino))
         img = (img - img.min())/(img.max()-img.min())
 
@@ -332,7 +333,7 @@ def model_training(model, criterion, crit_backproj, crit_fbp, optimizer, dataloa
                # Track history in training only
                with torch.set_grad_enabled(phase=='train'):
                     
-                   inputs = (model.nAngles/model.proj_num)*inputs
+                   #inputs = (model.nAngles/model.proj_num)*inputs
 
                    outputs = model(inputs)
                    loss = criterion(outputs['dc'+str(model.K)], labels)

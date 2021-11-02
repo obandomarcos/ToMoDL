@@ -28,6 +28,18 @@ The DeepOPT architecture can be trained using the OPT datasets stored at folder 
 
 In order to keep images compatible with Torch Radon operators, sinograms are resized to 640 angle steps so we have a multiple of 16 projections. Image preprocessing involves the registration of opposite pairs to correct the axis of rotation's shift respect to the detector. 
 
+The full dataset can be downloaded from the following link:
+
+### Download Link : https://drive.google.com/drive/folders/1KCs__sLQTN4PclU1ehfbLATKUkBWt7cT?usp=sharing
+
+## Files description
+
+The file `ModelUtilities.py`, inside the folder `Utilities` ,contains the main functions needed to preprocess the dataset, train the model and calculate PSNR. 
+
+Different training functions to evaluate the variation of model parameters are contained in `Training`. 
+
+Inside the folder`OPTmodl`, MODL architecture for OPT is contained in `model_torch.py`, which contains a PyTorch adaptation of original MODL code, in `model.py`.
+
 
 ## References
 <a id="1">[1]</a>

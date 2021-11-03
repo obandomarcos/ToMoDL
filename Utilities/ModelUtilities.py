@@ -198,122 +198,122 @@ def formDataloaders(datasets, number_projections, total_size, projections_augmen
 
     return dataloaders
 
-def formDataloaders(datasets, number_projections, train_size, val_size, test_size, batch_size, img_size, augment_factor = 1, augment_random = False, augment_random_factor = 0):
-    """
-    Form torch dataloaders for training and testing, full and undersampled, as well as filtered backprojection reconstructions for benchmarking
-    params:
-        - train_dataset and test dataset are a list of volumes containing the sinograms to be processed into images
-        - number_projections is the number of projections the sinogram is reconstructed with for undersampled FBP
-        - train size (test_size) is the number of training (test) images to be taken from the volumes. They are taken randomly using formDatasets
-        - batch_size is the number of images a batch contains in the dataloader
-        - img_size is the size of the new images to be reconstructed
-        - augment_factor determines how many times the dataset will be resampled with different seed angles
-    """
+# def formDataloaders(datasets, number_projections, train_size, val_size, test_size, batch_size, img_size, augment_factor = 1, augment_random = False, augment_random_factor = 0):
+#     """
+#     Form torch dataloaders for training and testing, full and undersampled, as well as filtered backprojection reconstructions for benchmarking
+#     params:
+#         - train_dataset and test dataset are a list of volumes containing the sinograms to be processed into images
+#         - number_projections is the number of projections the sinogram is reconstructed with for undersampled FBP
+#         - train size (test_size) is the number of training (test) images to be taken from the volumes. They are taken randomly using formDatasets
+#         - batch_size is the number of images a batch contains in the dataloader
+#         - img_size is the size of the new images to be reconstructed
+#         - augment_factor determines how many times the dataset will be resampled with different seed angles
+#     """
     
-    trainX = []
-    filtTrainX = []
-    trainY = []
+#     trainX = []
+#     filtTrainX = []
+#     trainY = []
     
-    testX = []
-    filtTestX = []
-    testY = []
+#     testX = []
+#     filtTestX = []
+#     testY = []
     
-    valX = []
-    filtValX = []
-    valY = []
+#     valX = []
+#     filtValX = []
+#     valY = []
     
-    # Augment factor iterates over the datasets for data augmentation
-    for i in range(augment_factor):
+#     # Augment factor iterates over the datasets for data augmentation
+#     for i in range(augment_factor):
 
-        # Seed angle for data augmentation
-        rand_angle = np.random.randint(0, number_projections)
+#         # Seed angle for data augmentation
+#         rand_angle = np.random.randint(0, number_projections)
     
-        # Dataset train
-        # Masks chosen dataset with the number of projections required
-        for dataset in datasets:
+#         # Dataset train
+#         # Masks chosen dataset with the number of projections required
+#         for dataset in datasets:
             
-            l = len(train_dataset)
-            tY, tX, filtX = maskDatasets(dataset, number_projections, (train_size+val_size)//l, img_size, rand_angle)
+#             l = len(train_dataset)
+#             tY, tX, filtX = maskDatasets(dataset, number_projections, (train_size+val_size)//l, img_size, rand_angle)
             
-            trainX.append(tX)
-            trainY.append(tY)
-            filtTrainX.append(filtX)
+#             trainX.append(tX)
+#             trainY.append(tY)
+#             filtTrainX.append(filtX)
    
-            # if (augment_random == True) and (augment_random_factor > 0):
+#             # if (augment_random == True) and (augment_random_factor > 0):
                 
-            #     augment_random_factor -= 1
-            #     transform = albumentations.Compose([albumentations.OneOf([
-            #             albumentations.HorizontalFlip(),
-            #             albumentations.ShiftScaleRotate(),
-            #             albumentations.RandomBrightnessContrast()])], additional_targets = {'input':'image', 'target':'image', 'filtX':'image'})
+#             #     augment_random_factor -= 1
+#             #     transform = albumentations.Compose([albumentations.OneOf([
+#             #             albumentations.HorizontalFlip(),
+#             #             albumentations.ShiftScaleRotate(),
+#             #             albumentations.RandomBrightnessContrast()])], additional_targets = {'input':'image', 'target':'image', 'filtX':'image'})
                 
-            #     for (tImgX, tImgY, filtImgX) in zip(tX, tY, filtTrainX):
+#             #     for (tImgX, tImgY, filtImgX) in zip(tX, tY, filtTrainX):
                     
-            #         print('')
+#             #         print('')
                                     
 
 
-   # Dataset test
-    for dataset in test_dataset:
+#    # Dataset test
+#     for dataset in test_dataset:
            
-        l = len(test_dataset)
-        tY, tX, filtX = maskDatasets(dataset, number_projections, test_size//l, img_size, rand_angle)
+#         l = len(test_dataset)
+#         tY, tX, filtX = maskDatasets(dataset, number_projections, test_size//l, img_size, rand_angle)
                                                                                                           
-        testX.append(tX)                                                                                       
-        testY.append(tY)                                                                                       
-        filtTestX.append(filtX)
+#         testX.append(tX)                                                                                       
+#         testY.append(tY)                                                                                       
+#         filtTestX.append(filtX)
                                                                                                       
-    # Stack augmented datasets
-    trainX = torch.vstack(trainX)
-    filtTrainX = torch.vstack(filtTrainX)
-    trainY = torch.vstack(trainY)
+#     # Stack augmented datasets
+#     trainX = torch.vstack(trainX)
+#     filtTrainX = torch.vstack(filtTrainX)
+#     trainY = torch.vstack(trainY)
 
-    testX = torch.vstack(testX)
-    filtTestX = torch.vstack(filtTestX)
-    testY = torch.vstack(testY) 
+#     testX = torch.vstack(testX)
+#     filtTestX = torch.vstack(filtTestX)
+#     testY = torch.vstack(testY) 
     
-    # Grab validation slice 
-    valX = torch.clone(trainX[:int((augment_factor+augment_random_factor)*val_size),...])
-    filtValX = torch.clone(filtTrainX[:int((augment_factor+augment_random_factor)*val_size),...])
-    valY = torch.clone(trainY[:int((augment_factor+augment_random_factor)*val_size),...])
+#     # Grab validation slice 
+#     valX = torch.clone(trainX[:int((augment_factor+augment_random_factor)*val_size),...])
+#     filtValX = torch.clone(filtTrainX[:int((augment_factor+augment_random_factor)*val_size),...])
+#     valY = torch.clone(trainY[:int((augment_factor+augment_random_factor)*val_size),...])
     
-    # Grab train slice
+#     # Grab train slice
     
-    # Grab train slice
-    trainX = torch.clone(trainX[int((augment_factor+augment_random_factor)*val_size):,...])
-    filtTrainX = torch.clone(filtTrainX[int((augment_factor+augment_random_factor)*val_size):,...])
-    trainY = torch.clone(trainY[int((augment_factor+augment_random_factor)*val_size):,...])
+#     # Grab train slice
+#     trainX = torch.clone(trainX[int((augment_factor+augment_random_factor)*val_size):,...])
+#     filtTrainX = torch.clone(filtTrainX[int((augment_factor+augment_random_factor)*val_size):,...])
+#     trainY = torch.clone(trainY[int((augment_factor+augment_random_factor)*val_size):,...])
     
-    # Build dataloaders
-    trainX = torch.utils.data.DataLoader(trainX,
-                                          batch_size=batch_size,
-                                          shuffle=False, num_workers=0)
+#     # Build dataloaders
+#     trainX = torch.utils.data.DataLoader(trainX,
+#                                           batch_size=batch_size,
+#                                           shuffle=False, num_workers=0)
 
-    filtTrainX = torch.utils.data.DataLoader(filtTrainX,
-                                              batch_size=batch_size,
-                                              shuffle=False, num_workers=0)
+#     filtTrainX = torch.utils.data.DataLoader(filtTrainX,
+#                                               batch_size=batch_size,
+#                                               shuffle=False, num_workers=0)
 
-    trainY = torch.utils.data.DataLoader(trainY,                                                                              batch_size=batch_size,
-                                          shuffle=False, num_workers=0)                                 
+#     trainY = torch.utils.data.DataLoader(trainY,                                                                              batch_size=batch_size,
+#                                           shuffle=False, num_workers=0)                                 
 
-    testX = torch.utils.data.DataLoader(testX, batch_size=1,
-                                                shuffle=False, num_workers=0)
-    filtTestX = torch.utils.data.DataLoader(filtTestX, batch_size=1,
-                                                     shuffle=False, num_workers=0)
-    testY = torch.utils.data.DataLoader(testY, batch_size=1,
-                                                shuffle=False, num_workers=0)
+#     testX = torch.utils.data.DataLoader(testX, batch_size=1,
+#                                                 shuffle=False, num_workers=0)
+#     filtTestX = torch.utils.data.DataLoader(filtTestX, batch_size=1,
+#                                                      shuffle=False, num_workers=0)
+#     testY = torch.utils.data.DataLoader(testY, batch_size=1,
+#                                                 shuffle=False, num_workers=0)
     
-    valX = torch.utils.data.DataLoader(valX, batch_size=batch_size,
-                                                 shuffle=False, num_workers=0)
-    filtValX = torch.utils.data.DataLoader(filtValX, batch_size=batch_size,
-                                                      shuffle=False, num_workers=0)
-    valY = torch.utils.data.DataLoader(valY, batch_size=batch_size,
-                                                 shuffle=False, num_workers=0)
+#     valX = torch.utils.data.DataLoader(valX, batch_size=batch_size,
+#                                                  shuffle=False, num_workers=0)
+#     filtValX = torch.utils.data.DataLoader(filtValX, batch_size=batch_size,
+#                                                       shuffle=False, num_workers=0)
+#     valY = torch.utils.data.DataLoader(valY, batch_size=batch_size,
+#                                                  shuffle=False, num_workers=0)
 
-    # Dictionary reshape
-    dataloaders = {'train':{'x':trainX, 'filtX':filtTrainX, 'y':trainY}, 'val':{'x':valX, 'filtX':filtValX, 'y':valY}, 'test':{'x':testX, 'filtX':filtTestX, 'y':testY}}
+#     # Dictionary reshape
+#     dataloaders = {'train':{'x':trainX, 'filtX':filtTrainX, 'y':trainY}, 'val':{'x':valX, 'filtX':filtValX, 'y':valY}, 'test':{'x':testX, 'filtX':filtTestX, 'y':testY}}
 
-    return dataloaders
+#     return dataloaders
 
 def maskDatasets(full_sino, num_beams, dataset_size, img_size, angle_seed = 0):
     '''

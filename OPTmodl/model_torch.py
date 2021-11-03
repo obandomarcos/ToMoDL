@@ -173,7 +173,7 @@ def myCG(A,rhs):
     p = rhs 
     rTr = torch.sum(r*r)
          
-    while((i<5) and torch.ge(rTr, 1e-6)):
+    while((i<10) and torch.ge(rTr, 1e-6)):
         
         Ap = A.myAtA(p)
        # print('Ap', Ap.max(), Ap.min())
@@ -269,8 +269,8 @@ class OPTmodl(nn.Module):
         torch.cuda.empty_cache()
         del rhs
 
-    #self.out['dc'+j] = normalize01(self.out['dc'+j])    
-
+    self.out['dc'+j] = normalize01(self.out['dc'+j])    
+    #print('output network max', self.out['dc'+j].max(), 'min', self.out['dc'+j].min()) 
     return self.out
   
   def plot_histogram(self,x):
@@ -283,12 +283,14 @@ class OPTmodl(nn.Module):
     fig.savefig(self.results_folder+'Quotient_Atb_lamZn_{}.pdf'.format(self.print_epoch))
 
 def normalize01(images):
+    
+    image_norm = torch.zeros_like(images)
 
-    for img in images:
-        
-        img = (img - img.min())/(img.max()-img.min())
+    for i, img in enumerate(images):
+         
+        image_norm[i,...] = (img - img.min())/(img.max()-img.min())
 
-    return images
+    return image_norm
 
 class Unet(nn.Module):
     def __init__(self, in_channel=1, out_channel=1):

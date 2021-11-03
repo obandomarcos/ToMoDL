@@ -14,6 +14,7 @@ import math
 import matplotlib.pyplot as plt
 import cv2 
 import torchvision.transforms as T
+import albumentations
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 # Torch dataset tidying
@@ -91,7 +92,7 @@ def formRegDatasets(folder_paths, threshold, img_resize = 100, n_proy = 640,samp
 
     return train_dataset, test_dataset
 
-def formDataloaders(train_dataset, test_dataset, number_projections, train_size, val_size, test_size, batch_size, img_size, augment_factor = 1):
+def formDataloaders(train_dataset, test_dataset, number_projections, train_size, val_size, test_size, batch_size, img_size, augment_factor = 1, augment_random = False, augment_random_factor = 0):
     """
     Form torch dataloaders for training and testing, full and undersampled
     params:
@@ -120,8 +121,9 @@ def formDataloaders(train_dataset, test_dataset, number_projections, train_size,
 
         # Seed angle for data augmentation
         rand_angle = np.random.randint(0, number_projections)
-
+    
         # Dataset train
+        # Masks chosen dataset with the number of projections required
         for dataset in train_dataset:
             
             l = len(train_dataset)
@@ -130,17 +132,31 @@ def formDataloaders(train_dataset, test_dataset, number_projections, train_size,
             trainX.append(tX)
             trainY.append(tY)
             filtTrainX.append(filtX)
+   
+            if (augment_random == True) and (augment_random_factor > 0):
+                
+                augment_random_factor -= 1
+                transform = albumentations.Compose([albumentations.OneOf([
+                        albumentations.HorizontalFlip(),
+                        albumentations.ShiftScaleRotate(),
+                        albumentations.RandomBrightnessContrast()])], additional_targets = {'input':'image', 'target':'image', 'filtX':'image'})
+                
+                for (tImgX, tImgY, filtImgX) in zip(tX, tY, filtTrainX):
+                    
+                    print('')
+                                    
 
-        # Dataset test
-        for dataset in test_dataset:
-            
-            l = len(test_dataset)
-            tY, tX, filtX = maskDatasets(dataset, number_projections, test_size//l, img_size, rand_angle)
-            
-            testX.append(tX)
-            testY.append(tY)
-            filtTestX.append(filtX)
 
+   # Dataset test
+    for dataset in test_dataset:
+           
+        l = len(test_dataset)
+        tY, tX, filtX = maskDatasets(dataset, number_projections, test_size//l, img_size, rand_angle)
+                                                                                                          
+        testX.append(tX)                                                                                       
+        testY.append(tY)                                                                                       
+        filtTestX.append(filtX)
+                                                                                                      
     # Stack augmented datasets
     trainX = torch.vstack(trainX)
     filtTrainX = torch.vstack(filtTrainX)
@@ -151,14 +167,16 @@ def formDataloaders(train_dataset, test_dataset, number_projections, train_size,
     testY = torch.vstack(testY) 
     
     # Grab validation slice 
-    valX = torch.clone(trainX[:int(augment_factor*val_size),...])
-    filtValX = torch.clone(filtTrainX[:int(augment_factor*val_size),...])
-    valY = torch.clone(trainY[:int(augment_factor*val_size),...])
+    valX = torch.clone(trainX[:int((augment_factor+augment_random_factor)*val_size),...])
+    filtValX = torch.clone(filtTrainX[:int((augment_factor+augment_random_factor)*val_size),...])
+    valY = torch.clone(trainY[:int((augment_factor+augment_random_factor)*val_size),...])
     
     # Grab train slice
-    trainX = torch.clone(trainX[int(augment_factor*val_size):,...])
-    filtTrainX = torch.clone(filtTrainX[int(augment_factor*val_size):,...])
-    trainY = torch.clone(trainY[int(augment_factor*val_size):,...])
+    
+    # Grab train slice
+    trainX = torch.clone(trainX[int((augment_factor+augment_random_factor)*val_size):,...])
+    filtTrainX = torch.clone(filtTrainX[int((augment_factor+augment_random_factor)*val_size):,...])
+    trainY = torch.clone(trainY[int((augment_factor+augment_random_factor)*val_size):,...])
     
     # Build dataloaders
     trainX = torch.utils.data.DataLoader(trainX,
@@ -267,7 +285,7 @@ def maskDatasets(full_sino, num_beams, dataset_size, img_size, angle_seed = 0):
     return desired, undersampled, undersampled_filtered
 
 # Training function
-def model_training(model, criterion, crit_backproj, crit_fbp, optimizer, dataloaders, device, root, num_epochs = 25, disp=False, do_checkpoint = 0, title = ''):
+def model_training(model, criterion, crit_backproj, crit_fbp, optimizer, dataloaders, device, root, num_epochs = 25, disp=False, do_checkpoint = 0, plot_title = False,title = ''):
     """
     Training routine for model
     Params:
@@ -300,10 +318,12 @@ def model_training(model, criterion, crit_backproj, crit_fbp, optimizer, dataloa
     train_info['train'] = []
     train_info['train_backproj'] = []
     train_info['train_fbp'] = []
-    
+    train_info['train_norm'] = []
+
     train_info['val'] = []
     train_info['val_backproj'] = []
     train_info['val_fbp'] = []
+    train_info['val_norm'] = []
 
     loss_std = []
     loss_std_fbp = []
@@ -321,7 +341,8 @@ def model_training(model, criterion, crit_backproj, crit_fbp, optimizer, dataloa
             running_loss = 0.0    
             fbp_loss = 0.0
             backproj_loss = 0.0
- 
+            norm_loss = 0.0
+
             for batch_i, (inputs, inputs_fbp, labels) in enumerate(zip(*dataloaders[phase].values())):
 
                inputs.to(device)
@@ -339,7 +360,13 @@ def model_training(model, criterion, crit_backproj, crit_fbp, optimizer, dataloa
                    loss = criterion(outputs['dc'+str(model.K)], labels)
                    loss_backproj = crit_backproj(inputs, labels)
                    loss_fbp = crit_fbp(inputs_fbp, labels)
+                   
+                   #print('output max:', outputs['dc'+str(model.K)].max(), ' min:', outputs['dc'+str(model.K)].max())
+                   #print('labels max:', labels.max(), 'min ', labels.min())
 
+                   # Output normalization
+                   loss_norm = psnr_normalize(outputs['dc'+str(model.K)], labels)
+                    
                    if phase == 'train':
                        
                        loss.backward()
@@ -347,15 +374,16 @@ def model_training(model, criterion, crit_backproj, crit_fbp, optimizer, dataloa
                        optimizer.step()
                
                # Plot images
-               if (epoch in [0, num_epochs-1]) and (batch_i in [0, 10, 20]):                                                                                           
+               if (plot_title == True) and (epoch in [0, num_epochs-1]) and (batch_i in [0, 10, 20]):                                                                                           
                    print('Plotted {}'.format(phase))
                    path_plot = '{}_images_epoch{}_proj{}_batch{}_K{}_lam{}.pdf'.format(phase, epoch, model.proj_num, batch_i, model.K, model.lam)
                    title_plot = title+'{} images epoch{} proj{} batch{} K{} lam{}'.format(phase, epoch, model.proj_num, batch_i, model.K, model.lam)
-                   plot_outputs(labels, outputs, root+title_plot, title_plot)
+                   plot_outputs(labels, outputs, root+path_plot, title_plot)
 
                running_loss += loss.item()*inputs.size(0)
                backproj_loss += loss_backproj.item()*inputs.size(0)
                fbp_loss += loss_fbp.item()*inputs.size(0)
+               norm_loss += loss_norm.item()*inputs.size(0)
 
                if torch.cuda.is_available():
                    torch.cuda.empty_cache()
@@ -385,16 +413,20 @@ def model_training(model, criterion, crit_backproj, crit_fbp, optimizer, dataloa
             epoch_loss = running_loss/len(dataloaders[phase]['x'])
             epoch_loss_fbp = fbp_loss/len(dataloaders[phase]['x'])
             epoch_loss_backproj = backproj_loss/len(dataloaders[phase]['x'])
+            epoch_loss_norm = norm_loss/len(dataloaders[phase]['x'])
 
             train_info[phase].append(epoch_loss)
             train_info[phase+'_fbp'].append(epoch_loss_fbp)
             train_info[phase+'_backproj'].append(epoch_loss_backproj)
+            train_info[phase+'_norm'].append(epoch_loss_norm)
 
             if disp:
                 print('')
                 print('{} Loss: {:.4f} '.format(phase, epoch_loss))
                 print('{} Loss FBP: {:.4f} '.format(phase, epoch_loss_fbp))
                 print('{} Loss Backprojection: {:.4f} '.format(phase, epoch_loss_backproj))
+                print('{} Loss Norm: {:.4f}'.format(phase, epoch_loss_norm))
+
 
             if phase == 'val' and epoch_loss < best_loss:
                 
@@ -418,6 +450,27 @@ def model_training(model, criterion, crit_backproj, crit_fbp, optimizer, dataloa
     model.load_state_dict(best_model_wts)
 
     return model , train_info
+
+
+def psnr_normalize(outputs, target):
+    """
+    Adjusts outputs mean to target mean and calculates PSNR
+    """
+    norm_loss = torch.nn.MSELoss(reduction = 'sum')
+    
+    norm_output = torch.zeros_like(outputs)
+    norm_target = torch.zeros_like(target)
+    
+    for i, (out, tar) in enumerate(zip(outputs, target)):
+
+        norm_output[i,...] = (out-out.min())/(out.max()-out.min())
+        norm_target[i,...] = (tar-tar.min())/(tar.max()-tar.min())
+    
+    #print('norm output max', norm_output.max(), ' min ', norm_output.min())
+    #print('norm output min', norm_target.max(), ' min ', norm_target.min())
+    loss = norm_loss(norm_output, norm_target)
+    
+    return loss
 
 def plot_data(x, y, root):
 
@@ -881,5 +934,3 @@ def model_training_unet(model, criterion, crit_fbp, optimizer, dataloaders, devi
         print('Training complete in {:.0f}m {:.0f}s'.format(time_elapsed // 60, time_elapsed % 60))
         print('Best val Loss: {:4f}'.format(best_loss))
 
-    # load best model weights
-    model.load_state_dict(best_model_wts)

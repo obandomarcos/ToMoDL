@@ -14,7 +14,7 @@ import math
 import matplotlib.pyplot as plt
 import cv2 
 import torchvision.transforms as T
-import albumentations
+import albumentations as A
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 # Torch dataset tidying
@@ -79,16 +79,128 @@ def formRegDatasets(folder_paths, threshold, img_resize = 100, n_proy = 640,samp
 
     return datasets_reg
 
-def formDataloaders(datasets, number_projections):
+def formDataloaders(datasets, number_projections, total_size, projections_augment_factor, transform_augment_factor, train_factor, val_factor, test_factor, img_size, batch_size, load_tensor = False, save_tensor = False):
+    
+    """
+    Form torch dataloaders for training and testing, full and undersampled, as well as filtered backprojection reconstructions for benchmarking
+    params:
+        - train_dataset and test dataset are a list of volumes containing the sinograms to be processed into images
+        - number_projections is the number of projections the sinogram is reconstructed with for undersampled FBP
+        - train factor (test_factor) is the percentage of training (test) images to be taken from the volumes. They are taken randomly using formDatasets
+        - batch_size is the number of images a batch contains in the dataloader
+        - img_size is the size of the new images to be reconstructed
+        - projection_augment_factor determines how many times the dataset will be resampled with different seed angles
+        - transform_augment_factor determines the number of times the datasets will be transformed 
+    """
+    
+    assert((train_factor+val_factor+test_factor) == 1)
+    datasets_len = len(datasets)
+    fraction = total_size//(datasets_len*projections_augment_factor*transform_augment_factor)
 
-    # Get masked datasets
-    for dataset in datasets:
+    if loadTensor == False:
 
+        fullX = []
+        fullY = []
+        fullFiltX = []
 
+        # Data augmentation
+        transform = A.OneOf([
+                A.Rotate(limit=40),
+                A.RandomBrightness(limit=0.1),
+                A.JpegCompression(quality_lower=85, quality_upper=100, p=0.5),
+                A.HueSaturationValue(hue_shift_limit=20, sat_shift_limit=30, val_shift_limit=20, p=0.5),
+                A.RandomContrast(limit=0.2, p=0.5),
+                A.HorizontalFlip(),
+                A.GaussNoise(),
+            ], additional_targets = {'X':'image', 'Y':'image', 'filtX':'image'})
+        
+        # Transform augment factor iterates over the datasets taking different transformations
+        for j in range(transform_augment_factor): 
+            # Projection augment factor iterates over the datasets taking different starting angles for subsampling
+            for i in range(projections_augment_factor):
+                # Seed angle for data augmentation
+                rand_angle = np.random.randint(0, number_projections)
+                # Get masked datasets
+                for dataset in datasets:
+
+                    Y, X, filtX = maskDatasets(dataset, number_projections, fraction, img_size, rand_angle)
+                    
+                    for y, x, filtx in zip(Y, X, filtX):
+
+                        transformed_image = transform(X = x.numpy(), Y = y.numpy(), filtX = filtx.numpy())
+                        
+                        fullX.append(torch.Tensor(transformed_image['X']))
+                        fullY.append(torch.Tensor(transformed_image['Y']))
+                        fullFiltX.append(torch.Tensor(transformed_image['filtX']))
+
+        fullX = torch.unsqueeze(torch.vstack(fullX), 1)
+        fullY = torch.unsqueeze(torch.vstack(fullY), 1)
+        fullFiltX = torch.unsqueeze(torch.vstack(fullFiltX), 1)
+
+    else:
+
+        fullX = torch.load('Datasets/FullX.pt')
+        fullY = torch.save('Datasets/FullY.pt')
+        fullFiltX = torch.save('Datasets/FullFiltX.pt')
+
+    if saveTensor == True:
+
+        torch.save(fullX, 'Datasets/FullX.pt')
+        torch.save(fullY, 'Datasets/FullY.pt')
+        torch.save(fullFiltX, 'Datasets/FullFiltX.pt')
+
+    # Randomly permute images in the full dataset
+    idx = torch.randperm(fullX.shape[0])
+    fullX = fullX[idx].view(fullX.size())
+    fullY = fullY[idx].view(fullY.size())
+    fullFiltX = fullFiltX[idx].view(fullFiltX.size())
+    
+    #Slice train, validation and test sets
+    trainX = torch.clone(fullX[:int(train_factor*total_size),...])
+    trainY = torch.clone(fullY[:int(train_factor*total_size),...])
+    trainFiltX = torch.clone(fullFiltX[:int(train_factor*total_size),...])
+
+    valX = torch.clone(fullX[int(train_factor*total_size):int((train_factor+val_factor)*total_size),...])
+    valY = torch.clone(fullY[int(train_factor*total_size):int((train_factor+val_factor)*total_size),...])
+    valFiltX = torch.clone(fullFiltX[int(train_factor*total_size):int((train_factor+val_factor)*total_size),...])
+
+    testX = torch.clone(fullX[int((train_factor+val_factor)*total_size):,...])
+    testY = torch.clone(fullY[int((train_factor+val_factor)*total_size):,...])
+    testFiltX = torch.clone(fullFiltX[int((train_factor+val_factor)*total_size):,...])
+
+    # Build dataloaders
+    trainX = torch.utils.data.DataLoader(trainX,
+                                          batch_size=batch_size,
+                                          shuffle=False, num_workers=0)
+    trainFiltX = torch.utils.data.DataLoader(trainFiltX,
+                                              batch_size=batch_size,
+                                              shuffle=False, num_workers=0)
+    trainY = torch.utils.data.DataLoader(trainY,                                                                       
+                                        batch_size=batch_size,
+                                          shuffle=False, num_workers=0)                                 
+
+    testX = torch.utils.data.DataLoader(testX, batch_size=1,
+                                                shuffle=False, num_workers=0)
+    testFiltX = torch.utils.data.DataLoader(testFiltX, batch_size=1,
+                                                     shuffle=False, num_workers=0)
+    testY = torch.utils.data.DataLoader(testY, batch_size=1,
+                                                shuffle=False, num_workers=0)
+    
+    valX = torch.utils.data.DataLoader(valX, batch_size=batch_size,
+                                                 shuffle=False, num_workers=0)
+    valFiltX = torch.utils.data.DataLoader(valFiltX, batch_size=batch_size,
+                                                      shuffle=False, num_workers=0)
+    valY = torch.utils.data.DataLoader(valY, batch_size=batch_size,
+                                                 shuffle=False, num_workers=0)
+
+    # Dictionary reshape
+    dataloaders = {'train':{'x':trainX, 'filtX':trainFiltX, 'y':trainY}, 'val':{'x':valX, 'filtX':valFiltX, 'y':valY}, 'test':{'x':testX, 'filtX':testFiltX, 'y':testY}}
+
+    return dataloaders
 
 def formDataloaders(datasets, number_projections, train_size, val_size, test_size, batch_size, img_size, augment_factor = 1, augment_random = False, augment_random_factor = 0):
     """
-    Form torch dataloaders for training and testing, full and undersampled
+    Form torch dataloaders for training and testing, full and undersampled, as well as filtered backprojection reconstructions for benchmarking
     params:
         - train_dataset and test dataset are a list of volumes containing the sinograms to be processed into images
         - number_projections is the number of projections the sinogram is reconstructed with for undersampled FBP

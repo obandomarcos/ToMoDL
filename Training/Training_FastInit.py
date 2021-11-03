@@ -44,8 +44,8 @@ test_loss_dict = {}
 
 train_dataset, test_dataset = modutils.formRegDatasets(folder_paths, umbral_reg, img_resize = img_size)
 
-lambdas = [10]
-train_name = 'BatchNormalization_Test4'
+lambdas = [0.05]
+train_name = 'NBN_Lambdas_Test15'
 
 for lam in lambdas:
     
@@ -54,7 +54,7 @@ for lam in lambdas:
     
     #%% Model Settings
     nLayer= 4
-    K = 5
+    K = 10
     epochs = 20
     max_angle = 640
     
@@ -66,7 +66,7 @@ for lam in lambdas:
     optimizer = torch.optim.Adam(model.parameters(), lr = lr)
         
     #### Training
-    model, train_info = modutils.model_training(model, loss_fn, loss_backproj_fn, loss_fbp_fn, optimizer, dataloaders, device, results_folder+train_name, num_epochs = epochs, disp = True, do_checkpoint = 0, title = train_name)
+    model, train_info = modutils.model_training(model, loss_fn, loss_backproj_fn, loss_fbp_fn, optimizer, dataloaders, device, results_folder+train_name, num_epochs = epochs, disp = True, do_checkpoint = 0, title = train_name, plot_title = True )
     # 
     train_infos[K] = train_info
     #

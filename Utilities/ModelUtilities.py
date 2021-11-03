@@ -30,8 +30,7 @@ def formRegDatasets(folder_paths, threshold, img_resize = 100, n_proy = 640,samp
         - experiment (string): name of the experiment
     """
 
-    train_dataset = []
-    test_dataset = []
+    datasets_reg = []
     disp_reg = []
     
     for dataset in folder_paths:    
@@ -61,38 +60,33 @@ def formRegDatasets(folder_paths, threshold, img_resize = 100, n_proy = 640,samp
         
         print('Registration transformation {}'.format(df.Tparams['Ty'].mean()))
         # Append volumes
-        if dataset_num <= 2: 
-            print("Loaded train dataset")
+         
+        print("Dataset {}/{} loaded".format(dataset_num, len(folder_paths)))
+        
+        dataset = df.getRegisteredVolume('head', margin = disp_reg//2, saveDataset = False, useSegmented = True)
+        # Move axis to (N_projections, n_detector, n_slices)
+        dataset = np.rollaxis(dataset, 2)
+        # Resize projection number % 16
+        dataset_size = dataset.shape
+        
+        det_count = int((img_resize+0.5)*np.sqrt(2))
+        dataset = np.array([cv2.resize(img, (det_count, n_proy)) for img in dataset])
+        
+        # Back to (N_slices, N_projections, n_detector)
+        datasets_reg.append(np.moveaxis(dataset, 0,-1))                                                
             
-            dataset = df.getRegisteredVolume('head', margin = disp_reg//2, saveDataset = False, useSegmented = True)
-            # Move axis to (N_projections, n_detector, n_slices)
-            dataset = np.rollaxis(dataset, 2)
-            # Resize projection number % 16
-            dataset_size = dataset.shape
-            
-            det_count = int((img_resize+0.5)*np.sqrt(2))
-            dataset = np.array([cv2.resize(img, (det_count, n_proy)) for img in dataset])
-            
-            # Back to (N_slices, N_projections, n_detector)
-            train_dataset.append(np.moveaxis(dataset, 0,-1))                                                
-            
-        else:
-            print("Loaded test dataset")
-            dataset = df.getRegisteredVolume('head', margin = disp_reg//2, saveDataset = False, useSegmented = True)
-            dataset = np.rollaxis(dataset, 2)
-            # Resize to projection number % 16
-            dataset_size = dataset.shape
-
-            det_count = int((img_resize+0.5)*np.sqrt(2))
-            dataset = np.array([cv2.resize(img, (det_count, n_proy)) for img in dataset])
-            
-            test_dataset.append(np.moveaxis(dataset, 0,-1))
-
       del df
 
-    return train_dataset, test_dataset
+    return datasets_reg
 
-def formDataloaders(train_dataset, test_dataset, number_projections, train_size, val_size, test_size, batch_size, img_size, augment_factor = 1, augment_random = False, augment_random_factor = 0):
+def formDataloaders(datasets, number_projections):
+
+    # Get masked datasets
+    for dataset in datasets:
+
+
+
+def formDataloaders(datasets, number_projections, train_size, val_size, test_size, batch_size, img_size, augment_factor = 1, augment_random = False, augment_random_factor = 0):
     """
     Form torch dataloaders for training and testing, full and undersampled
     params:
@@ -124,7 +118,7 @@ def formDataloaders(train_dataset, test_dataset, number_projections, train_size,
     
         # Dataset train
         # Masks chosen dataset with the number of projections required
-        for dataset in train_dataset:
+        for dataset in datasets:
             
             l = len(train_dataset)
             tY, tX, filtX = maskDatasets(dataset, number_projections, (train_size+val_size)//l, img_size, rand_angle)
@@ -133,17 +127,17 @@ def formDataloaders(train_dataset, test_dataset, number_projections, train_size,
             trainY.append(tY)
             filtTrainX.append(filtX)
    
-            if (augment_random == True) and (augment_random_factor > 0):
+            # if (augment_random == True) and (augment_random_factor > 0):
                 
-                augment_random_factor -= 1
-                transform = albumentations.Compose([albumentations.OneOf([
-                        albumentations.HorizontalFlip(),
-                        albumentations.ShiftScaleRotate(),
-                        albumentations.RandomBrightnessContrast()])], additional_targets = {'input':'image', 'target':'image', 'filtX':'image'})
+            #     augment_random_factor -= 1
+            #     transform = albumentations.Compose([albumentations.OneOf([
+            #             albumentations.HorizontalFlip(),
+            #             albumentations.ShiftScaleRotate(),
+            #             albumentations.RandomBrightnessContrast()])], additional_targets = {'input':'image', 'target':'image', 'filtX':'image'})
                 
-                for (tImgX, tImgY, filtImgX) in zip(tX, tY, filtTrainX):
+            #     for (tImgX, tImgY, filtImgX) in zip(tX, tY, filtTrainX):
                     
-                    print('')
+            #         print('')
                                     
 
 

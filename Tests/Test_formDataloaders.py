@@ -58,10 +58,16 @@ for phase in ['train', 'val', 'test']:
         if i == j:
             break
         
-        ax[i,0].imshow(x.numpy()[0,0,:,:])
-        ax[i,1].imshow(y.numpy()[0,0,:,:]) 
-        ax[i,2].imshow(filtx.numpy()[0,0,:,:])
-    
+        ax[i,0].imshow(x.cpu().numpy()[0,0,:,:])
+        ax[i,1].imshow(y.cpu().numpy()[0,0,:,:]) 
+        im = ax[i,2].imshow(filtx.cpu().numpy()[0,0,:,:])
+        
+        print('y', y.max(), y.min()) 
+        print('x', x.max(), x.min())
+
+        cax = fig.add_axes([ax[i,2].get_position().x1+0.01,ax[i,2].get_position().y0,0.02, ax[i,2].get_position().height])
+        plt.colorbar(im, cax = cax)
+
     ax[0,0].set_title('Input')
     ax[0,1].set_title('Target')
     ax[0,2].set_title('Filtered backprojection')

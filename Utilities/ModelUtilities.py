@@ -128,7 +128,12 @@ def formDataloaders(datasets, number_projections, total_size, projections_augmen
                     for y, x, filtx in zip(Y, X, filtX):
 
                         transformed_image = transform(image = x.cpu().numpy(), image0 = y.cpu().numpy(), image1 = filtx.cpu().numpy())
-                        
+                           
+
+                        transformed_image['image'] = (transformed_image['image'] -transformed_image['image'].min())/(transformed_image['image'].max()-transformed_image['image'].min())
+                        transformed_image['image0'] = (transformed_image['image0'] -transformed_image['image0'].min())/(transformed_image['image0'].max()-transformed_image['image0'].min())
+                        transformed_image['image1'] = (transformed_image['image1'] -transformed_image['image1'].min())/(transformed_image['image1'].max()-transformed_image['image1'].min())
+
                         fullX.append(torch.Tensor(transformed_image['image']))
                         fullY.append(torch.Tensor(transformed_image['image0']))
                         fullFiltX.append(torch.Tensor(transformed_image['image1']))
@@ -153,9 +158,9 @@ def formDataloaders(datasets, number_projections, total_size, projections_augmen
     
     # Randomly permute images in the full dataset
     idx = torch.randperm(fullX.shape[0])
-    fullX = fullX[idx].view(fullX.size())
-    fullY = fullY[idx].view(fullY.size())
-    fullFiltX = fullFiltX[idx].view(fullFiltX.size())
+    fullX = fullX[idx].view(fullX.size()).to(device)
+    fullY = fullY[idx].view(fullY.size()).to(device)
+    fullFiltX = fullFiltX[idx].view(fullFiltX.size()).to(device)
     
     #Slice train, validation and test sets
     trainX = torch.clone(fullX[:int(train_factor*total_size),...])

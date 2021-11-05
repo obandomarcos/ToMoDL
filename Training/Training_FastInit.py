@@ -32,27 +32,30 @@ umbral_reg = 50
 # Training with more than one dataset
 proj_num = 72
 
-train_size = 100
-val_size = 20
-test_size = 20
+train_factor = 0.7
+val_factor = 0.2
+test_factor = 0.1
+total_size = 2000
 
 batch_size = 5
 img_size = 100
 augment_factor = 15
 train_infos = {}
 test_loss_dict = {}
+tensor_path = datasets_folder+'Proj_{}_augmentFactor_{}_totalSize_{}_'.format(proj_num, augment_factor, total_size)
 
-train_dataset, test_dataset = modutils.formRegDatasets(folder_paths, umbral_reg, img_resize = img_size)
+datasets = modutils.formRegDatasets(folder_paths, umbral_reg, img_resize = img_size)
+#datasets = []
+dataloaders = modutils.formDataloaders(datasets, proj_num, total_size, train_factor, val_factor, test_factor, batch_size, img_size, tensor_path, augment_factor, load_tensor = False, save_tensor = True)
 
 lambdas = [0.05]
-train_name = 'NBN_Lambdas_Test15'
+train_name = 'NBN_DatasetSplitting_Test20'
 
 for lam in lambdas:
     
-    # Load desired and undersampled datasets, on image space. Testing on Test Dataset
-    dataloaders = modutils.formDataloaders(train_dataset, test_dataset, proj_num, train_size, val_size, test_size, batch_size, img_size, augment_factor)
-    
+    # Load desired and undersampled datasets, on image space. Testing on Test Dataset    
     #%% Model Settings
+
     nLayer= 4
     K = 10
     epochs = 20
@@ -82,12 +85,12 @@ for lam in lambdas:
     #train_infos[K] = train_info
 
     ##%% save loss for fbp and modl network
-    with open(results_folder+train_name+'Dict_Proj{}_nlay{}_epochs{}_K{}_lam{}_trnSize{}.pkl'.format(proj_num, nLayer, epochs, K, lam, train_size), 'wb') as f:
+    with open(results_folder+train_name+'Dict_Proj{}_nlay{}_epochs{}_K{}_lam{}_trnSize{}.pkl'.format(proj_num, nLayer, epochs, K, lam, train_factor), 'wb') as f:
     #
         pickle.dump(train_infos, f)
         print('Diccionario salvado para proyección {}'.format(proj_num))
     #
-    modutils.save_net(model_folder+'Lambdas_K_{}_lam_{}_nlay_{}_proj_{}_trnSize{}'.format(K, lam, nLayer, proj_num, train_size), model)
+    modutils.save_net(model_folder+'Lambdas_K_{}_lam_{}_nlay_{}_proj_{}_trnSize{}'.format(K, lam, nLayer, proj_num, train_factor), model)
 
     ### Testing part
     test_loss_total = []
@@ -106,7 +109,7 @@ for lam in lambdas:
 
     test_loss_dict[proj_num] = {'loss_net': test_loss_total, 'loss_fbp': test_loss_fbp_total}
 
-    with open(results_folder+train_name+'Proj{}_nLay{}_epochs{}_K{}_lam{}_trnSize{}.pkl'.format(proj_num, nLayer, epochs, K, lam, train_size), 'wb') as f:
+    with open(results_folder+train_name+'Proj{}_nLay{}_epochs{}_K{}_lam{}_trnSize{}.pkl'.format(proj_num, nLayer, epochs, K, lam, train_factor), 'wb') as f:
         
         pickle.dump(test_loss_dict, f)
         print('Diccionario salvado para proyección {}'.format(proj_num))

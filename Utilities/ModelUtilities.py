@@ -86,7 +86,7 @@ def formDataloaders(datasets, number_projections):
 
 
 
-def formDataloaders(datasets, number_projections, train_size, val_size, test_size, batch_size, img_size, augment_factor = 1, augment_random = False, augment_random_factor = 0):
+def formDataloaders(datasets, number_projections, total_size, train_factor, val_factor, test_factor, batch_size, img_size, tensor_path, augment_factor = 1, augment_random = False, augment_random_factor = 0, load_tensor = True, save_tensor = False):
     """
     Form torch dataloaders for training and testing, full and undersampled
     params:
@@ -98,80 +98,69 @@ def formDataloaders(datasets, number_projections, train_size, val_size, test_siz
         - augment_factor determines how many times the dataset will be resampled with different seed angles
     """
     
-    trainX = []
-    filtTrainX = []
-    trainY = []
+    fullX = []
+    filtFullX = []
+    fullY = []
     
-    testX = []
-    filtTestX = []
-    testY = []
-    
-    valX = []
-    filtValX = []
-    valY = []
-    
-    # Augment factor iterates over the datasets for data augmentation
-    for i in range(augment_factor):
+    if load_tensor == False:
 
-        # Seed angle for data augmentation
-        rand_angle = np.random.randint(0, number_projections)
-    
-        # Dataset train
-        # Masks chosen dataset with the number of projections required
-        for dataset in datasets:
-            
-            l = len(train_dataset)
-            tY, tX, filtX = maskDatasets(dataset, number_projections, (train_size+val_size)//l, img_size, rand_angle)
-            
-            trainX.append(tX)
-            trainY.append(tY)
-            filtTrainX.append(filtX)
+        # Augment factor iterates over the datasets for data augmentation
+        for i in range(augment_factor):
+
+            # Seed angle for data augmentation
+            rand_angle = np.random.randint(0, number_projections)
+        
+            # Dataset train
+            # Masks chosen dataset with the number of projections required
+            for dataset in datasets:
+                
+                l = len(datasets)
+                tY, tX, filtX = maskDatasets(dataset, number_projections, total_size//l, img_size, rand_angle)
+                
+                fullX.append(tX)
+                fullY.append(tY)
+                filtFullX.append(filtX)
    
-            # if (augment_random == True) and (augment_random_factor > 0):
-                
-            #     augment_random_factor -= 1
-            #     transform = albumentations.Compose([albumentations.OneOf([
-            #             albumentations.HorizontalFlip(),
-            #             albumentations.ShiftScaleRotate(),
-            #             albumentations.RandomBrightnessContrast()])], additional_targets = {'input':'image', 'target':'image', 'filtX':'image'})
-                
-            #     for (tImgX, tImgY, filtImgX) in zip(tX, tY, filtTrainX):
-                    
-            #         print('')
-                                    
+        # Stack augmented datasets
+        fullX = torch.vstack(fullX)
+        filtFullX = torch.vstack(filtFullX)
+        fullY = torch.vstack(fullY)
 
+    else:
 
-   # Dataset test
-    for dataset in test_dataset:
-           
-        l = len(test_dataset)
-        tY, tX, filtX = maskDatasets(dataset, number_projections, test_size//l, img_size, rand_angle)
-                                                                                                          
-        testX.append(tX)                                                                                       
-        testY.append(tY)                                                                                       
-        filtTestX.append(filtX)
-                                                                                                      
-    # Stack augmented datasets
-    trainX = torch.vstack(trainX)
-    filtTrainX = torch.vstack(filtTrainX)
-    trainY = torch.vstack(trainY)
-
-    testX = torch.vstack(testX)
-    filtTestX = torch.vstack(filtTestX)
-    testY = torch.vstack(testY) 
+        fullX = torch.load(tensor_path+'FullX.pt')
+        filtFullX = torch.load(tensor_path+'FiltFullX.pt')
+        fullY = torch.load(tensor_path+'FullY.pt')
     
+    if save_tensor == True:
+        
+        torch.save(fullX, tensor_path+'FullX.pt')
+        torch.save(filtFullX, tensor_path+'FiltFullX.pt')
+        torch.save(fullY, tensor_path+'FiltY.pt')
+    
+    # Randomly shuffle the images
+    idx = torch.randperm(fullX.shape[0])
+    fullX = fullX[idx].view(fullX.size())
+    filtFullX = filtFullX[idx].view(fullX.size())
+    fullY = fullY[idx].view(fullX.size())
+
+    len_full = fullX.shape[0]
+
     # Grab validation slice 
-    valX = torch.clone(trainX[:int((augment_factor+augment_random_factor)*val_size),...])
-    filtValX = torch.clone(filtTrainX[:int((augment_factor+augment_random_factor)*val_size),...])
-    valY = torch.clone(trainY[:int((augment_factor+augment_random_factor)*val_size),...])
+    valX = torch.clone(fullX[:int(val_factor*len_full),...])
+    filtValX = torch.clone(filtFullX[:int(val_factor*len_full),...])
+    valY = torch.clone(fullY[:int(val_factor*len_full),...])
     
     # Grab train slice
+    trainX = torch.clone(fullX[int(val_factor*len_full):int((val_factor+train_factor)*len_full),...])
+    filtTrainX = torch.clone(filtFullX[int(val_factor*len_full):int((val_factor+train_factor)*len_full),...])
+    trainY = torch.clone(fullY[int(val_factor*len_full):int((val_factor+train_factor)*len_full),...])
     
-    # Grab train slice
-    trainX = torch.clone(trainX[int((augment_factor+augment_random_factor)*val_size):,...])
-    filtTrainX = torch.clone(filtTrainX[int((augment_factor+augment_random_factor)*val_size):,...])
-    trainY = torch.clone(trainY[int((augment_factor+augment_random_factor)*val_size):,...])
-    
+    #Grab test slice
+    testX = torch.clone(fullX[int((val_factor+train_factor)*len_full):,...])
+    filtTestX = torch.clone(filtFullX[int((val_factor+train_factor)*len_full):,...])    
+    testY = torch.clone(fullY[int((val_factor+train_factor)*len_full):,...])
+
     # Build dataloaders
     trainX = torch.utils.data.DataLoader(trainX,
                                           batch_size=batch_size,

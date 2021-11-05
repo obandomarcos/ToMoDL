@@ -54,7 +54,6 @@ def formRegDatasets(folder_paths, threshold, img_resize = 100, n_proy = 640,samp
       df.loadRegTransforms()
       # Apply transforms for this dataset
       df.applyRegistration(sample = 'head')                                                         
-
       # Grab data from registration
       if abs(df.Tparams['Ty'].mean()) < threshold:                                                        
         
@@ -79,14 +78,7 @@ def formRegDatasets(folder_paths, threshold, img_resize = 100, n_proy = 640,samp
 
     return datasets_reg
 
-def formDataloaders(datasets, number_projections):
-
-    # Get masked datasets
-    for dataset in datasets:
-
-
-
-def formDataloaders(datasets, number_projections, total_size, train_factor, val_factor, test_factor, batch_size, img_size, tensor_path, augment_factor = 1, augment_random = False, augment_random_factor = 0, load_tensor = True, save_tensor = False):
+def formDataloaders(datasets, number_projections, total_size, train_factor, val_factor, test_factor, batch_size, img_size, tensor_path, augment_factor = 1, load_tensor = True, save_tensor = False):
     """
     Form torch dataloaders for training and testing, full and undersampled
     params:

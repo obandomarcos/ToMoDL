@@ -1,5 +1,5 @@
 """
-Optimise parameters using 
+Optimise parameters K and Lambda simultaneousy 
 """
 import os
 import os,time, sys
@@ -28,33 +28,32 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 folder_paths = [ f140315_3dpf, f140419_5dpf, f140115_1dpf,f140714_5dpf] # Folders to be used
 
 umbral_reg = 50
-#%% Datasets 
-# Training with more than one dataset
 proj_num = 72
 
-train_size = 100
-val_size = 20
-test_size = 20
+train_factor = 0.7
+val_factor = 0.2
+test_factor = 0.1
+total_size = 3000
 
 batch_size = 5
 img_size = 100
-augment_factor = 15
+augment_factor = 10
 train_infos = {}
 test_loss_dict = {}
+tensor_path = datasets_folder+'Proj_{}_augmentFactor_{}_totalSize_{}_'.format(proj_num, augment_factor, total_size)
 
-train_dataset, test_dataset = modutils.formRegDatasets(folder_paths, umbral_reg, img_resize = img_size)
-train_name = 'OptimizationLambda_Test14'
+#datasets = []
+datasets = modutils.formRegDatasets(folder_paths, umbral_reg, img_resize = img_size)
 
-# Load desired and undersampled datasets, on image space. Testing on Test Dataset
-dataloaders = modutils.formDataloaders(train_dataset, test_dataset, proj_num, train_size, val_size, test_size, batch_size, img_size, augment_factor)
+dataloaders = modutils.formDataloaders(datasets, proj_num, total_size, train_factor, val_factor, test_factor, batch_size, img_size, tensor_path, augment_factor, load_tensor = False, save_tensor = True)
 
-print('Lambda Optimization begins...')
-#  Optimization function for lambda
-def lambda_optimization(lambdas):
+train_name = 'OptimizationLambdaK_Test21'
+
+def lambda_K_optimization(lambdas, K):
     
     #%% Model Settings
     nLayer= 4
-    K = 10
+    K = int(K)
     proj_num = 72
     epochs = 20
     max_angle = 640
@@ -72,20 +71,19 @@ def lambda_optimization(lambdas):
     
     return -train_info['val'][-1]
 
-lambda_bounds = {'lambdas':(0.01, 20)}
+parameters_bounds = {'lambdas':(0.01, 20), 'K' : (1,11)}
+
 optimizer = BayesianOptimization(
-        f = lambda_optimization,
-        pbounds = lambda_bounds,
+        f = lambda_K_optimization,
+        pbounds = parameters_bounds,
         random_state = 1, 
         verbose = 2)
 
-init_points = 5
-n_iter = 5
+init_points = 7
+n_iter = 13
 
 optimizer.maximize(init_points = init_points, n_iter = n_iter)
 
 with open(results_folder+'OptimizationValues_'+train_name+'.pkl', 'wb') as f:
 
     pickle.dump(optimizer.res, f)
-
-

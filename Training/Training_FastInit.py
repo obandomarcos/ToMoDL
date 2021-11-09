@@ -46,6 +46,7 @@ tensor_path = datasets_folder+'Proj_{}_augmentFactor_{}_totalSize_{}_'.format(pr
 
 datasets = modutils.formRegDatasets(folder_paths, umbral_reg, img_resize = img_size)
 #datasets = []
+
 dataloaders = modutils.formDataloaders(datasets, proj_num, total_size, train_factor, val_factor, test_factor, batch_size, img_size, tensor_path, augment_factor, load_tensor = False, save_tensor = True)
 
 lambdas = [0.05]

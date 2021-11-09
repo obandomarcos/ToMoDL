@@ -60,7 +60,7 @@ def formRegDatasets(folder_paths, threshold, img_resize = 100, n_proy = 640,samp
         print('Registration transformation {}'.format(df.Tparams['Ty'].mean()))
         # Append volumes
          
-        print("Dataset {}/{} loaded".format(dataset_num, len(folder_paths)))
+        print("Dataset {}/{} loaded".format(dataset_num+1, len(folder_paths)))
         
         dataset = df.getRegisteredVolume('head', margin = disp_reg//2, saveDataset = False, useSegmented = True)
         # Move axis to (N_projections, n_detector, n_slices)
@@ -95,7 +95,8 @@ def formDataloaders(datasets, number_projections, total_size, train_factor, val_
     fullY = []
     
     if load_tensor == False:
-
+        
+        l = len(datasets)*augment_factor
         # Augment factor iterates over the datasets for data augmentation
         for i in range(augment_factor):
 
@@ -106,7 +107,6 @@ def formDataloaders(datasets, number_projections, total_size, train_factor, val_
             # Masks chosen dataset with the number of projections required
             for dataset in datasets:
                 
-                l = len(datasets)
                 tY, tX, filtX = maskDatasets(dataset, number_projections, total_size//l, img_size, rand_angle)
                 
                 fullX.append(tX)
@@ -128,7 +128,7 @@ def formDataloaders(datasets, number_projections, total_size, train_factor, val_
         
         torch.save(fullX, tensor_path+'FullX.pt')
         torch.save(filtFullX, tensor_path+'FiltFullX.pt')
-        torch.save(fullY, tensor_path+'FiltY.pt')
+        torch.save(fullY, tensor_path+'FullY.pt')
     
     # Randomly shuffle the images
     idx = torch.randperm(fullX.shape[0])

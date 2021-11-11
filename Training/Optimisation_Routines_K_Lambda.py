@@ -33,21 +33,21 @@ proj_num = 72
 train_factor = 0.7
 val_factor = 0.2
 test_factor = 0.1
-total_size = 3000
+total_size = 2000
 
 batch_size = 5
 img_size = 100
-augment_factor = 10
+augment_factor = 15
 train_infos = {}
 test_loss_dict = {}
 tensor_path = datasets_folder+'Proj_{}_augmentFactor_{}_totalSize_{}_'.format(proj_num, augment_factor, total_size)
 
-#datasets = []
-datasets = modutils.formRegDatasets(folder_paths, umbral_reg, img_resize = img_size)
+datasets = []
+#datasets = modutils.formRegDatasets(folder_paths, umbral_reg, img_resize = img_size)
 
-dataloaders = modutils.formDataloaders(datasets, proj_num, total_size, train_factor, val_factor, test_factor, batch_size, img_size, tensor_path, augment_factor, load_tensor = False, save_tensor = True)
+dataloaders = modutils.formDataloaders(datasets, proj_num, total_size, train_factor, val_factor, test_factor, batch_size, img_size, tensor_path, augment_factor, load_tensor = True, save_tensor = False)
 
-train_name = 'OptimizationLambdaK_Test21'
+train_name = 'OptimizationLambdaK_Test24'
 
 def lambda_K_optimization(lambdas, K):
     
@@ -71,18 +71,18 @@ def lambda_K_optimization(lambdas, K):
     
     return -train_info['val'][-1]
 
-parameters_bounds = {'lambdas':(0.01, 20), 'K' : (1,11)}
+parameters_bounds = {'lambdas':(0.01, 2.5), 'K' : (1,12)}
 
 optimizer = BayesianOptimization(
         f = lambda_K_optimization,
         pbounds = parameters_bounds,
-        random_state = 1, 
+        random_state = 43, 
         verbose = 2)
 
-init_points = 7
-n_iter = 13
+init_points = 10
+n_iter = 20
 
-optimizer.maximize(init_points = init_points, n_iter = n_iter)
+optimizer.maximize(init_points = init_points, n_iter = n_iter, acq = "ucb", kappa = 10)
 
 with open(results_folder+'OptimizationValues_'+train_name+'.pkl', 'wb') as f:
 

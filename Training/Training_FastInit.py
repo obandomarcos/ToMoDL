@@ -44,13 +44,13 @@ train_infos = {}
 test_loss_dict = {}
 tensor_path = datasets_folder+'Proj_{}_augmentFactor_{}_totalSize_{}_'.format(proj_num, augment_factor, total_size)
 
-datasets = modutils.formRegDatasets(folder_paths, umbral_reg, img_resize = img_size)
-#datasets = []
+#datasets = modutils.formRegDatasets(folder_paths, umbral_reg, img_resize = img_size)
+datasets = []
 
-dataloaders = modutils.formDataloaders(datasets, proj_num, total_size, train_factor, val_factor, test_factor, batch_size, img_size, tensor_path, augment_factor, load_tensor = False, save_tensor = True)
+dataloaders = modutils.formDataloaders(datasets, proj_num, total_size, train_factor, val_factor, test_factor, batch_size, img_size, tensor_path, augment_factor, load_tensor = True, save_tensor = False)
 
-lambdas = [0.05]
-train_name = 'NBN_DatasetSplitting_Test20'
+lambdas = [18]
+train_name = 'NBN_Optimization_Test22'
 
 for lam in lambdas:
     
@@ -58,7 +58,7 @@ for lam in lambdas:
     #%% Model Settings
 
     nLayer= 4
-    K = 10
+    K = 6
     epochs = 20
     max_angle = 640
     

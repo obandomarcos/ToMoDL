@@ -226,8 +226,8 @@ class OPTmodl(nn.Module):
     """
     super(OPTmodl, self).__init__()
     self.out = {}
-    #self.lam = torch.nn.Parameter(torch.tensor([lam], requires_grad = True, device = dev))
-    self.lam = lam
+    self.lam_init = lam
+    self.lam = torch.nn.Parameter(torch.tensor([self.lam_init], requires_grad = True, device = dev))
     self.proj_num = proj_num
     self.epochs_save = 0
 

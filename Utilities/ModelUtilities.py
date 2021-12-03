@@ -46,6 +46,7 @@ def formRegDatasets(folder_paths, threshold, img_resize = 100, n_proy = 640,samp
     disp_reg = math.ceil(max(np.array([abs(d) for d in disp_reg])))
     
     for dataset_num, dataset in enumerate(folder_paths):                                                   
+      
       df = DL.ZebraDataset(dataset, 'Datasets', 'Bassi')
       print('Loading image for dataset {}'.format(df.folderName))                                      
       # Load dataset
@@ -73,9 +74,11 @@ def formRegDatasets(folder_paths, threshold, img_resize = 100, n_proy = 640,samp
         
         # Back to (N_slices, N_projections, n_detector)
         datasets_reg.append(np.moveaxis(dataset, 0,-1))                                                
-            
+        
+        print('Shape',datasets_reg[-1].shape)
+     
       del df
-
+    
     return datasets_reg
 
 def formDataloaders(datasets, number_projections, total_size, train_factor, val_factor, test_factor, batch_size, img_size, tensor_path, augment_factor = 1, load_tensor = True, save_tensor = False):
@@ -343,7 +346,12 @@ def model_training(model, criterion, crit_backproj, crit_fbp, optimizer, dataloa
                    loss_norm = psnr_normalize(outputs['dc'+str(model.K)], labels)
                     
                    if phase == 'train':
-                       
+                        
+                       if (np.isnan(loss.item())):
+                           # Solución provisoria
+                           print('FOUND A NAN IN BATCH {}'.format(batch_i))
+                           continue
+
                        loss.backward()
                        torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm = 1.0, norm_type =2.0)
                        optimizer.step()
@@ -354,6 +362,8 @@ def model_training(model, criterion, crit_backproj, crit_fbp, optimizer, dataloa
                    path_plot = '{}_images_epoch{}_proj{}_batch{}_K{}_lam{}.pdf'.format(phase, epoch, model.proj_num, batch_i, model.K, model.lam)
                    title_plot = title+'{} images epoch{} proj{} batch{} K{} lam{}'.format(phase, epoch, model.proj_num, batch_i, model.K, model.lam)
                    plot_outputs(labels, outputs, root+path_plot, title_plot)
+                
+               print(loss.item(), inputs.size(0), len(dataloaders[phase]['x']))
 
                running_loss += loss.item()*inputs.size(0)
                backproj_loss += loss_backproj.item()*inputs.size(0)
@@ -385,10 +395,10 @@ def model_training(model, criterion, crit_backproj, crit_fbp, optimizer, dataloa
                            )
                        )
                 
-            epoch_loss = running_loss/len(dataloaders[phase]['x'])
-            epoch_loss_fbp = fbp_loss/len(dataloaders[phase]['x'])
-            epoch_loss_backproj = backproj_loss/len(dataloaders[phase]['x'])
-            epoch_loss_norm = norm_loss/len(dataloaders[phase]['x'])
+            epoch_loss = running_loss/(len(dataloaders[phase]['x'])*inputs.size(0))
+            epoch_loss_fbp = fbp_loss/(len(dataloaders[phase]['x'])*inputs.size(0))
+            epoch_loss_backproj = backproj_loss/(len(dataloaders[phase]['x'])*inputs.size(0))
+            epoch_loss_norm = norm_loss/(len(dataloaders[phase]['x'])*inputs.size(0))
 
             train_info[phase].append(epoch_loss)
             train_info[phase+'_fbp'].append(epoch_loss_fbp)

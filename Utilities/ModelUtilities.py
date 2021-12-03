@@ -131,7 +131,7 @@ def formDataloaders(datasets, number_projections, total_size, train_factor, val_
             for dataset_path in datasets:
                 
                 dataset = openDataset(dataset_path)
-                print(dataset.shape)
+                print(dataset.shape, dataset_path)
                 tY, tX, filtX = maskDatasets(dataset, number_projections, total_size//l, img_size, rand_angle)
                 
                 fullX.append(tX)

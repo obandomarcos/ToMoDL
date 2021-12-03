@@ -286,6 +286,8 @@ class ZebraDataset:
                                           'Sample': sample}, ignore_index=True)
     
     self.registeredDataset = self.registeredDataset.sort_values(['Sample','Angle'], axis = 0).reset_index(drop=True)
+    
+    del self.dataset
   
   def getRegisteredVolume(self, sample ,saveDataset = True, margin = 10, useSegmented = False):
     '''
@@ -382,6 +384,9 @@ class ZebraDataset:
       self.registeredDataset = reg['reg_dataset']
       self.Tparams = reg['reg_transform']
 
+  def deleteSection(self, sample):
+
+    self.registeredDataset = self.registeredDataset.drop(self.registeredDataset[self.registeredDataset.Sample == sample].index)
 
 def getDataset(sample, experimentName, randomChoice = True, datasetFilename = 'Datasets/OPTdatasets.hdf5'):
   '''

@@ -79,6 +79,9 @@ def formRegDatasets(folder_paths, threshold, img_resize = 100, n_proy = 640,samp
                 datasets_reg.append(np.moveaxis(dataset, 0,-1))                                                
                 
                 print('Shape',datasets_reg[-1].shape)
+
+            # Deletes registered volume section
+            df.deleteSection(sample)
         
         del df
     

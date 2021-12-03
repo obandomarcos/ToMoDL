@@ -17,6 +17,8 @@ import torchvision.transforms as T
 import pickle
 # import albumentations
 
+results_folder = '/home/marcos/DeepOPT/Resultados/'
+
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 # Torch dataset tidying
 def formRegDatasets(folder_paths, threshold, img_resize = 100, n_proy = 640,sample = 'head', experiment = 'Bassi'):
@@ -137,6 +139,8 @@ def formDataloaders(datasets, number_projections, total_size, train_factor, val_
                 fullX.append(tX)
                 fullY.append(tY)
                 filtFullX.append(filtX)
+
+                plot_sample(filtX, dataset_path)
    
         # Stack augmented datasets
         fullX = torch.vstack(fullX)
@@ -489,6 +493,18 @@ def plot_data(x, y, root):
     ax[1].set_title('Y')
 
     fig.savefig(root)
+
+def plot_sample(X, title):
+
+    fig, axs = plt.subplots(1,3)
+    
+    rand = np.random.choice(range(X.shape[0]), 3, replace=False)
+
+    for i, ax in zip(rand, axs):
+
+        ax.plot(X[i,0,:,:], cmap = 'gray')
+
+    fig.savefig(results_folder+title+'.pdf')
 
 def checkpoint_plot(outputs, root, epoch):
     # outputs

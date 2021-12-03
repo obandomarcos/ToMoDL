@@ -47,37 +47,40 @@ def formRegDatasets(folder_paths, threshold, img_resize = 100, n_proy = 640,samp
     
     for dataset_num, dataset in enumerate(folder_paths):                                                   
       
-      df = DL.ZebraDataset(dataset, 'Datasets', 'Bassi')
-      print('Loading image for dataset {}'.format(df.folderName))                                      
-      # Load dataset
-      df.loadImages(sample = 'head')
-      # Load corresponding registrations
-      df.loadRegTransforms()
-      # Apply transforms for this dataset
-      df.applyRegistration(sample = 'head')                                                         
-      # Grab data from registration
-      if abs(df.Tparams['Ty'].mean()) < threshold:                                                        
+        df = DL.ZebraDataset(dataset, 'Datasets', 'Bassi')
+        print('Loading image for dataset {}'.format(df.folderName))                                      
+        # Load dataset
+        df.loadImages(sample = None)
+        # Load corresponding registrations
+        df.loadRegTransforms()
+        # Apply transforms for this dataset
+        df.applyRegistration()                                                         
+        # Grab data from registration
+
+        for sample in df.registeredDataset.Sample.unique():
+
+            if abs(df.Tparams['Ty'].mean()) < threshold:                                                        
+                
+                print('Registration transformation {}'.format(df.Tparams['Ty'].mean()))
+                # Append volumes
+                
+                print("Dataset {}/{} loaded".format(dataset_num+1, len(folder_paths)))
+                
+                dataset = df.getRegisteredVolume(sample, margin = disp_reg//2, saveDataset = False, useSegmented = True)
+                # Move axis to (N_projections, n_detector, n_slices)
+                dataset = np.rollaxis(dataset, 2)
+                # Resize projection number % 16
+                dataset_size = dataset.shape
+                
+                det_count = int((img_resize+0.5)*np.sqrt(2))
+                dataset = np.array([cv2.resize(img, (det_count, n_proy)) for img in dataset])
+                
+                # Back to (N_slices, N_projections, n_detector)
+                datasets_reg.append(np.moveaxis(dataset, 0,-1))                                                
+                
+                print('Shape',datasets_reg[-1].shape)
         
-        print('Registration transformation {}'.format(df.Tparams['Ty'].mean()))
-        # Append volumes
-         
-        print("Dataset {}/{} loaded".format(dataset_num+1, len(folder_paths)))
-        
-        dataset = df.getRegisteredVolume('head', margin = disp_reg//2, saveDataset = False, useSegmented = True)
-        # Move axis to (N_projections, n_detector, n_slices)
-        dataset = np.rollaxis(dataset, 2)
-        # Resize projection number % 16
-        dataset_size = dataset.shape
-        
-        det_count = int((img_resize+0.5)*np.sqrt(2))
-        dataset = np.array([cv2.resize(img, (det_count, n_proy)) for img in dataset])
-        
-        # Back to (N_slices, N_projections, n_detector)
-        datasets_reg.append(np.moveaxis(dataset, 0,-1))                                                
-        
-        print('Shape',datasets_reg[-1].shape)
-     
-      del df
+        del df
     
     return datasets_reg
 

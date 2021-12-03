@@ -77,14 +77,14 @@ class ZebraDataset:
     Params:
       - sample (string): {None, body, head, tail}
     '''
-    
-    fishPart = self.fishPartCode[sample]
+
     loadList = [f for f in self.fileList if ('tif' in str(f))]
 
     if sample is not None:
-
+  
+      fishPart = self.fishPartCode[sample]
       loadList = [f for f in loadList if (fishPart in str(f))]
-
+      
     loadImages = []
     loadAngle = []
     loadSample = []
@@ -126,8 +126,14 @@ class ZebraDataset:
     """  
     
     # self. = self.dataset[df.dataset.Sample == '000'].sort_values('Angle', axis = 0).reset_index(drop=True)
-    sample = self.fishPart[sample]
-    dataset = self.dataset[self.dataset.Sample == sample].filter(['Angle','Image'])
+    if sample is not None:
+
+      sample = self.fishPart[sample]
+      dataset = self.dataset[self.dataset.Sample == sample].filter(['Angle','Image'])
+    
+    else:
+      
+      dataset = self.dataset.filter(['Angle', 'Image'])
 
     # Assert angle step {360, 720} -> (1, 0.5)
     if dataset['Angle'].max() in [359, 360]:
@@ -156,10 +162,6 @@ class ZebraDataset:
     R.SetOptimizerAsGradientDescentLineSearch(learningRate=0.1,
                                               numberOfIterations=10)
     R.SetInterpolator(sitk.sitkLinear)
-    
-    # Connect all of the observers so that we can perform plotting during registration.
-    # R.AddCommand(sitk.sitkStartEvent, start_plot)
-    # R.AddCommand(sitk.sitkIterationEvent, lambda: plot_values(R))
     
     for angle in tqdm(angles):
       
@@ -231,57 +233,57 @@ class ZebraDataset:
     # Order by angle
     self.registeredDataset = self.registeredDataset.sort_values(['Sample','Angle'], axis = 0).reset_index(drop=True)
   
-  def applyRegistration(self, sample):
+  def applyRegistration(self):
     """
     Applies mean registration for dataset from registration params
     """
 
     assert(self.Tparams is not None)
     
-    sample_code = self.fishPart[sample]
-    dataset = self.dataset[self.dataset.Sample == sample_code].filter(['Angle','Image'])
-
-    # Assert angle step {360, 720} -> (1, 0.5)
-    if dataset['Angle'].max() in [359, 360]:
-      self.maxAngle = 360
-    else:
-      self.maxAngle = 720
-
-    angles = np.arange(0, self.maxAngle//2, 1).astype(float)
-
     self.registeredDataset = pd.DataFrame(columns = ['Image', 'Angle', 'Sample'])
-    
-    for angle in tqdm(angles):
 
-      fixed =  dataset[dataset.Angle == angle].iloc[0]['Image'].astype(float)
-      moving = dataset[dataset.Angle == angle+self.maxAngle//2].iloc[0]['Image'].astype(float)
+    for sample in self.dataset.Sample.unique():
 
-      fixed_s = sitk.Cast(sitk.GetImageFromArray(fixed), sitk.sitkFloat32)
-      moving_s = sitk.Cast(sitk.GetImageFromArray(moving), sitk.sitkFloat32)
+      dataset = self.dataset[self.dataset.Sample == sample].filter(['Angle','Image'])
 
-      
-      # setting moving transform
-      transform = sitk.TranslationTransform(2)
-      transform.SetParameters((0, -self.meanDisplacement/2))  # Fixed image to center
-      
-      fixed_s_T = sitk.Resample(fixed_s, 
-                                    transform, 
-                                    sitk.sitkLinear, 
-                                    0.0,
-                                    fixed_s.GetPixelID())
+      # Assert angle step {360, 720} -> (1, 0.5)
+      if dataset['Angle'].max() in [359, 360]:
+        self.maxAngle = 360
+      else:
+        self.maxAngle = 720
 
-      moving_s_T = sitk.Resample(moving_s, 
-                                    transform, 
-                                    sitk.sitkLinear, 
-                                    0.0,
-                                    moving_s.GetPixelID())
-      # Append to registered dataset
-      self.registeredDataset = self.registeredDataset.append({'Image' : sitk.GetArrayFromImage(fixed_s_T),
-                                        'Angle': angle,
-                                        'Sample': sample}, ignore_index=True)
-      self.registeredDataset = self.registeredDataset.append({'Image' : sitk.GetArrayFromImage(moving_s_T),
-                                        'Angle': angle+self.maxAngle//2,
-                                        'Sample': sample}, ignore_index=True)
+      angles = np.arange(0, self.maxAngle//2, 1).astype(float)
+  
+      for angle in tqdm(angles):
+
+        fixed =  dataset[dataset.Angle == angle].iloc[0]['Image'].astype(float)
+        moving = dataset[dataset.Angle == angle+self.maxAngle//2].iloc[0]['Image'].astype(float)
+
+        fixed_s = sitk.Cast(sitk.GetImageFromArray(fixed), sitk.sitkFloat32)
+        moving_s = sitk.Cast(sitk.GetImageFromArray(moving), sitk.sitkFloat32)
+        
+        # setting moving transform
+        transform = sitk.TranslationTransform(2)
+        transform.SetParameters((0, -self.meanDisplacement/2))  # Fixed image to center
+        
+        fixed_s_T = sitk.Resample(fixed_s, 
+                                      transform, 
+                                      sitk.sitkLinear, 
+                                      0.0,
+                                      fixed_s.GetPixelID())
+
+        moving_s_T = sitk.Resample(moving_s, 
+                                      transform, 
+                                      sitk.sitkLinear, 
+                                      0.0,
+                                      moving_s.GetPixelID())
+        # Append to registered dataset
+        self.registeredDataset = self.registeredDataset.append({'Image' : sitk.GetArrayFromImage(fixed_s_T),
+                                          'Angle': angle,
+                                          'Sample': sample}, ignore_index=True)
+        self.registeredDataset = self.registeredDataset.append({'Image' : sitk.GetArrayFromImage(moving_s_T),
+                                          'Angle': angle+self.maxAngle//2,
+                                          'Sample': sample}, ignore_index=True)
     
     self.registeredDataset = self.registeredDataset.sort_values(['Sample','Angle'], axis = 0).reset_index(drop=True)
   

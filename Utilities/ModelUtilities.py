@@ -100,7 +100,7 @@ def openDataset(dataset_path):
                     
         datasets_reg = pickle.load(f)
 
-    return dataset_reg
+    return datasets_reg
 
 def formDataloaders(datasets, number_projections, total_size, train_factor, val_factor, test_factor, batch_size, img_size, tensor_path, augment_factor = 1, load_tensor = True, save_tensor = False):
     """

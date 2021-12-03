@@ -58,7 +58,7 @@ def formRegDatasets(folder_paths, threshold, img_resize = 100, n_proy = 640,samp
         
         else:    
 
-            df = DL.ZebraDataset(dataset, 'Datasets', 'Bassi')
+            df = DL.ZebraDataset(folder_path, 'Datasets', 'Bassi')
             print('Loading image for dataset {}'.format(df.folderName))                                      
             # Load dataset
             df.loadImages(sample = None)

@@ -8,15 +8,15 @@ import numpy as np
 from Folders_cluster import *
 import ModelUtilities as modutils
 
-nLayer = 4
+nLayer = 9
 K = 10
-epochs = 20
+epochs = 30
 lam = 0.05
 max_angle = 720
 proj_num = 72
 img_size = 100
-train_size = 100
-train_name = 'NBN_Lambdas_Test15'
+train_size = 0.7
+train_name = 'TestingBatch_Test35'
 batch_size = 5
 
 with open(results_folder+train_name+'Dict_Proj{}_nlay{}_epochs{}_K{}_lam{}_trnSize{}.pkl'.format(proj_num, nLayer, epochs, K, lam, train_size), 'rb') as f:
@@ -25,9 +25,9 @@ with open(results_folder+train_name+'Dict_Proj{}_nlay{}_epochs{}_K{}_lam{}_trnSi
 #%% Plot
 fig, ax = plt.subplots(1,1, figsize = (8,6))
 
-train = modutils.psnr(img_size, train_info[K]['train'], batch_size)
-val = modutils.psnr(img_size,train_info[K]['val'], batch_size)
-train_fbp = modutils.psnr(img_size,train_info[K]['train_fbp'], batch_size)
+train = modutils.psnr(img_size, train_info[K]['train'], batch_size)+10*np.log10(batch_size)
+val = modutils.psnr(img_size,train_info[K]['val'], batch_size)+10*np.log10(batch_size)
+train_fbp = modutils.psnr(img_size,train_info[K]['train_fbp'], batch_size)+10*np.log10(batch_size)
 
 print(val[-1])
 print(train_fbp[-1])

@@ -10,6 +10,10 @@ import numpy as np
 from torch_radon import Radon, RadonFanbeam
 from torch_radon.solvers import cg
 import matplotlib.pyplot as plt 
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+
 
 dev=torch.device("cuda") 
 
@@ -211,7 +215,7 @@ def dc(Aobj, rhs, useTorchRadon = False):
 
 class OPTmodl(nn.Module):
   
-  def __init__(self, nLayer, K, n_angles, proj_num, image_size, mask, lam, shared, results_folder):
+  def __init__(self, nLayer, K, n_angles, proj_num, image_size, mask, lam, shared, results_folder, useUnet = False):
     """
     Main function that creates the model
     Params : 
@@ -230,11 +234,17 @@ class OPTmodl(nn.Module):
     self.lam = torch.nn.Parameter(torch.tensor([self.lam_init], requires_grad = True, device = dev))
     self.proj_num = proj_num
     self.epochs_save = 0
-
-    if shared == True:
-      self.dw = dw(nLayer)
+    
+    if useUnet == True:
+        
+        self.dw = UNet(1,1)
+        
     else:
-      self.dw = nn.ModuleList([dw(nLayer) for _ in range(K)])
+
+        if shared == True:
+            self.dw = dw(nLayer)
+        else:
+            self.dw = nn.ModuleList([dw(nLayer) for _ in range(K)])
     
     if torch.cuda.is_available():
       self.dw.cuda(dev)
@@ -292,96 +302,204 @@ def normalize01(images):
 
     return image_norm
 
-class Unet(nn.Module):
-    def __init__(self, in_channel=1, out_channel=1):
-        super(Unet, self).__init__()
-        #Descending branch
-        self.conv_encode1 = self.contract(in_channels=in_channel, out_channels=16)
-        self.conv_maxpool1 = torch.nn.MaxPool2d(kernel_size=2)
-        self.conv_encode2 = self.contract(16, 32)
-        self.conv_maxpool2 = torch.nn.MaxPool2d(kernel_size=2)
-        self.conv_encode3 = self.contract(32, 64)
-        self.conv_maxpool3 = torch.nn.MaxPool2d(kernel_size=2)
-        #Bottleneck
-        self.bottleneck = self.bottle_neck(64)
-        #Decode branch
-        self.conv_decode4 = self.expans(64,64,64)
-        self.conv_decode3 = self.expans(128, 64, 32)
-        self.conv_decode2 = self.expans(64, 32, 16)
-        self.final_layer = self.final_block(32, 16, out_channel)
-        
-    
-    def contract(self, in_channels, out_channels, kernel_size=3, padding=1):
-        block = torch.nn.Sequential(
-                    torch.nn.Conv2d(kernel_size=kernel_size, in_channels=in_channels, out_channels=out_channels, padding=padding),
-                    torch.nn.ReLU(),
-                    torch.nn.BatchNorm2d(out_channels),
-                    torch.nn.Conv2d(kernel_size=kernel_size, in_channels=out_channels, out_channels=out_channels, padding=padding),
-                    torch.nn.ReLU(),
-                    torch.nn.BatchNorm2d(out_channels),
-                    )
-        return block
-    
-    def expans(self, in_channels, mid_channel, out_channels, kernel_size=3,padding=1):
-            block = torch.nn.Sequential(
-                    torch.nn.Conv2d(kernel_size=kernel_size, in_channels=in_channels, out_channels=mid_channel, padding=padding),
-                    torch.nn.ReLU(),
-                    torch.nn.BatchNorm2d(mid_channel),
-                    torch.nn.Conv2d(kernel_size=kernel_size, in_channels=mid_channel, out_channels=mid_channel, padding=padding),
-                    torch.nn.ReLU(),
-                    torch.nn.BatchNorm2d(mid_channel),
-                    torch.nn.ConvTranspose2d(in_channels=mid_channel, out_channels=out_channels, kernel_size=kernel_size, stride=2,padding=padding, output_padding=1)
-                    )
+# U-Net
 
-            return  block
-    
+class double_conv(nn.Module):
+    '''(conv => BN => ReLU) * 2'''
+    def __init__(self, in_ch, out_ch):
+        super(double_conv, self).__init__()
+        self.conv = nn.Sequential(
+            nn.Conv2d(in_ch, out_ch, 3, padding=1),
+            #nn.BatchNorm2d(out_ch),
+            nn.ReLU(inplace=True),
+            #nn.Dropout2d(),
+            nn.Conv2d(out_ch, out_ch, 3, padding=1),
+            #nn.BatchNorm2d(out_ch),
+            nn.ReLU(inplace=True),
+            #nn.Dropout2d()
+        )
 
-    def concat(self, upsampled, bypass):
-        out = torch.cat((upsampled,bypass),1)
-        return out
-    
-    def bottle_neck(self,in_channels, kernel_size=3, padding=1):
-        bottleneck = torch.nn.Sequential(
-            torch.nn.Conv2d(kernel_size=kernel_size, in_channels=in_channels, out_channels=2*in_channels, padding=padding),
-            torch.nn.ReLU(),
-            torch.nn.Conv2d(kernel_size=kernel_size, in_channels=2*in_channels, out_channels=in_channels, padding=padding),
-            torch.nn.ReLU(),
-            )
-        return bottleneck
-    
-    def final_block(self, in_channels, mid_channel, out_channels, kernel_size=3):
-            block = torch.nn.Sequential(
-                    torch.nn.Conv2d(kernel_size=kernel_size, in_channels=in_channels, out_channels=mid_channel,padding=1),
-                    torch.nn.ReLU(),
-                    torch.nn.BatchNorm2d(mid_channel),
-                    torch.nn.Conv2d(kernel_size=kernel_size, in_channels=mid_channel, out_channels=mid_channel,padding=1),
-                    torch.nn.ReLU(),
-                    torch.nn.BatchNorm2d(mid_channel),
-                    torch.nn.Conv2d(kernel_size=kernel_size, in_channels=mid_channel, out_channels=out_channels, padding=1),
-                    )
-            return  block
-    
-    def forward(self, x ,b,c,h,w,x0, var):
-        
-        #Encode
-        encode_block1 = self.conv_encode1(x)
-        x = self.conv_maxpool1(encode_block1)
-        encode_block2 = self.conv_encode2(x)
-        x = self.conv_maxpool2(encode_block2)
-        encode_block3 = self.conv_encode3(x)
-        x = self.conv_maxpool3(encode_block3)
-        
-        # Bottleneck
-        x = self.bottleneck(x)
-        
-        # Decode
-        x = self.conv_decode4(x)
-        x = self.concat(x, encode_block3)
-        x = self.conv_decode3(x)
-        x = self.concat(x, encode_block2)
-        x = self.conv_decode2(x)
-        x = self.concat(x, encode_block1)
-        x = self.final_layer(x)      
+    def forward(self, x):
+        x = self.conv(x)
         return x
+
+
+class inconv(nn.Module):
+    def __init__(self, in_ch, out_ch):
+        super(inconv, self).__init__()
+        self.conv = double_conv(in_ch, out_ch)
+        #self.conv = nn.Sequential(
+        #    nn.BatchNorm2d(in_ch),
+        #    double_conv(in_ch, out_ch)
+        #)
+    def forward(self, x):
+        x = self.conv(x)
+        return x
+
+
+class down(nn.Module):
+    def __init__(self, in_ch, out_ch):
+        super(down, self).__init__()
+        self.mpconv = nn.Sequential(
+            nn.MaxPool2d(2),
+            double_conv(in_ch, out_ch)
+        )
+
+    def forward(self, x):
+        x = self.mpconv(x)
+        return x
+
+
+class up(nn.Module):
+    def __init__(self, in_ch, out_ch, bilinear=True):
+        super(up, self).__init__()
+
+        #  would be a nice idea if the upsampling could be learned too,
+        #  but my machine do not have enough memory to handle all those weights
+        if bilinear:
+            self.up = nn.Upsample(scale_factor=2, mode='bilinear', align_corners=True)
+        else:
+            self.up = nn.ConvTranspose2d(in_ch//2, in_ch//2, 2, stride=2)
+
+        self.conv = double_conv(in_ch, out_ch)
+
+    def forward(self, x1, x2):
+        x1 = self.up(x1)
+        diffX = x1.size()[2] - x2.size()[2]
+        diffY = x1.size()[3] - x2.size()[3]
+        x2 = F.pad(x2, (diffX // 2, int(diffX / 2),
+                        diffY // 2, int(diffY / 2)))
+        x = torch.cat([x2, x1], dim=1)
+        x = self.conv(x)
+        return x
+
+
+class outconv(nn.Module):
+    def __init__(self, in_ch, out_ch):
+        super(outconv, self).__init__()
+        self.conv = nn.Conv2d(in_ch, out_ch, 1, padding = (2,2))
+
+    def forward(self, x):
+        x = self.conv(x)
+        return x
+
+
+
+class UNet(nn.Module):
+    def __init__(self, n_channels, n_classes):
+        super(UNet, self).__init__()
+        self.inc = inconv(n_channels, 64)
+        self.down1 = down(64, 128)
+        self.down2 = down(128, 256)
+        self.down3 = down(256, 512)
+        self.down4 = down(512, 512)
+        self.up1 = up(1024, 256)
+        self.up2 = up(512, 128)
+        self.up3 = up(256, 64)
+        self.up4 = up(128, 64)
+        self.outc = outconv(64, n_classes)
+
+    def forward(self, x0):
+        x1 = self.inc(x0)
+        x2 = self.down1(x1)
+        x3 = self.down2(x2)
+        x4 = self.down3(x3)
+        x5 = self.down4(x4)
+        x = self.up1(x5, x4)
+        x = self.up2(x, x3)
+        x = self.up3(x, x2)
+        x = self.up4(x, x1)
+        x = self.outc(x)
+        return x#F.sigmoid(x)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 

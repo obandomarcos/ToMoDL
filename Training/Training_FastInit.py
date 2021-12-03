@@ -24,9 +24,10 @@ from tqdm import tqdm
 
 # Using CPU or GPU
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-folder_paths = [ f140315_3dpf, f140419_5dpf, f140115_1dpf,f140714_5dpf] # Folders to be used
+folder_paths = [f140117_3dpf, f140114_5dpf, f140315_3dpf, f140419_5dpf, f140115_1dpf,f140714_5dpf]#, f140117_3dpf, f140114_5dpf] # Folders to be used
 
-umbral_reg = 50
+torch.autograd.detect_anomaly()
+umbral_reg = 200
 
 #%% Datasets 
 # Training with more than one dataset
@@ -35,11 +36,11 @@ proj_num = 72
 train_factor = 0.7
 val_factor = 0.2
 test_factor = 0.1
-total_size = 2000
+total_size = 3000
 
 batch_size = 5
 img_size = 100
-augment_factor = 15
+augment_factor = 2
 train_infos = {}
 test_loss_dict = {}
 tensor_path = datasets_folder+'Proj_{}_augmentFactor_{}_totalSize_{}_'.format(proj_num, augment_factor, total_size)
@@ -49,24 +50,24 @@ datasets = []
 
 dataloaders = modutils.formDataloaders(datasets, proj_num, total_size, train_factor, val_factor, test_factor, batch_size, img_size, tensor_path, augment_factor, load_tensor = True, save_tensor = False)
 
-lambdas = [18]
-train_name = 'NBN_Optimization_Test22'
+lambdas = [0.05]
+train_name = 'NoBatchNormalization_Test37'
 
 for lam in lambdas:
     
     # Load desired and undersampled datasets, on image space. Testing on Test Dataset    
     #%% Model Settings
 
-    nLayer= 4
-    K = 6
-    epochs = 20
+    nLayer= 9
+    K = 10
+    epochs = 30
     max_angle = 640
     
-    model = modl.OPTmodl(nLayer, K, max_angle, proj_num, img_size, None, lam, True, results_folder)
+    model = modl.OPTmodl(nLayer, K, max_angle, proj_num, img_size, None, lam, True, results_folder, useUnet = True)
     loss_fn = torch.nn.MSELoss(reduction = 'sum')
     loss_fbp_fn = torch.nn.MSELoss(reduction = 'sum')
     loss_backproj_fn = torch.nn.MSELoss(reduction = 'sum')
-    lr = 1e-3
+    lr = 1e-4
     optimizer = torch.optim.Adam(model.parameters(), lr = lr)
         
     #### Training
@@ -97,7 +98,7 @@ for lam in lambdas:
     test_loss_total = []
     test_loss_fbp_total = []
 
-    for inp, target in tqdm(zip(dataloaders['test']['x'], dataloaders['test']['y'])): 
+    for inp, target, filtX in tqdm(zip(dataloaders['test']['x'], dataloaders['test']['y'], dataloaders['test']['filtX'])): 
         
         pred = model(inp)
         loss_test = loss_fn(pred['dc'+str(K)], target)

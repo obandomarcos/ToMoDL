@@ -96,7 +96,7 @@ def formRegDatasets(folder_paths, threshold, img_resize = 100, n_proy = 640,samp
 
 def openDataset(dataset_path):
             
-    with open(str(folder_path)+'_registered'+'.pkl', 'rb') as f:
+    with open(str(dataset_path)+'_registered'+'.pkl', 'rb') as f:
                     
         datasets_reg = pickle.load(dataset_reg, f)
 
@@ -106,7 +106,6 @@ def formDataloaders(datasets, number_projections, total_size, train_factor, val_
     """
     Form torch dataloaders for training and testing, full and undersampled
     params:
-        - datasets is a list of paths containing the registered sinograms to be processed into images
         - number_projections is the number of projections the sinogram is reconstructed with for undersampled FBP
         - train size (test_size) is the number of training (test) images to be taken from the volumes. They are taken randomly using formDatasets
         - batch_size is the number of images a batch contains in the dataloader

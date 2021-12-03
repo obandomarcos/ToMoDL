@@ -18,7 +18,7 @@ import torchvision.transforms as T
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 # Torch dataset tidying
-def formRegDatasets(folder_paths, threshold, img_resize = 100, n_proy = 640,sample = 'head', experiment = 'Bassi'):
+def formRegDatasets(folder_paths, threshold, img_resize = 100, n_proy = 640,sample = 'head', experiment = 'Bassi', loadDataset = True, saveDataset = False):
     """
     Forms registered datasets from raw projection data.
     params:
@@ -32,7 +32,8 @@ def formRegDatasets(folder_paths, threshold, img_resize = 100, n_proy = 640,samp
 
     datasets_reg = []
     disp_reg = []
-    
+
+    # Get registration value
     for dataset in folder_paths:    
       
       df = DL.ZebraDataset(dataset, 'Datasets', 'Bassi')
@@ -45,46 +46,63 @@ def formRegDatasets(folder_paths, threshold, img_resize = 100, n_proy = 640,samp
     # Agarro el mayor valor de desplazamiento para cortar el volumen
     disp_reg = math.ceil(max(np.array([abs(d) for d in disp_reg])))
     
-    for dataset_num, dataset in enumerate(folder_paths):                                                   
-      
-        df = DL.ZebraDataset(dataset, 'Datasets', 'Bassi')
-        print('Loading image for dataset {}'.format(df.folderName))                                      
-        # Load dataset
-        df.loadImages(sample = None)
-        # Load corresponding registrations
-        df.loadRegTransforms()
-        # Apply transforms for this dataset
-        df.applyRegistration()                                                         
-        # Grab data from registration
-
-        for sample in df.registeredDataset.Sample.unique():
-
-            if abs(df.Tparams['Ty'].mean()) < threshold:                                                           
-                print('Registration transformation {}'.format(df.Tparams['Ty'].mean()))
-                # Append volumes
-                
-                print("Dataset {}/{} loaded".format(dataset_num+1, len(folder_paths)))
-                
-                dataset = df.getRegisteredVolume(sample, margin = disp_reg//2, saveDataset = False, useSegmented = True)
-                # Move axis to (N_projections, n_detector, n_slices)
-                dataset = np.rollaxis(dataset, 2)
-                # Resize projection number % 16
-                dataset_size = dataset.shape
-                
-                det_count = int((img_resize+0.5)*np.sqrt(2))
-                dataset = np.array([cv2.resize(img, (det_count, n_proy)) for img in dataset])
-                
-                # Back to (N_slices, N_projections, n_detector)
-                datasets_reg.append(np.moveaxis(dataset, 0,-1))                                                
-                
-                print('Shape',datasets_reg[-1].shape)
-
-            # Deletes registered volume section
-            df.deleteSection(sample)
+    for dataset_num, folder_path in enumerate(folder_paths):                                                   
         
-        del df
+        # Loads dataset registered
+        if loadDataset == True:
+            
+            with open(str(folder_path)+'registered'+'.pkl', 'rb') as f:
+                    
+                datasets_reg.append(pickle.load(dataset_reg, f))
+        
+        else:    
+
+            df = DL.ZebraDataset(dataset, 'Datasets', 'Bassi')
+            print('Loading image for dataset {}'.format(df.folderName))                                      
+            # Load dataset
+            df.loadImages(sample = None)
+            # Load corresponding registrations
+            df.loadRegTransforms()
+            # Apply transforms for this dataset
+            df.applyRegistration()                                                         
+            # Grab data from registration
+            
+            print('Registration transformation {}'.format(df.Tparams['Ty'].mean()))
+            # Append volumes        
+            print("Dataset {}/{} loaded".format(dataset_num+1, len(folder_paths)))
+            
+            for sample in df.registeredDataset.Sample.unique():
+
+                if abs(df.Tparams['Ty'].mean()) < threshold:                                                           
+                            
+                    dataset = df.getRegisteredVolume(sample, margin = disp_reg//2, saveDataset = False, useSegmented = True)
+                    # Move axis to (N_projections, n_detector, n_slices)
+                    dataset = np.rollaxis(dataset, 2)
+                    # Resize projection number % 16
+                    dataset_size = dataset.shape
+                    
+                    det_count = int((img_resize+0.5)*np.sqrt(2))
+                    dataset = np.array([cv2.resize(img, (det_count, n_proy)) for img in dataset])
+                    
+                    # Back to (N_slices, N_projections, n_detector)
+                    dataset_reg.append(np.moveaxis(dataset, 0,-1))                                                
+                    
+                    print('Shape',dataset_reg[-1].shape)
+
+                # Deletes registered volume section
+                df.deleteSection(sample)
+            
+            if saveDataset == True:
+
+                with open(str(df.folderPath)+'registered'+'.pkl', 'wb') as f:
+                    
+                    pickle.dump(dataset_reg, f)
+            
+            datasets_reg.append(dataset_reg)
+            
+            del df
     
-    return datasets_reg
+    return [np.stack(datasets) for datasets in datasets_reg]
 
 def formDataloaders(datasets, number_projections, total_size, train_factor, val_factor, test_factor, batch_size, img_size, tensor_path, augment_factor = 1, load_tensor = True, save_tensor = False):
     """

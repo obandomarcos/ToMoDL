@@ -502,7 +502,7 @@ def plot_sample(X, title):
 
     for i, ax in zip(rand, axs):
 
-        ax.plot(X[i,0,:,:], cmap = 'gray')
+        ax.imshow(X[i,0,:,:], cmap = 'gray')
 
     fig.savefig(results_folder+title+'.pdf')
 

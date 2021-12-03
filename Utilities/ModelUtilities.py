@@ -51,7 +51,7 @@ def formRegDatasets(folder_paths, threshold, img_resize = 100, n_proy = 640,samp
         # Loads dataset registered
         if loadDataset == True:
             
-            with open(str(folder_path)+'registered'+'.pkl', 'rb') as f:
+            with open(str(folder_path)+'_registered'+'.pkl', 'rb') as f:
                     
                 datasets_reg.append(pickle.load(dataset_reg, f))
         
@@ -85,8 +85,7 @@ def formRegDatasets(folder_paths, threshold, img_resize = 100, n_proy = 640,samp
                     dataset = np.array([cv2.resize(img, (det_count, n_proy)) for img in dataset])
                     
                     # Back to (N_slices, N_projections, n_detector)
-                    dataset_reg.append(np.moveaxis(dataset, 0,-1))                                                
-                    
+                    dataset_reg.append(np.moveaxis(dataset, 0,-1))                                                               
                     print('Shape',dataset_reg[-1].shape)
 
                 # Deletes registered volume section
@@ -94,7 +93,7 @@ def formRegDatasets(folder_paths, threshold, img_resize = 100, n_proy = 640,samp
             
             if saveDataset == True:
 
-                with open(str(df.folderPath)+'registered'+'.pkl', 'wb') as f:
+                with open(str(df.folderPath)+'_registered'+'.pkl', 'wb') as f:
                     
                     pickle.dump(dataset_reg, f)
             

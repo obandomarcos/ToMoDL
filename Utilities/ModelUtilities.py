@@ -98,7 +98,7 @@ def openDataset(dataset_path):
             
     with open(str(dataset_path)+'_registered'+'.pkl', 'rb') as f:
                     
-        datasets_reg = pickle.load(dataset_reg, f)
+        datasets_reg = pickle.load(f)
 
     return dataset_reg
 

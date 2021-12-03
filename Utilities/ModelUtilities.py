@@ -100,7 +100,7 @@ def openDataset(dataset_path):
                     
         datasets_reg = pickle.load(f)
 
-    return datasets_reg
+    return np.vstack(datasets_reg)
 
 def formDataloaders(datasets, number_projections, total_size, train_factor, val_factor, test_factor, batch_size, img_size, tensor_path, augment_factor = 1, load_tensor = True, save_tensor = False):
     """
@@ -131,6 +131,7 @@ def formDataloaders(datasets, number_projections, total_size, train_factor, val_
             for dataset_path in datasets:
                 
                 dataset = openDataset(dataset_path)
+                print(dataset.shape)
                 tY, tX, filtX = maskDatasets(dataset, number_projections, total_size//l, img_size, rand_angle)
                 
                 fullX.append(tX)

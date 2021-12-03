@@ -140,7 +140,7 @@ def formDataloaders(datasets, number_projections, total_size, train_factor, val_
                 fullY.append(tY)
                 filtFullX.append(filtX)
 
-                plot_sample(filtX, dataset_path[-10:])
+                plot_sample(filtX, dataset_path[-10:]+'filtY')
    
         # Stack augmented datasets
         fullX = torch.vstack(fullX)

@@ -70,7 +70,8 @@ def formRegDatasets(folder_paths, threshold, img_resize = 100, n_proy = 640,samp
             print('Registration transformation {}'.format(df.Tparams['Ty'].mean()))
             # Append volumes        
             print("Dataset {}/{} loaded".format(dataset_num+1, len(folder_paths)))
-            
+
+            dataset_reg = []            
             for sample in df.registeredDataset.Sample.unique():
 
                 if abs(df.Tparams['Ty'].mean()) < threshold:                                                           

@@ -284,9 +284,10 @@ class ZebraDataset:
         self.registeredDataset = self.registeredDataset.append({'Image' : sitk.GetArrayFromImage(moving_s_T),
                                           'Angle': angle+self.maxAngle//2,
                                           'Sample': sample}, ignore_index=True)
+      
+      self.dataset = self.dataset.drop(self.dataset[self.dataset.Sample == sample].index)
     
     self.registeredDataset = self.registeredDataset.sort_values(['Sample','Angle'], axis = 0).reset_index(drop=True)
-    
     del self.dataset
   
   def getRegisteredVolume(self, sample ,saveDataset = True, margin = 10, useSegmented = False):

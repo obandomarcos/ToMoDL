@@ -13,7 +13,7 @@ import DataLoading as dl
 
 def TwIST(y, A, AT, tau, kwarg, true_img = None):
   '''
-  This function solves the regularization problem
+  his function solves the regularization problem
      arg min_x = 0.5*|| y - A x ||_2^2 + tau phi( x ), 
 
   where A is a generic matrix and phi(.) is a regularizarion 
@@ -43,8 +43,6 @@ def TwIST(y, A, AT, tau, kwarg, true_img = None):
 
   '''
   # Normalization / True_img comes prevously normalised at fbp reconstruction 
-  y = y-y.min()
-  y /= y.max()
 
   # Default optional parameters
   stopCriterion = 1
@@ -135,7 +133,7 @@ def TwIST(y, A, AT, tau, kwarg, true_img = None):
       print('Unrecognized option: {}'.format(k))
       return
   
-  if (true_img is not None) & (true_img.size == AT(np.zeros(y.shape)).size):
+  if (true_img is not None):
     
     true_img = true_img
 
@@ -240,9 +238,9 @@ def TwIST(y, A, AT, tau, kwarg, true_img = None):
         print('Parameter tau has wrong dimensions; it should be scalar or size(x)')
   
   #if the true_img x was given, check its size
-  if compute_mse and (true_img.size != x.size):  
-    print('Initial x has incompatible size') 
-    return
+  #if compute_mse and (true_img.size != x.size):  
+  #  print('Initial x has incompatible size') 
+  #  return
 
   # if tau is large enough, in the case of phi = l1, thus psi = soft,
   # the optimal solution is the zero vector
@@ -269,6 +267,7 @@ def TwIST(y, A, AT, tau, kwarg, true_img = None):
   num_nz_x = np.sum(nz_x)
   
   # Compute and store initial value of the objective function
+
   resid =  (y-A(x))
   prev_f = 0.5*(np.dot(resid.flatten().T,resid.flatten())) + tau*phi_function(x)
 
@@ -321,6 +320,8 @@ def TwIST(y, A, AT, tau, kwarg, true_img = None):
         # two-step iteration
         xm2 = (alpha-beta)*xm1 + (1-alpha)*xm2 + beta*x
         # compute residual
+        y_new = A(xm2) 
+        
         resid =  y-A(xm2)
         f = 0.5*(np.dot(resid.flatten().T, resid.flatten())) + tau*phi_function(xm2)
 
@@ -340,8 +341,8 @@ def TwIST(y, A, AT, tau, kwarg, true_img = None):
       
       else:
            
+        y_new = A(x)
         resid = y-A(x)
-        
         f = 0.5*(np.dot(resid.flatten().T, resid.flatten())) + tau*phi_function(x)
         
         if f > prev_f:
@@ -474,10 +475,7 @@ def ADMM(y, A, AT, Den, alpha, delta, max_iter,
   assert(callable(AT))  # Assert AT is callable
   assert(callable(Den))  # Assert Denoiser is callable
 
-  # Normalization
-  y = y-y.min()
-  y /= y.max()
-  
+  # Normalization  
   b = np.zeros(AT(y).shape)
   s = np.zeros(AT(y).shape)
   u = np.zeros(AT(y).shape)
@@ -530,22 +528,23 @@ def ADMM(y, A, AT, Den, alpha, delta, max_iter,
       if true_img is not None:
         
         ISNR=20*np.log10(np.linalg.norm((AT(y)-true_img).flatten())/np.linalg.norm((s-true_img).flatten()));
-      
-      res = y-A(snew)
+      y_new = A(snew)
+      y_new = (y_new-y_new.min())/(y_new.max()-y_new.min())
+
+      res = y-y_new
       objective.append(0.5*(np.dot(res.flatten(), res.flatten())) +
                        alpha*phi(snew))
       error_MSE.append(np.linalg.norm(true_img-s)**2)
       error_SSIM.append(ssim(true_img, s))
       
       if i>=2:
-          crit = abs(objective[i]-objective[i-1])/objective[i-1];
-          
-          if crit < tol:
-            break
+          crit = abs(objective[i]-objective[i-1])/objective[i-1]; 
 
           print('{}\t|{}\t|{}\t|{}\t{}'.format(
                 i, np.round(10*np.log10(np.sum((AT(y)-true_img)**2)/np.sum((s-true_img)**2)),3), 
                 objective[i], crit/tol, alpha*phi(snew)))
+          if crit < tol:
+            break
 
       if alpha_weight is True:
         

@@ -21,7 +21,7 @@ results_folder = '/home/marcos/DeepOPT/Resultados/'
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 # Torch dataset tidying
-def formRegDatasets(folder_paths, threshold, img_resize = 100, n_proy = 640,sample = 'head', experiment = 'Bassi'):
+def formRegDatasets(folder_paths, threshold, img_resize = 100, n_proy = 640,sample = None, experiment = 'Bassi'):
     """
     Forms registered datasets from raw projection data.
     params:
@@ -55,7 +55,7 @@ def formRegDatasets(folder_paths, threshold, img_resize = 100, n_proy = 640,samp
         df = DL.ZebraDataset(folder_path, 'Datasets', 'Bassi')
         print('Loading image for dataset {}'.format(df.folderName))                                      
         # Load dataset
-        df.loadImages(sample = None)
+        df.loadImages(sample = sample)
         # Load corresponding registrations
         df.loadRegTransforms()
         # Apply transforms for this dataset
@@ -133,14 +133,14 @@ def formDataloaders(datasets, number_projections, total_size, train_factor, val_
             for dataset_path in datasets:
                 
                 dataset = openDataset(dataset_path)
-                print(dataset.shape, dataset_path)
+                #print(dataset.shape, dataset_path)
                 tY, tX, filtX = maskDatasets(dataset, number_projections, total_size//l, img_size, rand_angle)
                 
                 fullX.append(tX)
                 fullY.append(tY)
                 filtFullX.append(filtX)
 
-                plot_sample(tY, dataset_path[-10:]+'filtY')
+                plot_sample(tY, dataset_path[-11:]+'Y')
    
         # Stack augmented datasets
         fullX = torch.vstack(fullX)

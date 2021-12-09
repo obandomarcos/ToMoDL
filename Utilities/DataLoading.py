@@ -285,7 +285,7 @@ class ZebraDataset:
                                           'Angle': angle+self.maxAngle//2,
                                           'Sample': sample}, ignore_index=True)
       
-      self.dataset = self.dataset.drop(self.dataset[self.dataset.Sample == sample].index)
+        self.dataset = self.dataset.drop(self.dataset[self.dataset.Sample == sample].index)
     
     self.registeredDataset = self.registeredDataset.sort_values(['Sample','Angle'], axis = 0).reset_index(drop=True)
     del self.dataset

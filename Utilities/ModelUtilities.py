@@ -69,6 +69,8 @@ def formRegDatasets(folder_paths, threshold, img_resize = 100, n_proy = 640,samp
         dataset_reg = []            
         for sample in df.registeredDataset.Sample.unique():
 
+            print(sample)
+            
             if abs(df.Tparams['Ty'].mean()) < threshold:                                                           
                         
                 dataset = df.getRegisteredVolume(sample, margin = disp_reg//2, saveDataset = False, useSegmented = True)

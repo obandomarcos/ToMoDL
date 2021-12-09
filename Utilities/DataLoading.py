@@ -301,9 +301,9 @@ class ZebraDataset:
     '''
     assert(self.registeredDataset is not None)
 
-    if self.registeredVolume is not None:
+    # if self.registeredVolume is not None:
 
-      return self.registeredVolume
+      # return self.registeredVolume
 
     # Filter by sample
     self.registeredVolume = np.stack(self.registeredDataset[self.registeredDataset.Sample == sample]['Image'].to_numpy())

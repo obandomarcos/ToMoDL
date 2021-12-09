@@ -106,7 +106,7 @@ def openDataset(dataset_path):
 
     return datasets_reg
 
-def formDataloaders(datasets, number_projections, total_size, train_factor, val_factor, test_factor, batch_size, img_size, tensor_path, augment_factor = 1, load_tensor = True, save_tensor = False):
+def formDataloaders(datasets, number_projections, total_size, train_factor, val_factor, test_factor, batch_size, img_size, tensor_path, augment_factor = 1, load_tensor = True, save_tensor = False):   
     """
     Form torch dataloaders for training and testing, full and undersampled
     params:
@@ -135,6 +135,13 @@ def formDataloaders(datasets, number_projections, total_size, train_factor, val_
             for dataset_path in datasets:
                 
                 dataset = openDataset(dataset_path)
+                
+                # If it is a list (different parts of the body) choose one randomly
+                if isinstance(dataset, list):
+
+                    rand = np.random.randint(0, len(dataset))
+                    dataset = dataset[rand]
+
                 #print(dataset.shape, dataset_path)
                 tY, tX, filtX = maskDatasets(dataset, number_projections, total_size//l, img_size, rand_angle)
                 

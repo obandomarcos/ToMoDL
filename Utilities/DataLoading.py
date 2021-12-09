@@ -243,7 +243,8 @@ class ZebraDataset:
     self.registeredDataset = pd.DataFrame(columns = ['Image', 'Angle', 'Sample'])
 
     for sample in self.dataset.Sample.unique():
-
+      
+      print(sample)
       dataset = self.dataset[self.dataset.Sample == sample].filter(['Angle','Image'])
 
       # Assert angle step {360, 720} -> (1, 0.5)

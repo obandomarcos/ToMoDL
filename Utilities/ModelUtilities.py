@@ -70,7 +70,7 @@ def formRegDatasets(folder_paths, threshold, img_resize = 100, n_proy = 640,samp
         for sample in df.registeredDataset.Sample.unique():
 
             print(sample)
-            
+
             if abs(df.Tparams['Ty'].mean()) < threshold:                                                           
                         
                 dataset = df.getRegisteredVolume(sample, margin = disp_reg//2, saveDataset = False, useSegmented = True)
@@ -104,7 +104,7 @@ def openDataset(dataset_path):
                     
         datasets_reg = pickle.load(f)
 
-    return np.vstack(datasets_reg)
+    return datasets_reg
 
 def formDataloaders(datasets, number_projections, total_size, train_factor, val_factor, test_factor, batch_size, img_size, tensor_path, augment_factor = 1, load_tensor = True, save_tensor = False):
     """

@@ -114,6 +114,7 @@ class ZebraDataset:
     # Create Registered Dataset - empty till reggistering
     self.registeredDataset = pd.DataFrame(columns = ['Image', 'Angle', 'Sample'])
 
+    print(self.dataset.Sample.unique())
     # Sort dataset by sample and angle
     self.dataset = self.dataset.sort_values(['Sample','Angle'], axis = 0).reset_index(drop=True)
 

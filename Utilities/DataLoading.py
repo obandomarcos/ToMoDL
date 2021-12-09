@@ -254,6 +254,7 @@ class ZebraDataset:
       else:
         self.maxAngle = 720
 
+      print(self.maxAngle)
       angles = np.arange(0, self.maxAngle//2, 1).astype(float)
   
       for angle in tqdm(angles):

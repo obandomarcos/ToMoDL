@@ -37,10 +37,10 @@ class ZebraDataset:
     self.folderName = pathlib.PurePath(self.folderPath).name
 
     self.objective = 10
-    self.fileList = self._searchAllFiles(self.folderPath)
     self.datasetFolder = datasetsFolder
     self.experimentName = experimentName
     self.registeredVolume = {}
+    self.shifts_path = self.folderPath 
 
     if '4X' in self.folderName:
 
@@ -61,6 +61,20 @@ class ZebraDataset:
     self.registeredDataset = None
     self.imageVolume = None
     self.shifts = None
+
+    # Get available fish parts
+    self.fileList = self._searchAllFiles(self.folderPath)
+    self.loadList = [f for f in self.fileList if ('tif' in str(f))]
+    self.fishPartsAvailable = []
+
+    for (fishPart_key, fishPart_value) in self.fishPartCode.items():
+
+      for s in self.loadList:
+        
+        if fishPart_value in str(s):
+
+          self.fishPartsAvailable.append(fishPart_key)
+          break
 
   def _searchAllFiles(self, x):
 
@@ -127,25 +141,38 @@ class ZebraDataset:
     
       self.imageVolume = np.stack(self.dataset[self.dataset.Sample == sample2idx]['Image'].to_numpy())
   
-  def correctRotationAxis(self,  max_shift = 200, shift_step = 4, center_shift_top = 0, center_shift_bottom = 0, sample = 'head'):
-
+  def correctRotationAxis(self,  max_shift = 200, shift_step = 4, center_shift_top = 0, center_shift_bottom = 0, sample = 'head', load_shifts = False, save_shifts = True):
     
-    # Grab top and bottom sinograms (automate to grab non-empty sinograms)
-    top_index, bottom_index = self._grabImageIndexes()
-    # top_index, bottom_index = (0,self.imageVolume.shape[2]-1)
+    if load_shifts == True:
+      
+      with open(str(self.shifts_path)+"_{}".format(sample)+".pickle", 'rb') as f:
+        
+        self.shifts = pickle.load(f)
     
-    self.top_sino = np.copy(self.imageVolume[:,:,top_index].T)
-    self.bottom_sino = np.copy(self.imageVolume[:,:,bottom_index].T)
-    self.angles = np.linspace(0, 2*180, self.top_sino.shape[1] ,endpoint = False)
+    else:
+    
+      # Grab top and bottom sinograms (automate to grab non-empty sinograms)
+      top_index, bottom_index = self._grabImageIndexes()
+      # top_index, bottom_index = (0,self.imageVolume.shape[2]-1)
 
-    # Iteratively sweep from -maxShift pixels to maxShift pixels
-    (top_shift_max, bottom_shift_max) = self._searchShifts(max_shift, shift_step, center_shift_top, center_shift_bottom)
+      self.top_sino = np.copy(self.imageVolume[:,:,top_index].T)
+      self.bottom_sino = np.copy(self.imageVolume[:,:,bottom_index].T)
+      self.angles = np.linspace(0, 2*180, self.top_sino.shape[1] ,endpoint = False)
 
-    # Interpolation 
-    # (top_shift_max, bottom_shift_max) = (abs(top_shift_max), abs(bottom_shift_max))
-    m = (top_shift_max-bottom_shift_max)/(top_index-bottom_index)
-    b = top_shift_max-m*top_index
-    self.shifts = (m*np.arange(0, self.imageVolume.shape[2]-1)+b).astype(int)
+      # Iteratively sweep from -maxShift pixels to maxShift pixels
+      (top_shift_max, bottom_shift_max) = self._searchShifts(max_shift, shift_step, center_shift_top, center_shift_bottom)
+
+      # Interpolation 
+      # (top_shift_max, bottom_shift_max) = (abs(top_shift_max), abs(bottom_shift_max))
+      m = (top_shift_max-bottom_shift_max)/(top_index-bottom_index)
+      b = top_shift_max-m*top_index
+      self.shifts = (m*np.arange(0, self.imageVolume.shape[2]-1)+b).astype(int)
+
+    if save_shifts == True:
+      
+      with open(str(self.shifts_path)+"_{}".format(sample)+".pickle", 'wb') as f:
+
+        pickle.dump(self.shifts, f)
 
     # Create Registered volume[sample] with the shifts
     self._registerVolume(sample)
@@ -156,11 +183,15 @@ class ZebraDataset:
     """
     assert(self.shifts is not None)
 
+    self.registeredVolume[sample] = np.empty_like(self.imageVolume)
+
     # Shift according to shifts
     for idx, shift in enumerate(self.shifts):
       
-      self.imageVolume[:,:,idx] = ndi.shift(self.imageVolume[:,:,idx], (0, shift), mode = 'nearest')
-      
+      self.registeredVolume[sample][:,:,idx] = ndi.shift(self.imageVolume[:,:,idx], (0, shift), mode = 'nearest')
+    
+    self.imageVolume = None
+
   def _grabImageIndexes(self, threshold = 50):
     """
     Grabs top and bottom non-empty indexes
@@ -192,18 +223,6 @@ class ZebraDataset:
       top_shift_sino = ndi.shift(self.top_sino, (top_shift, 0), mode = 'nearest')
       bottom_shift_sino = ndi.shift(self.bottom_sino, (bottom_shift, 0), mode = 'nearest')
 
-      # if top_shift>0:
-      #   top_shift_sino = top_shift_sino[math.ceil(top_shift):,:]
-
-      # elif top_shift<0:
-      #   top_shift_sino = top_shift_sino[:math.ceil(top_shift),:]
-
-      # # crop zero intensity padding
-      # if bottom_shift > 0:  
-      #   bottom_shift_sino = bottom_shift_sino[math.ceil(bottom_shift):,:]
-      # elif bottom_shift < 0:
-      #   bottom_shift_sino = bottom_shift_sino[:math.ceil(bottom_shift),:]
-
       # Get image reconstruction
       top_shift_iradon =  iradon(top_shift_sino, self.angles, circle = False)
       bottom_shift_iradon =  iradon(bottom_shift_sino, self.angles, circle = False)
@@ -218,13 +237,7 @@ class ZebraDataset:
     max_shift_top = top_shifts[np.argmax(top_image_std)]
     max_shift_bottom = bottom_shifts[np.argmax(bottom_image_std)]
 
-    # if (shift_step <1) or (max_shift < 10):
-
     return (max_shift_top, max_shift_bottom)
-
-    # else:
-
-    #   return self._searchShifts(max_shift/10, shift_step/5, max_shift_top, max_shift_bottom)
 
   def registerDataset(self, sample, inPlace = False):
 
@@ -521,45 +534,6 @@ def getDataset(sample, experimentName, randomChoice = True, datasetFilename = 'D
 
   return volume, angles
 
-def formDatasets(sino_dataset, num_beams, size):
-  """
-  This function receives a sinogram dataset and returns two FBP reconstructed datasets,
-  ocan't multiply sequence by non-int of type 'floatne with the full span of angles and one reconstructed with num_beams
-  """
-  # Angles
-  n_angles = sino_dataset.shape[0]
-  angles_full = np.linspace(0, np.pi, n_angles, endpoint=False)
-  angles_under = np.linspace(0, np.pi, num_beams, endpoint=False)
-
-  projs = np.linspace(0, n_angles, num_beams, endpoint=False).astype(int)
-
-  det_count = sino_dataset.shape[1]
-  image_size = int(det_count/np.sqrt(2)-0.5) 
-  # Datasets undersampled with projs
-  under_sino = sino_dataset[projs,:,:]
-
-  rad_full = Radon(image_size, angles_full, clip_to_circle=False, det_count=det_count)
-  rad_under = Radon(image_size, angles_under, clip_to_circle=False, det_count=det_count)
-  
-  undersampled = []
-  desired = []
-  # retrieve random z-slices to train
-  rand = np.random.choice(range(under_sino.shape[2]), size, replace=False)
-  
-  # Undersampled
-  for img in np.rollaxis(under_sino[:,:,rand], 2):
-    
-    undersampled.append(rad_under.backward(rad_under.filter_sinogram(torch.FloatTensor(img).to(device))))
-  
-  # Full
-  for img in np.rollaxis(sino_dataset[:,:,rand], 2):
-     
-    desired.append(rad_full.backward(rad_full.filter_sinogram(torch.FloatTensor(img).to(device))))
-
-  desired = torch.unsqueeze(torch.stack(desired), 1)
-  undersampled = torch.unsqueeze(torch.stack(undersampled), 1)
-
-  return desired, undersampled
 
 def subsample(volume, max_angle, angle_step, subsampling_type = 'linear'):
   '''

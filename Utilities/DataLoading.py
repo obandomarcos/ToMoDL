@@ -25,6 +25,16 @@ import scipy.ndimage as ndi
 
 device = torch.device('cuda')
 
+class FlatfishDataset:
+    
+    def __init__(self, folderPath):
+
+        self.folderPath = pathlib.Path(folderPath)
+        self.folderName = pathlib.PurePath(self.folderPath).name
+
+        self.shifts_path = self.folderPath 
+
+
 class ZebraDataset:
   '''
   Zebra dataset 
@@ -87,7 +97,6 @@ class ZebraDataset:
             file_list.append(x)
         elif x.is_dir():
             file_list.extend(self._searchAllFiles(x))
-    
 
     return file_list
 

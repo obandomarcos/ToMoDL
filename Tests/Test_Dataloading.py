@@ -40,7 +40,7 @@ results_folder = '/home/marcos/DeepOPT/Resultados/'
 model_folder = '/home/marcos/DeepOPT/Models/'
 
 #%% Cargo un dataset
-dataset = folder_paths[0]
+dataset = folder_paths
 
 df = DL.ZebraDataset(dataset, 'Datasets', 'Bassi')
 # Cargo el dataset

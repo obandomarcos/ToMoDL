@@ -27,13 +27,159 @@ device = torch.device('cuda')
 
 class FlatfishDataset:
     
-    def __init__(self, folderPath):
+  def __init__(self, folderPath):
 
-        self.folderPath = pathlib.Path(folderPath)
-        self.folderName = pathlib.PurePath(self.folderPath).name
+    self.folderPath = pathlib.Path(folderPath)
+    self.folderName = pathlib.PurePath(self.folderPath).name
 
-        self.shifts_path = self.folderPath 
+    self.shifts_path = self.folderPath 
+    self.fileList = self._searchAllFiles(self.folderPath)
+    self.loadList = [f for f in self.fileList if ('tif' in str(f))]
+    self.imageVolume = None
 
+  def _searchAllFiles(self, x):
+
+    dirpath = x
+    assert(dirpath.is_dir())
+    file_list = []
+    
+    for x in dirpath.iterdir():
+        if x.is_file():
+            file_list.append(x)
+        elif x.is_dir():
+            file_list.extend(self._searchAllFiles(x))
+
+    return file_list
+    
+  def loadImages(self):
+    '''
+    Params:
+      - sample (string): {None, body, head, tail}
+    '''
+    
+    loadImages = []
+    loadAngle = []
+
+    angle = re.compile('theta\d+')
+    
+    for f in tqdm(self.loadList):
+      
+      loadImages.append(np.array(Image.open(f)))
+      loadAngle.append(float(angle.findall(str(f))[0].strip('theta')))
+
+    self.dataset = pd.DataFrame({'Filename':self.loadList, 
+                                 'Image':loadImages,
+                                 'Angle':loadAngle
+                                 })
+
+    # Create Registered Dataset - empty till reggistering
+    self.registeredDataset = pd.DataFrame(columns = ['Image', 'Angle'])
+
+    # Sort dataset by sample and angle
+    self.dataset = self.dataset.sort_values(['Angle'], axis = 0).reset_index(drop=True)
+
+    if self.imageVolume is None:
+    
+      self.imageVolume = np.moveaxis(np.stack(self.dataset['Image'].to_numpy()), 1, 2)
+
+  def correctRotationAxis(self,  max_shift = 200, shift_step = 4, center_shift_top = 0, center_shift_bottom = 0, load_shifts = False, save_shifts = True, sample = 'full'):
+    
+    if load_shifts == True:
+      
+      with open(str(self.shifts_path)+"_{}".format(sample)+".pickle", 'rb') as f:
+        
+        self.shifts = pickle.load(f)
+    
+    else:
+    
+      # Grab top and bottom sinograms (automate to grab non-empty sinograms)
+      top_index, bottom_index = self._grabImageIndexes(threshold = 30)
+      # top_index, bottom_index = (0,self.imageVolume.shape[2]-1)
+
+      self.top_sino = np.copy(self.imageVolume[:,:,top_index].T)
+      self.bottom_sino = np.copy(self.imageVolume[:,:,bottom_index].T)
+      self.angles = np.linspace(0, 2*180, self.top_sino.shape[1] ,endpoint = False)
+
+      # Iteratively sweep from -maxShift pixels to maxShift pixels
+      (top_shift_max, bottom_shift_max) = self._searchShifts(max_shift, shift_step, center_shift_top, center_shift_bottom)
+
+      # Interpolation 
+      # (top_shift_max, bottom_shift_max) = (abs(top_shift_max), abs(bottom_shift_max))
+      m = (top_shift_max-bottom_shift_max)/(top_index-bottom_index)
+      b = top_shift_max-m*top_index
+      self.shifts = (m*np.arange(0, self.imageVolume.shape[2]-1)+b).astype(int)
+
+    if save_shifts == True:
+      
+      with open(str(self.shifts_path)+"_{}".format(sample)+".pickle", 'wb') as f:
+
+        pickle.dump(self.shifts, f)
+
+    # Create Registered volume[sample] with the shifts
+    self._registerVolume()
+
+  def _registerVolume(self):
+    """
+    Register volume with interpolated shifts
+    """
+    assert(self.shifts is not None)
+
+    self.registeredVolume = np.empty_like(self.imageVolume)
+
+    # Shift according to shifts
+    for idx, shift in enumerate(self.shifts):
+      
+      self.registeredVolume[:,:,idx] = ndi.shift(self.imageVolume[:,:,idx], (0, shift), mode = 'nearest')
+    
+    self.imageVolume = None
+  
+  def _grabImageIndexes(self, threshold = 50):
+    """
+    Grabs top and bottom non-empty indexes
+    """
+    img_max = self.imageVolume.min(axis = 0)
+    img_max = (((img_max-img_max.min())/(img_max.max()-img_max.min()))*255.0).astype(np.uint8)
+    img_max = ndi.gaussian_filter(img_max,(11,11))
+
+    plt.plot(img_max.std(axis = 0))
+    top_index, bottom_index = (np.where(img_max.std(axis = 0)>threshold)[0][0],np.where(img_max.std(axis = 0)>threshold)[0][-1])
+    
+    print('Top index:', top_index)
+    print('Bottom index:', bottom_index)
+    
+    return top_index, bottom_index
+  
+  def _searchShifts(self, max_shift, shift_step, center_shift_top, center_shift_bottom):
+
+    # Sweep through all shifts
+    top_shifts = np.arange(-max_shift, max_shift, shift_step)+center_shift_top
+    bottom_shifts = np.arange(-max_shift, max_shift, shift_step)+center_shift_bottom
+    
+    self.top_image_std = []
+    self.bottom_image_std = []
+
+    for i, (top_shift, bottom_shift) in enumerate(zip(top_shifts, bottom_shifts)):
+
+      print('Shift {}, top shift {}, bottom shift {}'.format(i, top_shift, bottom_shift))
+
+      top_shift_sino = ndi.shift(self.top_sino, (top_shift, 0), mode = 'nearest')
+      bottom_shift_sino = ndi.shift(self.bottom_sino, (bottom_shift, 0), mode = 'nearest')
+
+      # Get image reconstruction
+      top_shift_iradon =  iradon(top_shift_sino, self.angles, circle = False)
+      bottom_shift_iradon =  iradon(bottom_shift_sino, self.angles, circle = False)
+      
+      # Calculate variance
+      self.top_image_std.append(np.std(top_shift_iradon))
+      self.bottom_image_std.append(np.std(bottom_shift_iradon))
+    
+    plt.plot(top_shifts, top_image_std)
+    plt.plot(bottom_shifts, bottom_image_std)
+
+    max_shift_top = top_shifts[np.argmax(top_image_std)]
+    max_shift_bottom = bottom_shifts[np.argmax(bottom_image_std)]
+
+    return (max_shift_top, max_shift_bottom)
 
 class ZebraDataset:
   '''

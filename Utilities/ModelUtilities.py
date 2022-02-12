@@ -31,6 +31,8 @@ def formRegDatasets(folder_paths, img_resize = 100, n_proy = 640, experiment = '
         - sample (string): name of the part of the boy to be sampled, defaults to head
         - experiment (string): name of the experiment
     """
+    # Paths of pickled registered datasets
+    datasets_registered = []
     
     for dataset_num, folder_path in enumerate(folder_paths):                                                   
         
@@ -51,11 +53,11 @@ def formRegDatasets(folder_paths, img_resize = 100, n_proy = 640, experiment = '
             with open(str(df.folderPath)+'_'+sample+'_registered'+'.pkl', 'wb') as f:
                 
                 pickle.dump(df.registeredVolume[sample], f)
-            
+                datasets_registered.append([str(folder_path)+'_'+sample+'_registered'+'.pkl')
             # Save memory deleting sample volume
             del df.registeredVolume[sample]
-    
-    return [str(folder_path)+'_registered'+'.pkl' for folder_path in folder_paths]
+            
+    return datasets_registered
 
 def openDataset(dataset_path):
             

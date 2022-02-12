@@ -44,7 +44,7 @@ train_infos = {}
 test_loss_dict = {} 
 
 tensor_path = datasets_folder+'Proj_{}_augmentFactor_{}_totalSize_{}_'.format(proj_num, augment_factor, total_size)                                                                                                                                                                         
-datasets = modutils.formRegDatasets(folder_paths, umbral_reg, img_resize = img_size)
+datasets = modutils.formRegDatasets(folder_paths, img_resize = img_size)
 dataloaders = modutils.formDataloaders(datasets, proj_num, total_size, train_factor, val_factor, test_factor, batch_size, img_size, tensor_path, augment_factor, load_tensor = False, save_tensor = True)    
 
 train_name = 'Optimization_K_CorrectRegistration_Test51'

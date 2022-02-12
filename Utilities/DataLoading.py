@@ -216,13 +216,14 @@ class ZebraDataset:
     self.dataset = {}
     self.registeredDataset = None
     self.imageVolume = None
-    self.shifts = None
+    self.shifts = {}
 
     # Get available fish parts
     self.fileList = self._searchAllFiles(self.folderPath)
     self.loadList = [f for f in self.fileList if ('tif' in str(f))]
     self.fishPartsAvailable = []
 
+    # Check available parts - sample
     for (fishPart_key, fishPart_value) in self.fishPartCode.items():
 
       for s in self.loadList:
@@ -251,13 +252,14 @@ class ZebraDataset:
     Params:
       - sample (string): {None, body, head, tail}
     '''
-    sample2idx =  self.fishPart[sample]
+    
     loadList = [f for f in self.fileList if ('tif' in str(f))]
 
     if sample is not None:
-  
+      # If it's None, then it loads all fish parts/sample
       fishPart = self.fishPartCode[sample]
       loadList = [f for f in loadList if (fishPart in str(f))]
+    
       
     loadImages = []
     loadAngle = []
@@ -288,27 +290,27 @@ class ZebraDataset:
     # Create Registered Dataset - empty till reggistering
     self.registeredDataset = pd.DataFrame(columns = ['Image', 'Angle', 'Sample'])
 
-    print(self.dataset.Sample.unique())
     # Sort dataset by sample and angle
     self.dataset = self.dataset.sort_values(['Sample','Angle'], axis = 0).reset_index(drop=True)
+  
+  def correctRotationAxis(self,  max_shift = 200, shift_step = 4, center_shift_top = 0, center_shift_bottom = 0, sample = 'head', load_shifts = False, save_shifts = True):
+    
+    sample2idx =  self.fishPart[sample]
 
     if self.imageVolume is None:
     
       self.imageVolume = np.stack(self.dataset[self.dataset.Sample == sample2idx]['Image'].to_numpy())
-  
-  def correctRotationAxis(self,  max_shift = 200, shift_step = 4, center_shift_top = 0, center_shift_bottom = 0, sample = 'head', load_shifts = False, save_shifts = True):
-    
+
     if load_shifts == True:
       
       with open(str(self.shifts_path)+"_{}".format(sample)+".pickle", 'rb') as f:
         
-        self.shifts = pickle.load(f)
+        self.shifts[sample] = pickle.load(f)
     
     else:
     
       # Grab top and bottom sinograms (automate to grab non-empty sinograms)
       top_index, bottom_index = self._grabImageIndexes()
-      # top_index, bottom_index = (0,self.imageVolume.shape[2]-1)
 
       self.top_sino = np.copy(self.imageVolume[:,:,top_index].T)
       self.bottom_sino = np.copy(self.imageVolume[:,:,bottom_index].T)
@@ -394,10 +396,14 @@ class ZebraDataset:
 
     return (max_shift_top, max_shift_bottom)
 
+  def getFishParts(self):
+
+    return self.fishPartsAvailable
+
   def registerDataset(self, sample, inPlace = False):
 
     """
-    Registers full dataset, by sample.
+    Registers full dataset, by sample. (deprecated method)
     Params:
       -sample (string): fish part sample.
     """  

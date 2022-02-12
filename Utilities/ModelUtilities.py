@@ -21,7 +21,7 @@ results_folder = '/home/marcos/DeepOPT/Resultados/'
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 # Torch dataset tidying
-def formRegDatasets(folder_paths, threshold, img_resize = 100, n_proy = 640,sample = None, experiment = 'Bassi'):
+def formRegDatasets(folder_paths, threshold, img_resize = 100, n_proy = 640, experiment = 'Bassi'):
     """
     Forms registered datasets from raw projection data.
     params:
@@ -32,69 +32,29 @@ def formRegDatasets(folder_paths, threshold, img_resize = 100, n_proy = 640,samp
         - sample (string): name of the part of the boy to be sampled, defaults to head
         - experiment (string): name of the experiment
     """
-
-    datasets_reg = []
-    disp_reg = []
-
-    # Get registration value
-    for dataset in folder_paths:    
-      
-        df = DL.ZebraDataset(dataset, 'Datasets', 'Bassi')
-        # Load corresponding registrations                       
-        df.loadRegTransforms()
-        # Grab registration value for that dataset
-        disp_reg.append(df.meanDisplacement)
-        del df
-    
-    # Agarro el mayor valor de desplazamiento para cortar el volumen
-    disp_reg = math.ceil(max(np.array([abs(d) for d in disp_reg])))
     
     for dataset_num, folder_path in enumerate(folder_paths):                                                   
         
         # Loads dataset registered
         df = DL.ZebraDataset(folder_path, 'Datasets', 'Bassi')
-        print('Loading image for dataset {}'.format(df.folderName))                                      
-        # Load dataset
-        df.loadImages(sample = sample)
-        # Load corresponding registrations
-        df.loadRegTransforms()
-        # Apply transforms for this dataset
-        df.applyRegistration()                                                         
-        # Grab data from registration
-        
-        print('Registration transformation {}'.format(df.Tparams['Ty'].mean()))
-        # Append volumes        
-        print("Dataset {}/{} loaded".format(dataset_num+1, len(folder_paths)))
+        print('Loading image for dataset {}'.format(df.folderName))
 
-        dataset_reg = []            
-        for sample in df.registeredDataset.Sample.unique():
+        for sample in df.getFishParts():
 
-            print(sample)
-
-            if abs(df.Tparams['Ty'].mean()) < threshold:                                                           
-                        
-                dataset = df.getRegisteredVolume(sample, margin = disp_reg//2, saveDataset = False, useSegmented = True)
-                # Move axis to (N_projections, n_detector, n_slices)
-                dataset = np.rollaxis(dataset, 2)
-                # Resize projection number % 16
-                dataset_size = dataset.shape
-                
-                det_count = int((img_resize+0.5)*np.sqrt(2))
-                dataset = np.array([cv2.resize(img, (det_count, n_proy)) for img in dataset])
-                
-                # Back to (N_slices, N_projections, n_detector)
-                dataset_reg.append(np.moveaxis(dataset, 0,-1))                                                               
-                print('Shape',dataset_reg[-1].shape)
-
-            # Deletes registered volume section
-            df.deleteSection(sample)
-        
-        with open(str(df.folderPath)+'_registered'+'.pkl', 'wb') as f:
+            # Load sample dataset
+            df.loadImages(sample = sample)
+            # Load corresponding registrations
+            df.correctRotationAxis(sample = sample, max_shift = 200, shift_step = 1, load_shifts = True, save_shifts = False)
             
-            pickle.dump(dataset_reg, f)
-        
-        del dataset_reg
-        del df
+            # Append volumes        
+            print("Dataset {}/{} loaded - {} {}".format(dataset_num+1, len(folder_paths), str(df.folderName), sample))
+
+            with open(str(df.folderPath)+'_'+sample+'_registered'+'.pkl', 'wb') as f:
+                
+                pickle.dump(df.registeredVolume[sample], f)
+            
+            # Save memory deleting sample volume
+            del df.registeredVolume[sample]
     
     return [str(folder_path)+'_registered'+'.pkl' for folder_path in folder_paths]
 
@@ -149,7 +109,7 @@ def formDataloaders(datasets, number_projections, total_size, train_factor, val_
                 fullY.append(tY)
                 filtFullX.append(filtX)
 
-                plot_sample(tY, dataset_path[-11:]+'Y')
+                # plot_sample(tY, dataset_path[-11:]+'Y')
    
         # Stack augmented datasets
         fullX = torch.vstack(fullX)

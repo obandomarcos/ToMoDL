@@ -27,8 +27,6 @@ from tqdm import tqdm
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 folder_paths = [f140115_1dpf, f140315_3dpf, f140419_5dpf, f140714_5dpf] # Folders to be used
 
-umbral_reg = 50
-
 #%% Datasets 
 # Training with more than one dataset
 # Projnum == %10 of the data
@@ -38,17 +36,18 @@ Ks = np.arange(1,11)
 train_factor = 0.7
 val_factor = 0.2
 test_factor = 0.1                                                                                                                           
-total_size = 2000                                                                                                                           
+total_size = 5000                                                                                                                           
 batch_size = 5                                                                                                                                                                                           
 img_size = 100                                                                                                                                                                                               
-augment_factor = 15                                                                                                                                                                                          # Load desired and undersampled datasets, on image space. Testing on Test Dataset
+augment_factor = 1
 train_infos = {}                                                                                                                            
-test_loss_dict = {}                                                                                                                                                                                          
+test_loss_dict = {} 
+
 tensor_path = datasets_folder+'Proj_{}_augmentFactor_{}_totalSize_{}_'.format(proj_num, augment_factor, total_size)                                                                                                                                                                         
-#datasets = modutils.formRegDatasets(folder_paths, umbral_reg, img_resize = img_size)                                                                                                                        epochs = 40
-datasets = []                                                                                                                               
-dataloaders = modutils.formDataloaders(datasets, proj_num, total_size, train_factor, val_factor, test_factor, batch_size, img_size, tensor_path, augment_factor, load_tensor = True, save_tensor = False)    
-train_name = 'Optimization_K_Test28'
+datasets = modutils.formRegDatasets(folder_paths, umbral_reg, img_resize = img_size)
+dataloaders = modutils.formDataloaders(datasets, proj_num, total_size, train_factor, val_factor, test_factor, batch_size, img_size, tensor_path, augment_factor, load_tensor = False, save_tensor = True)    
+
+train_name = 'Optimization_K_CorrectRegistration_Test51'
 
 for K in Ks:
 

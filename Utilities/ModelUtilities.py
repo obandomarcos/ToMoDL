@@ -21,12 +21,11 @@ results_folder = '/home/marcos/DeepOPT/Resultados/'
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 # Torch dataset tidying
-def formRegDatasets(folder_paths, threshold, img_resize = 100, n_proy = 640, experiment = 'Bassi'):
+def formRegDatasets(folder_paths, img_resize = 100, n_proy = 640, experiment = 'Bassi'):
     """
     Forms registered datasets from raw projection data.
     params:
         - folder_paths (string): paths to the training and test folders
-        - threshold (float): registration threshold value, usually set to 50
         - img_resize (int): image resize, detector count is calculated to fit this number and resize sinograms
         - n_proy (int): Number of projections to resize the sinogram, in order to work according to Torch Radon specifications
         - sample (string): name of the part of the boy to be sampled, defaults to head

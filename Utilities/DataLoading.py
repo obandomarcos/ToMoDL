@@ -343,7 +343,7 @@ class ZebraDataset:
     self.registeredVolume[sample] = np.empty_like(self.imageVolume)
 
     # Shift according to shifts
-    for idx, shift in enumerate(self.shifts):
+    for idx, shift in enumerate(self.shifts[sample]):
       
       self.registeredVolume[sample][:,:,idx] = ndi.shift(self.imageVolume[:,:,idx], (0, shift), mode = 'nearest')
     

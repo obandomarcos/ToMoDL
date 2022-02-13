@@ -219,7 +219,8 @@ def maskDatasets(full_sino, num_beams, dataset_size, img_size, angle_seed = 0):
     # Grab random slices
     assert(dataset_size <= full_sino.shape[2])
     rand = np.random.choice(range(full_sino.shape[2]), dataset_size, replace=False)
-
+    
+    print('Zero masked')
     # Inputs
     for i, sino in enumerate(np.rollaxis(undersampled_sino[:,:,rand], 2)):
         
@@ -230,7 +231,7 @@ def maskDatasets(full_sino, num_beams, dataset_size, img_size, angle_seed = 0):
         img = (img-img.min())-(img.max()-img.min())
 
         undersampled.append(img)
-
+    print('Undersampled reconstruction raw')
     # Grab filtered backprojection
     for sino in np.rollaxis(undersampled_sino[:,:,rand],2):
 
@@ -241,6 +242,9 @@ def maskDatasets(full_sino, num_beams, dataset_size, img_size, angle_seed = 0):
         del sino
         
         undersampled_filtered.append(img)
+    
+    del undersampled_sino
+    print('Undersampled reconstruction filtered')
     # Target
     for sino in np.rollaxis(full_sino[:,:,rand], 2):
         
@@ -252,6 +256,8 @@ def maskDatasets(full_sino, num_beams, dataset_size, img_size, angle_seed = 0):
 
         desired.append(img)
 
+    print('Undersampled reconstruction full')
+    
     # Format dataset to feed network
     desired = torch.unsqueeze(torch.stack(desired), 1)
     undersampled = torch.unsqueeze(torch.stack(undersampled), 1)

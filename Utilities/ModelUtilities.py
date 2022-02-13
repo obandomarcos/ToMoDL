@@ -104,7 +104,7 @@ def formDataloaders(datasets, number_projections, total_size, train_factor, val_
             # Masks chosen dataset with the number of projections required
             for dataset_path in datasets:
                 
-                dataset = openDataset(dataset_path)
+                dataset = openDataset(dataset_path).astype(float)
                 
                 # If it is a list (different parts of the body) choose one randomly
                 if isinstance(dataset, list):

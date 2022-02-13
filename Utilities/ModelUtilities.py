@@ -16,6 +16,7 @@ import cv2
 import torchvision.transforms as T
 import pickle
 import os.path
+from tqdm import tqdm
 # import albumentations
 
 results_folder = '/home/marcos/DeepOPT/Resultados/'
@@ -102,7 +103,7 @@ def formDataloaders(datasets, number_projections, total_size, train_factor, val_
 
             # Dataset train
             # Masks chosen dataset with the number of projections required
-            for dataset_path in datasets:
+            for dataset_path in tqdm(datasets):
                 
                 dataset = openDataset(dataset_path).astype(float)
                 

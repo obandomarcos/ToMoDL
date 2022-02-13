@@ -61,7 +61,7 @@ def formRegDatasets(folder_paths, img_resize = 100, n_proy = 640, experiment = '
 
 def openDataset(dataset_path):
             
-    with open(str(dataset_path)+'_registered'+'.pkl', 'rb') as f:
+    with open(str(dataset_path)+'.pkl', 'rb') as f:
                     
         datasets_reg = pickle.load(f)
 

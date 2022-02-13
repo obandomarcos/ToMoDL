@@ -88,10 +88,6 @@ def formDataloaders(datasets, number_projections, total_size, train_factor, val_
         - augment_factor determines how many times the dataset will be resampled with different seed angles
     """
     
-    fullX = []
-    filtFullX = []
-    fullY = []
-    
     if load_tensor == False:
 
         l = len(datasets)*augment_factor
@@ -106,16 +102,11 @@ def formDataloaders(datasets, number_projections, total_size, train_factor, val_
             for dataset_path in tqdm(datasets):
                 
                 dataset = openDataset(dataset_path).astype(float)
-                
-                # If it is a list (different parts of the body) choose one randomly
-                if isinstance(dataset, list):
-
-                    rand = np.random.randint(0, len(dataset))
-                    dataset = dataset[rand]
 
                 #print(dataset.shape, dataset_path)
                 tY, tX, filtX = maskDatasets(dataset, number_projections, total_size//l, img_size, rand_angle)
                 
+                print(tX.shape)
                 fullX.append(tX)
                 fullY.append(tY)
                 filtFullX.append(filtX)

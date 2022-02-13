@@ -15,6 +15,7 @@ import matplotlib.pyplot as plt
 import cv2 
 import torchvision.transforms as T
 import pickle
+import os.path
 # import albumentations
 
 results_folder = '/home/marcos/DeepOPT/Resultados/'
@@ -41,21 +42,29 @@ def formRegDatasets(folder_paths, img_resize = 100, n_proy = 640, experiment = '
         print('Loading image for dataset {}'.format(df.folderName))
 
         for sample in df.getFishParts():
-
-            # Load sample dataset
-            df.loadImages(sample = sample)
-            # Load corresponding registrations
-            df.correctRotationAxis(sample = sample, max_shift = 200, shift_step = 1, load_shifts = True, save_shifts = False)
+            # If the registered dataset exist, just add it to the list
             
-            # Append volumes        
-            print("Dataset {}/{} loaded - {} {}".format(dataset_num+1, len(folder_paths), str(df.folderName), sample))
+            registered_dataset_path = str(folder_path)+'_'+sample+'_registered'+'.pkl'
 
-            with open(str(df.folderPath)+'_'+sample+'_registered'+'.pkl', 'wb') as f:
+            if os.path.isfile(registered_dataset_path) == True:
                 
-                pickle.dump(df.registeredVolume[sample], f)
-                datasets_registered.append(str(folder_path)+'_'+sample+'_registered'+'.pkl')
-            # Save memory deleting sample volume
-            del df.registeredVolume[sample]
+                datasets_registered.append(registered_dataset_path)
+
+            else:
+                # Load sample dataset
+                df.loadImages(sample = sample)
+                # Load corresponding registrations
+                df.correctRotationAxis(sample = sample, max_shift = 200, shift_step = 1, load_shifts = True, save_shifts = False)
+                
+                # Append volumes        
+                print("Dataset {}/{} loaded - {} {}".format(dataset_num+1, len(folder_paths), str(df.folderName), sample))
+
+                with open(registered_dataset_path, 'wb') as f:
+                    
+                    pickle.dump(df.registeredVolume[sample], f)
+                    datasets_registered.append(registered_dataset_path)
+                # Save memory deleting sample volume
+                del df.registeredVolume[sample]
             
     return datasets_registered
 

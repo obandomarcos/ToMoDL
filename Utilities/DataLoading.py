@@ -301,6 +301,9 @@ class ZebraDataset:
     
       self.imageVolume = np.stack(self.dataset[self.dataset.Sample == sample2idx]['Image'].to_numpy())
 
+      # This should be changed in order to save memory
+      del self.dataset
+
     if load_shifts == True:
       
       with open(str(self.shifts_path)+"_{}".format(sample)+".pickle", 'rb') as f:

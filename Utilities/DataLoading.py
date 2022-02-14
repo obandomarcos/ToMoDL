@@ -347,7 +347,7 @@ class ZebraDataset:
       
       self.registeredVolume[sample][:,:,idx] = ndi.shift(self.imageVolume[:,:,idx], (0, shift), mode = 'nearest')
     
-    self.imageVolume = None
+    del self.imageVolume
 
   def datasetResize(self, sample, img_resize):
     """

@@ -55,8 +55,11 @@ def formRegDatasets(folder_paths, img_resize = 100, n_proy = 640, experiment = '
                 # Load sample dataset
                 df.loadImages(sample = sample)
                 # Load corresponding registrations
+                print(self.imageVolume.shape)
+                
                 df.correctRotationAxis(sample = sample, max_shift = 200, shift_step = 1, load_shifts = True, save_shifts = False)
                 
+                print(self.registeredVolume[sample].shape)
                 # Append volumes        
                 print("Dataset {}/{} loaded - {} {}".format(dataset_num+1, len(folder_paths), str(df.folderName), sample))
 

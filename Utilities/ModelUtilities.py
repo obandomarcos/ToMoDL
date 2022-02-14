@@ -93,6 +93,10 @@ def formDataloaders(datasets, number_projections, total_size, train_factor, val_
         - img_size is the size of the new images to be reconstructed
         - augment_factor determines how many times the dataset will be resampled with different seed angles
     """
+
+    fullX = []
+    fullY = []
+    filtFullX = []
     
     if load_tensor == False:
 

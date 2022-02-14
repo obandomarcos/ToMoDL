@@ -321,6 +321,7 @@ def model_training(model, criterion, crit_backproj, crit_fbp, optimizer, dataloa
     loss_std_fbp = []
 
     for epoch in range(num_epochs):
+        
         prev_time = time.time()
         
         for phase in ['train', 'val']:
@@ -377,7 +378,7 @@ def model_training(model, criterion, crit_backproj, crit_fbp, optimizer, dataloa
                    title_plot = title+'{} images epoch{} proj{} batch{} K{} lam{}'.format(phase, epoch, model.proj_num, batch_i, model.K, model.lam)
                    plot_outputs(labels, outputs, root+path_plot, title_plot)
                 
-               print(loss.item(), inputs.size(0), len(dataloaders[phase]['x']))
+            #    print(loss.item(), inputs.size(0), len(dataloaders[phase]['x']))
 
                running_loss += loss.item()*inputs.size(0)
                backproj_loss += loss_backproj.item()*inputs.size(0)
@@ -386,7 +387,6 @@ def model_training(model, criterion, crit_backproj, crit_fbp, optimizer, dataloa
 
                if torch.cuda.is_available():
                    torch.cuda.empty_cache()
-                   del inputs, outputs
 
                if disp:
 

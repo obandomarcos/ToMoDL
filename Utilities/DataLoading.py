@@ -269,7 +269,7 @@ class ZebraDataset:
     loadTime = []
 
     angle = re.compile('a\d+')
-    sample = re.compile('s\d+')
+    sample_re = re.compile('s\d+')
     channel = re.compile('c\d+')
     time = re.compile('t\d+')
     
@@ -277,7 +277,7 @@ class ZebraDataset:
       
       loadImages.append(np.array(Image.open(f)))
       loadAngle.append(float(angle.findall(str(f))[0][1:]))
-      loadSample.append(float(sample.findall(str(f))[0][1:]))
+      loadSample.append(float(sample_re.findall(str(f))[0][1:]))
       loadChannel.append(float(channel.findall(str(f))[0][1:]))
       loadTime.append(float(time.findall(str(f))[0][1:]))
 

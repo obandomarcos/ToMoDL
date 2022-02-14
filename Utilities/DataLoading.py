@@ -174,8 +174,8 @@ class FlatfishDataset:
       self.top_image_std.append(np.std(top_shift_iradon))
       self.bottom_image_std.append(np.std(bottom_shift_iradon))
     
-    plt.plot(top_shifts, top_image_std)
-    plt.plot(bottom_shifts, bottom_image_std)
+    plt.plot(top_shifts, self.top_image_std)
+    plt.plot(bottom_shifts, self.bottom_image_std)
 
     max_shift_top = top_shifts[np.argmax(top_image_std)]
     max_shift_bottom = bottom_shifts[np.argmax(bottom_image_std)]

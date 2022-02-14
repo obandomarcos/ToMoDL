@@ -52,9 +52,9 @@ for folder_path in folder_paths:
 
         all_shifts.append((str(df.folderName) , np.copy(df.shifts[sample]), np.copy(df.registeredVolume[sample][:,:,slice_idx]), np.copy(angles), np.copy(non_registered)))
 
-fig_shift, ax_shift =plt.subplots(1, len(all_shifts))
-fig_images, ax_images = plt.subplots(1, len(all_shifts))
-fig_images_non_reg, ax_images_non_reg = plt.subplots(1, len(all_shifts))
+fig_shift, ax_shift =plt.subplots(3, len(all_shifts)//3, figsize = (20, 20))
+fig_images, ax_images = plt.subplots(3, len(all_shifts)//3, figsize = (20, 20))
+fig_images_non_reg, ax_images_non_reg = plt.subplots(3, len(all_shifts)//3, figsize = (20, 20))
 
 for (a_shift, a_images, a_images_non_reg, shift) in zip(ax_shift.flatten(), ax_images.flatten(), ax_images_non_reg.flatten(), all_shifts):
 
@@ -64,10 +64,12 @@ for (a_shift, a_images, a_images_non_reg, shift) in zip(ax_shift.flatten(), ax_i
     a_shift.set_ylabel('Pixel Shift')
 
     a_images.imshow(iradon(shift[2].T, shift[3], circle = False))
+    a_images.set_axis_off()
     a_images.set_title(shift[0])
 
     a_images_non_reg.imshow(iradon(shift[4].T, shift[3], circle = False))
-    a_images.set_title(shift[0])
+    a_images_non_reg.set_axis_off()
+    a_images_non_reg.set_title(shift[0])
 
 fig_shift.savefig(results_folder+'Test50_Shift_DataAxisCorrection.pdf', bbox_inches = 'tight')
 fig_images.savefig(results_folder+'Test50_Images_DataAxisCorrection.pdf', bbox_inches = 'tight')

@@ -302,8 +302,8 @@ class ZebraDataset:
     
     sample2idx =  self.fishPart[sample]
 
-    self.registeredVolume[sample] = np.stack(self.dataset[self.dataset.Sample == sample2idx]['Image'].to_numpy())
-    del self.dataset
+    # self.registeredVolume[sample] = np.stack(self.dataset[self.dataset.Sample == sample2idx]['Image'].to_numpy())
+    # del self.dataset
 
     if load_shifts == True:
       

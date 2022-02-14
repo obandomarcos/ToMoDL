@@ -340,7 +340,7 @@ class ZebraDataset:
     """
     assert(self.shifts is not None)
 
-    self.registeredVolume[sample] = np.empty_like(self.imageVolume)
+    self.registeredVolume[sample] = np.empty_like(self.imageVolume).astype(float)
 
     # Shift according to shifts
     for idx, shift in enumerate(self.shifts[sample]):
@@ -348,6 +348,17 @@ class ZebraDataset:
       self.registeredVolume[sample][:,:,idx] = ndi.shift(self.imageVolume[:,:,idx], (0, shift), mode = 'nearest')
     
     self.imageVolume = None
+
+  def datasetResize(self, sample, img_resize):
+    """
+    Resizes sinograms according to reconstruction image size
+    """
+    # Move axis to (N_projections, n_detector, n_slices)
+    self.registeredVolume[sample] = np.rollaxis(self.registeredVolume[sample], 2)
+    # Resize projection number % 16
+
+    det_count = int((img_resize+0.5)*np.sqrt(2))
+    self.registeredVolume[sample] = np.array([cv2.resize(img, (det_count, n_proy)) for img in self.registeredVolume[sample]])
 
   def _grabImageIndexes(self, threshold = 50):
     """

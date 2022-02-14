@@ -60,8 +60,11 @@ def formRegDatasets(folder_paths, img_resize = 100, n_proy = 640, experiment = '
                 # Append volumes        
                 print("Dataset {}/{} loaded - {} {}".format(dataset_num+1, len(folder_paths), str(df.folderName), sample))
 
+                df.datasetResize(sample, img_resize)
+
                 with open(registered_dataset_path, 'wb') as f:
                     
+                    print(self.registeredVolume[sample].shape)
                     pickle.dump(df.registeredVolume[sample], f)
                     datasets_registered.append(registered_dataset_path)
                 # Save memory deleting sample volume
@@ -200,6 +203,7 @@ def maskDatasets(full_sino, num_beams, dataset_size, img_size, angle_seed = 0):
     undersampled_sino = np.copy(full_sino)
 
     # Using boolean mask, keep values sampled and clamp to zero others
+    print('Init mask datasets')
     zeros_idx = np.linspace(0, full_sino.shape[0], num_beams, endpoint = False).astype(int)
     zeros_idx = (zeros_idx+angle_seed)%full_sino.shape[0]
     zeros_mask = np.full(full_sino.shape[0], True, dtype = bool)

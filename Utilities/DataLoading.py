@@ -356,6 +356,8 @@ class ZebraDataset:
     det_count = int((img_resize+0.5)*np.sqrt(2))
   
     self.registeredVolume[sample] = np.array([cv2.resize(img, (det_count, number_projections)) for img in self.registeredVolume[sample]])
+    
+    self.registeredVolume[sample] = np.moveaxis(self.registeredVolume[sample], 0,-1)
 
   def _grabImageIndexes(self, threshold = 50):
     """

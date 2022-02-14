@@ -252,7 +252,8 @@ class ZebraDataset:
     Params:
       - sample (string): {None, body, head, tail}
     '''
-    
+
+    sample2idx =  self.fishPart[sample]    
     loadList = [f for f in self.fileList if ('tif' in str(f))]
 
     if sample is not None:
@@ -293,7 +294,6 @@ class ZebraDataset:
     # Sort dataset by sample and angle
     self.dataset = self.dataset.sort_values(['Sample','Angle'], axis = 0).reset_index(drop=True)
 
-    sample2idx =  self.fishPart[sample]
     self.registeredVolume[sample] = np.stack(self.dataset[self.dataset.Sample == sample2idx]['Image'].to_numpy())
     # SUPER UGLY BUT NECESSARY
     del self.dataset

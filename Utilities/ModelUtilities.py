@@ -23,7 +23,7 @@ results_folder = '/home/marcos/DeepOPT/Resultados/'
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 # Torch dataset tidying
-def formRegDatasets(folder_paths, img_resize = 100, n_proy = 640, experiment = 'Bassi'):
+def formRegDatasets(folder_paths, img_resize = 100, number_projections = 640, experiment = 'Bassi'):
     """
     Forms registered datasets from raw projection data.
     params:

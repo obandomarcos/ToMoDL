@@ -43,14 +43,20 @@ for folder_path in folder_paths:
     for sample in df.fishPartsAvailable:
         
         df.loadImages(sample = sample)
+
+        non_registered = df.registeredVolume[sample][:,:,slice_idx]
+
         df.correctRotationAxis(sample = sample, max_shift = 200, shift_step = 1, load_shifts = True, save_shifts = False)
+        
         angles = np.linspace(0, 2*180, df.registeredVolume[sample].shape[0] ,endpoint = False)
-        all_shifts.append((str(df.folderName) , np.copy(df.shifts), np.copy(df.registeredVolume[sample][:,:,slice_idx]), np.copy(angles)))
+
+        all_shifts.append((str(df.folderName) , np.copy(df.shifts), np.copy(df.registeredVolume[sample][:,:,slice_idx]), np.copy(angles), np.copy(non_registered)))
 
 fig_shift, ax_shift =plt.subplots(1, len(all_shifts))
 fig_images, ax_images = plt.subplots(1, len(all_shifts))
+fig_images_non_reg, ax_images_non_reg = plt.subplots(1, len(all_shifts))
 
-for (a_shift, a_images, shift) in zip(ax_shift.flatten(), ax_images.flatten(), all_shifts):
+for (a_shift, a_images, a_images_non_reg, shift) in zip(ax_shift.flatten(), ax_images.flatten(), ax_images_non_reg.flatten(), all_shifts):
 
     a_shift.plot(shift[1])
     a_shift.set_title(shift[0])
@@ -60,6 +66,10 @@ for (a_shift, a_images, shift) in zip(ax_shift.flatten(), ax_images.flatten(), a
     a_images.imshow(iradon(shift[2].T, shift[3], circle = False))
     a_images.set_title(shift[0])
 
+    a_images_non_reg.imshow(iradon(shift[4].T, shift[3], circle = False))
+    a_images.set_title(shift[0])
+
 fig_shift.savefig(results_folder+'Test50_Shift_DataAxisCorrection.pdf', bbox_inches = 'tight')
 fig_images.savefig(results_folder+'Test50_Images_DataAxisCorrection.pdf', bbox_inches = 'tight')
+fig_images_non_reg.savefig(results_folder+'Test50_ImagesNonReg_DataAxisCorrection.pdf', bbox_inches = 'tight')
     

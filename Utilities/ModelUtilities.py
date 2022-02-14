@@ -55,7 +55,6 @@ def formRegDatasets(folder_paths, img_resize = 100, n_proy = 640, experiment = '
                 # Load sample dataset
                 df.loadImages(sample = sample)
                 # Load corresponding registrations
-                print(df.imageVolume.shape)
                 
                 df.correctRotationAxis(sample = sample, max_shift = 200, shift_step = 1, load_shifts = True, save_shifts = False)
                 

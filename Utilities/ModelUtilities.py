@@ -61,8 +61,9 @@ def formRegDatasets(folder_paths, img_resize = 100, n_proy = 640, experiment = '
                 print(df.registeredVolume[sample].shape)
                 # Append volumes        
                 print("Dataset {}/{} loaded - {} {}".format(dataset_num+1, len(folder_paths), str(df.folderName), sample))
-
-                df.datasetResize(sample, img_resize)
+                
+                # Resize registered volume to desired
+                df.datasetResize(sample, img_resize, number_projections)
 
                 with open(registered_dataset_path, 'wb') as f:
                     

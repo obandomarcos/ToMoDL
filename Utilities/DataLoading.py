@@ -20,6 +20,7 @@ from torch_radon import Radon, RadonFanbeam
 from skimage.transform import radon, iradon
 import pickle
 import h5py
+import cv2
 import math
 import scipy.ndimage as ndi
 
@@ -344,7 +345,7 @@ class ZebraDataset:
       self.registeredVolume[sample][:,:,idx] = ndi.shift(self.registeredVolume[sample][:,:,idx], (0, shift), mode = 'nearest')
 
 
-  def datasetResize(self, sample, img_resize):
+  def datasetResize(self, sample, img_resize, number_projections):
     """
     Resizes sinograms according to reconstruction image size
     """
@@ -353,7 +354,8 @@ class ZebraDataset:
     # Resize projection number % 16
 
     det_count = int((img_resize+0.5)*np.sqrt(2))
-    self.registeredVolume[sample] = np.array([cv2.resize(img, (det_count, n_proy)) for img in self.registeredVolume[sample]])
+  
+    self.registeredVolume[sample] = np.array([cv2.resize(img, (det_count, number_projections)) for img in self.registeredVolume[sample]])
 
   def _grabImageIndexes(self, threshold = 50):
     """

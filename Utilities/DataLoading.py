@@ -215,7 +215,6 @@ class ZebraDataset:
 
     self.dataset = {}
     self.registeredDataset = None
-    self.imageVolume = None
     self.shifts = {}
 
     # Get available fish parts
@@ -297,9 +296,9 @@ class ZebraDataset:
     
     sample2idx =  self.fishPart[sample]
 
-    if self.imageVolume is None:
+    if self.registeredVolume[sample] is None:
     
-      self.imageVolume = np.stack(self.dataset[self.dataset.Sample == sample2idx]['Image'].to_numpy())
+      self.registeredVolume[sample] = np.stack(self.dataset[self.dataset.Sample == sample2idx]['Image'].to_numpy())
 
       # This should be changed in order to save memory
       del self.dataset
@@ -315,8 +314,8 @@ class ZebraDataset:
       # Grab top and bottom sinograms (automate to grab non-empty sinograms)
       top_index, bottom_index = self._grabImageIndexes()
 
-      self.top_sino = np.copy(self.imageVolume[:,:,top_index].T)
-      self.bottom_sino = np.copy(self.imageVolume[:,:,bottom_index].T)
+      self.top_sino = np.copy(self.registeredVolume[sample][:,:,top_index].T)
+      self.bottom_sino = np.copy(self.registeredVolume[sample][:,:,bottom_index].T)
       self.angles = np.linspace(0, 2*180, self.top_sino.shape[1] ,endpoint = False)
 
       # Iteratively sweep from -maxShift pixels to maxShift pixels
@@ -326,7 +325,7 @@ class ZebraDataset:
       # (top_shift_max, bottom_shift_max) = (abs(top_shift_max), abs(bottom_shift_max))
       m = (top_shift_max-bottom_shift_max)/(top_index-bottom_index)
       b = top_shift_max-m*top_index
-      self.shifts = (m*np.arange(0, self.imageVolume.shape[2]-1)+b).astype(int)
+      self.shifts = (m*np.arange(0, self.registeredVolume[sample].shape[2]-1)+b).astype(int)
 
     if save_shifts == True:
       
@@ -343,14 +342,11 @@ class ZebraDataset:
     """
     assert(self.shifts is not None)
 
-    self.registeredVolume[sample] = np.empty_like(self.imageVolume).astype(float)
-
     # Shift according to shifts
     for idx, shift in enumerate(self.shifts[sample]):
       
-      self.registeredVolume[sample][:,:,idx] = ndi.shift(self.imageVolume[:,:,idx], (0, shift), mode = 'nearest')
-    
-    del self.imageVolume
+      self.registeredVolume[sample][:,:,idx] = ndi.shift(self.registeredVolume[sample][:,:,idx], (0, shift), mode = 'nearest')
+
 
   def datasetResize(self, sample, img_resize):
     """

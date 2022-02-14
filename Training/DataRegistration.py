@@ -50,7 +50,7 @@ for folder_path in folder_paths:
         
         angles = np.linspace(0, 2*180, df.registeredVolume[sample].shape[0] ,endpoint = False)
 
-        all_shifts.append((str(df.folderName) , np.copy(df.shifts), np.copy(df.registeredVolume[sample][:,:,slice_idx]), np.copy(angles), np.copy(non_registered)))
+        all_shifts.append((str(df.folderName) , np.copy(df.shifts[sample]), np.copy(df.registeredVolume[sample][:,:,slice_idx]), np.copy(angles), np.copy(non_registered)))
 
 fig_shift, ax_shift =plt.subplots(1, len(all_shifts))
 fig_images, ax_images = plt.subplots(1, len(all_shifts))

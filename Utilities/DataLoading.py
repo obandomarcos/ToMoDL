@@ -142,7 +142,7 @@ class FlatfishDataset:
     img_max = (((img_max-img_max.min())/(img_max.max()-img_max.min()))*255.0).astype(np.uint8)
     img_max = ndi.gaussian_filter(img_max,(11,11))
 
-    plt.plot(img_max.std(axis = 0))
+    # plt.plot(img_max.std(axis = 0))
     top_index, bottom_index = (np.where(img_max.std(axis = 0)>threshold)[0][0],np.where(img_max.std(axis = 0)>threshold)[0][-1])
     
     print('Top index:', top_index)
@@ -327,7 +327,7 @@ class ZebraDataset:
       # (top_shift_max, bottom_shift_max) = (abs(top_shift_max), abs(bottom_shift_max))
       m = (top_shift_max-bottom_shift_max)/(top_index-bottom_index)
       b = top_shift_max-m*top_index
-      self.shifts = (m*np.arange(0, self.registeredVolume[sample].shape[2]-1)+b).astype(int)
+      self.shifts[sample] = (m*np.arange(0, self.registeredVolume[sample].shape[2]-1)+b).astype(int)
 
     if save_shifts == True:
       

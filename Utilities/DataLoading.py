@@ -177,8 +177,8 @@ class FlatfishDataset:
     plt.plot(top_shifts, self.top_image_std)
     plt.plot(bottom_shifts, self.bottom_image_std)
 
-    max_shift_top = top_shifts[np.argmax(top_image_std)]
-    max_shift_bottom = bottom_shifts[np.argmax(bottom_image_std)]
+    max_shift_top = top_shifts[np.argmax(self.top_image_std)]
+    max_shift_bottom = bottom_shifts[np.argmax(self.bottom_image_std)]
 
     return (max_shift_top, max_shift_bottom)
 

@@ -44,7 +44,7 @@ for folder_path in folder_paths:
         
         df.loadImages(sample = sample)
 
-        non_registered = df.registeredVolume[sample][:,:,slice_idx]
+        non_registered = np.copy(df.registeredVolume[sample][:,:,slice_idx])
 
         df.correctRotationAxis(sample = sample, max_shift = 200, shift_step = 1, load_shifts = True, save_shifts = False)
         

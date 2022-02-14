@@ -292,6 +292,10 @@ class ZebraDataset:
 
     # Sort dataset by sample and angle
     self.dataset = self.dataset.sort_values(['Sample','Angle'], axis = 0).reset_index(drop=True)
+
+    self.registeredVolume[sample] = np.stack(self.dataset[self.dataset.Sample == sample2idx]['Image'].to_numpy())
+    # SUPER UGLY BUT NECESSARY
+    del self.dataset
   
   def correctRotationAxis(self,  max_shift = 200, shift_step = 4, center_shift_top = 0, center_shift_bottom = 0, sample = 'head', load_shifts = False, save_shifts = True):
     

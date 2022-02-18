@@ -94,7 +94,7 @@ for K in Ks:
         test_loss_fbp_total.append(modutils.psnr(img_size, loss_test_fbp.item(), batch_size))
     
     modutils.plot_outputs(target, pred, results_folder+train_name+'Test_images_proj{}_K{}.pdf'.format(proj_num, K))
-    test_loss_dict[proj_num] = {'loss_net': test_loss_total, 'loss_fbp': test_loss_fbp_total}
+    test_loss_dict[K] = {'loss_net': test_loss_total, 'loss_fbp': test_loss_fbp_total}
                                                                                                                 
     with open(results_folder+train_name+'KAnalisis_Proj{}_nLay{}_K{}_lam{}_trnSize{}.pkl'.format(proj_num, nLayer, K, lam, train_factor), 'wb') as f:
         

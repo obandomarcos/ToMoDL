@@ -8,7 +8,7 @@ import numpy as np
 from Folders_cluster import *
 import ModelUtilities as modutils
 
-K = 10
+K = 9
 nLayer = 8 
 epochs = 50
 lam = 0.05
@@ -16,7 +16,7 @@ max_angle = 640
 proj_num = 72
 img_size = 100
 train_size = 0.7
-train_name = 'Optimization_K_Test28'
+train_name = 'Optimization_K_CorrectRegistration_Test51'
 batch_size = 5
 
 with open(results_folder+train_name+'KAnalisis_Proj{}_nLay{}_K{}_lam{}_trnSize{}.pkl'.format(proj_num, nLayer, K, lam, train_size), 'rb') as f:
@@ -25,10 +25,14 @@ with open(results_folder+train_name+'KAnalisis_Proj{}_nLay{}_K{}_lam{}_trnSize{}
 #print(test_loss_total)
 
 K_means = []
+K_fbp = []
+value_fbp = 70.55
 
+print(test_loss_total)
 for k,v in test_loss_total.items():
     
     K_means.append(np.mean(np.array(v['loss_net'])-10*np.log10(5)))
+    K_fbp.append(modutils.psnr(img_size, value_fbp, batch_size))
 
 print(K_means)
 K_idx = np.arange(1,K+1)
@@ -37,7 +41,7 @@ K_idx = np.arange(1,K+1)
 fig, ax = plt.subplots(1,1, figsize = (8,6))
 
 ax.plot(K_idx, K_means, 'b*-')
-
+ax.plot(K_idx, K_fbp, 'g--')
 ax.set_xlabel('# of iterations', fontsize = 15)
 ax.set_ylabel('PSNR [dB]', fontsize = 15)
 ax.legend()

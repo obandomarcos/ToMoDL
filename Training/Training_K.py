@@ -50,12 +50,12 @@ dataloaders = modutils.formDataloaders(datasets, proj_num, total_size, train_fac
 
 train_name = 'Optimization_K_CorrectRegistration_Test51'
 
-for K in Ks:
+lam = 0.05
+max_angle = 640
+nLayer = 8
+epochs = 50
 
-    lam = 0.05
-    max_angle = 640
-    nLayer = 8
-    epochs = 50
+for K in Ks:
 
     model = modl.OPTmodl(nLayer, K, max_angle, proj_num, img_size, None, lam, True, results_folder)
     loss_fn = torch.nn.MSELoss(reduction = 'sum')
@@ -83,19 +83,23 @@ for K in Ks:
     ### Testing part
     test_loss_total = []
     test_loss_fbp_total = []           
+    test_loss_backproj_total = []
 
-    for inp, target in tqdm(zip(dataloaders['test']['x'], dataloaders['test']['y'])): 
+    for inp, target, filt in tqdm(zip(dataloaders['test']['x'], dataloaders['test']['y'], dataloaders['test']['filtX'])): 
         
         pred = model(inp)
         loss_test = loss_fn(pred['dc'+str(K)], target)
-        loss_test_fbp = loss_fbp_fn(inp, target)
+        loss_test_backproj = loss_backproj_fn(inp, target)
+        loss_test_fbp = loss_fbp_fn(filt, target)
                                                                                                    
-        test_loss_total.append(modutils.psnr(img_size, loss_test.item(), batch_size))
-        test_loss_fbp_total.append(modutils.psnr(img_size, loss_test_fbp.item(), batch_size))
+        test_loss_total.append(modutils.psnr(img_size, loss_test.item(), 1))
+        test_loss_fbp_total.append(modutils.psnr(img_size, loss_test_fbp.item(), 1))
+        test_loss_backproj_total.append(modutils.psnr(img_size, loss_test_backproj.item(), 1))
     
     modutils.plot_outputs(target, pred, results_folder+train_name+'Test_images_proj{}_K{}.pdf'.format(proj_num, K))
-    test_loss_dict[K] = {'loss_net': test_loss_total, 'loss_fbp': test_loss_fbp_total}
-                                                                                                                
+    
+    test_loss_dict[K] = {'loss_net': test_loss_total, 'loss_fbp': test_loss_fbp_total, 'loss_backproj':test_loss_backproj_total}
+                                                                
     with open(results_folder+train_name+'KAnalisis_Proj{}_nLay{}_K{}_lam{}_trnSize{}.pkl'.format(proj_num, nLayer, K, lam, train_factor), 'wb') as f:
         
         pickle.dump(test_loss_dict, f)

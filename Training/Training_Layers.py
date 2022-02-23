@@ -23,39 +23,36 @@ import model_torch as modl
 import pickle
 from tqdm import tqdm
 
-# Using CPU or GPU
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-folder_paths = [f140115_1dpf, f140315_3dpf, f140419_5dpf, f140714_5dpf] # Folders to be used
-
-umbral_reg = 50
+folder_paths = [f140115_1dpf, f140315_3dpf, f140419_5dpf, f140714_5dpf, f140117_3dpf, f140114_5dpf] # Folders to be used
 
 #%% Datasets 
 # Training with more than one dataset
 # Projnum == %10 of the data
 proj_num = 72
-nLayers = np.arange(3,10)
+nLayers = np.arange(3, 11).astype(int)
 
 train_factor = 0.7
 val_factor = 0.2
-test_factor = 0.1                                                                                                                           
-total_size = 3000                                                                                                                           
-batch_size = 5                      
+test_factor = 0.1 
+total_size=5000                  
+batch_size= 5 
 img_size = 100
-augment_factor = 10                                             
-# Load desired and undersampled datasets, on image space. Testing on Test Dataset
-train_infos = {}                                                                                                                            
-test_loss_dict = {}                                                                                                                                 tensor_path = datasets_folder+'Proj_{}_augmentFactor_{}_totalSize_{}_'.format(proj_num, augment_factor, total_size)                                                                                                                                                                         
-datasets = modutils.formRegDatasets(folder_paths, umbral_reg, img_resize = img_size)                                                        
-#datasets = []                                                                                                                              
+augment_factor = 1
+train_infos = {}        
 
-dataloaders = modutils.formDataloaders(datasets, proj_num, total_size, train_factor, val_factor, test_factor, batch_size, img_size, tensor_path, augment_factor, load_tensor = False, save_tensor = True)    
-train_name = 'Optimization_Layers_Test29'
+test_loss_dict = {} 
+
+tensor_path = datasets_folder+'Proj_{}_augmentFactor_{}_totalSize_{}_'.format(proj_num, augment_factor, total_size)                                                                                                                                                                         
+datasets = modutils.formRegDatasets(folder_paths, img_resize =img_size)
+dataloaders = modutils.formDataloaders(datasets, proj_num, total_size, train_factor, val_factor, test_factor, batch_size, img_size, tensor_path, augment_factor, load_tensor = True, save_tensor = False)    
+
+train_name = 'Optimization_Layers_CorrectRegistration_Test52'
 
 lam = 0.05
 max_angle = 640
 K = 10
 epochs = 50
-lr = 5e-4
 
 for nLayer in nLayers:   
     
@@ -68,13 +65,13 @@ for nLayer in nLayers:
     
     model, train_info = modutils.model_training(model, loss_fn, loss_backproj_fn, loss_fbp_fn, optimizer, dataloaders, device, results_folder+train_name, num_epochs = epochs, disp = True, do_checkpoint = 0, title = train_name, plot_title = True)
 
-    train_infos[K] = train_info
+    train_infos[nLayer] = train_info
     
     print('Train MODL loss {}'.format(train_infos[K]['train'][-1]))
     print('Train FBP loss {}'.format(train_infos[K]['train_fbp'][-1]))
 
     #%% save loss for fbp and modl network
-    with open(results_folder+train_name+'LossKs_nlay{}_epochs{}_K{}_lam{}_trnSize{}.pkl'.format(nLayer, epochs, K, lam, train_factor), 'wb') as f:
+    with open(results_folder+train_name+'LossLayers_nlay{}_epochs{}_K{}_lam{}_trnSize{}.pkl'.format(nLayer, epochs, K, lam, train_factor), 'wb') as f:
     
         pickle.dump(train_infos, f)
         print('Diccionario salvado para proyección {}'.format(proj_num))
@@ -92,7 +89,7 @@ for nLayer in nLayers:
         loss_test = loss_fn(pred['dc'+str(K)], target)
         loss_test_backproj = loss_backproj_fn(inp, target)
         loss_test_fbp = loss_fbp_fn(filt, target)
-                                                                                                   
+                                                                 
         test_loss_total.append(modutils.psnr(img_size, loss_test.item(), 1))
         test_loss_fbp_total.append(modutils.psnr(img_size, loss_test_fbp.item(), 1))
         test_loss_backproj_total.append(modutils.psnr(img_size, loss_test_backproj.item(), 1))

@@ -33,7 +33,7 @@ n_angles = 72
 img_size = 100
 det_count = int((img_size+0.5)*np.sqrt(2))
 
-tensor_path = 'Datasets/Proj_{}_augmentFactor_{}_totalSize_{}_FullY.pt'.format(proj_num, augment_factor, total_size)                                            
+tensor_path = datasets_folder + 'Proj_{}_augmentFactor_{}_totalSize_{}_FullY.pt'.format(proj_num, augment_factor, total_size)                                            
 
 fullY = torch.load(tensor_path, map_location=torch.device('cpu'))
 
@@ -48,7 +48,11 @@ angles = np.linspace(0, 2*np.pi, n_angles, endpoint = False)
 radon = Radon(img_size, angles, clip_to_circle = False, det_count = det_count)
 
 # Have to send FiltX to Sinogram space in order to use ADMM
-plt.imshow(radon.forward(fullY[0, 0, ...]))
+fig, ax = plt.subplots(1,1)
+
+ax.imshow(radon.forward(fullY[0, 0, ...]))
+
+fig.savefig(results_folder+'TestADMM.pdf', bbox_inches = 'tight')
 
 
 

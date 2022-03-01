@@ -55,6 +55,8 @@ hRT = lambda sino: iradon(sino, angles, circle = False)
 # Test Image
 print(callable(hR))
 print(callable(hRT))
+print(callable(Phi))
+print(callable(Psi))
 
 sino = hR(fullY[0, 0, ...].to(device).cpu().numpy())
 img_rec_FBP = hRT(sino)

@@ -53,8 +53,8 @@ hR = lambda x: radon(x, angles, circle = False)
 hRT = lambda sino: iradon(sino, angles, circle = False)
 
 # Test Image
-print(isinstance(hR, callable))
-print(isinstance(hRT, callable))
+print(callable(hR))
+print(callable(hRT))
 
 sino = hR(fullY[0, 0, ...].to(device).cpu().numpy())
 img_rec_FBP = hRT(sino)

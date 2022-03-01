@@ -45,15 +45,25 @@ fullY = torch.load(tensor_path, map_location=torch.device('cpu'))
 
 # Radon operator
 angles = np.linspace(0, 2*np.pi, n_angles, endpoint = False)
-    
-radon = Radon(img_size, angles, clip_to_circle = False, det_count = det_count)
+
+Psi = lambda x,th:  RecTV.TVdenoise(x,2/th,tv_iters)
+#  set the penalty function, to compute the objective
+Phi = lambda x: RecTV.TVnorm(x)
+hR = lambda x: radon(x, angles, circle = False)
+hRT = lambda sino: iradon(sino, angles, circle = False)
+
+# Test Image
+
+sino = hR(fullY[0, 0, ...].to(device).cpu().numpy())
+img_rec_FBP = hRT(sino)
+img_rec_ADMM = RecTV(sino, hR, hRT, Psi, 0.01, 1, 200, Phi, 10e-7, invert = 0, warm = 1)
 
 # Have to send FiltX to Sinogram space in order to use ADMM
-fig, ax = plt.subplots(1,1)
+fig, ax = plt.subplots(1,3)
 
-ax.imshow(radon.forward(fullY[0, 0, ...].to(device)).cpu().numpy())
-
-
+ax[0].imshow(img_rec_FBP)
+ax[1].imshow(img_rec_ADMM)
+ax[2].imshow(np.abs(img_rec_ADMM-img_rec_FBP))
 
 fig.savefig(results_folder+'TestADMM.pdf', bbox_inches = 'tight')
 

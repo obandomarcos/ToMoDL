@@ -58,7 +58,7 @@ print(callable(hRT))
 
 sino = hR(fullY[0, 0, ...].to(device).cpu().numpy())
 img_rec_FBP = hRT(sino)
-img_rec_ADMM = RecTV(sino, hR, hRT, Psi, 0.01, 1, 200, Phi, 10e-7, invert = 0, warm = 1)
+img_rec_ADMM = RecTV(y = sino, A =hR, AT = hRT, Den = Psi, 0.01, 1, 200, Phi, 10e-7, invert = 0, warm = 1)
 
 
 # Have to send FiltX to Sinogram space in order to use ADMM

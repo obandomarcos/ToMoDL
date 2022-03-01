@@ -68,7 +68,7 @@ img_rec_ADMM,_,_,_ = RecTV.ADMM(y = sino, A =hR, AT = hRT, Den = Psi, alpha = 0.
 # Have to send FiltX to Sinogram space in order to use ADMM
 fig, ax = plt.subplots(1,3)
 
-ax[0].imshow(img_rec_FBP)
+ax[0].imshow(img_true)
 ax[1].imshow(img_rec_ADMM)
 ax[2].imshow(np.abs(img_rec_ADMM-img_rec_FBP))
 

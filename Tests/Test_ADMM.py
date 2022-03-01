@@ -4,7 +4,7 @@ Test ADMM and comparison
 #%% Import libraries
 import os
 import os,time, sys
-os.chdir('/home/obanmarcos/Balseiro/Maestría/Proyecto/Implementación/DeepOPT/')
+os.chdir('.')
 sys.path.append('Utilities/')
 sys.path.append('OPTmodl/')
 sys.path.append('Reconstruction/')
@@ -25,6 +25,8 @@ import pickle
 from tqdm import tqdm
 from bayes_opt import BayesianOptimization
 
+
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 #%% ADMM test on data
 proj_num = 72
 augment_factor = 1
@@ -36,7 +38,6 @@ det_count = int((img_size+0.5)*np.sqrt(2))
 tensor_path = datasets_folder + 'Proj_{}_augmentFactor_{}_totalSize_{}_FullY.pt'.format(proj_num, augment_factor, total_size)                                            
 
 fullY = torch.load(tensor_path, map_location=torch.device('cpu'))
-
 #%%
 
 # Tensors in image space
@@ -50,7 +51,9 @@ radon = Radon(img_size, angles, clip_to_circle = False, det_count = det_count)
 # Have to send FiltX to Sinogram space in order to use ADMM
 fig, ax = plt.subplots(1,1)
 
-ax.imshow(radon.forward(fullY[0, 0, ...]))
+ax.imshow(radon.forward(fullY[0, 0, ...].to(device)).cpu().numpy())
+
+
 
 fig.savefig(results_folder+'TestADMM.pdf', bbox_inches = 'tight')
 

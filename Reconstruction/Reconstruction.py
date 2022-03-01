@@ -471,9 +471,12 @@ def ADMM(y, A, AT, Den, alpha, delta, max_iter,
   # % via proximal splitting methods' 
 
 
-  assert callable(A), "A is not callable"  # Assert A is callable
-  assert callable(AT), "AT is not callable"  # Assert AT is callable
-  assert callable(Den), "Denoiser is not callable"  # Assert Denoiser is callable
+  assert callable(A) 
+  print("A is callable")  # Assert A is callable
+  assert callable(AT) 
+  print("AT is callable")  # Assert AT is callable
+  assert callable(Den) 
+  print("Denoiser is callable")  # Assert Denoiser is callable
 
   # Normalization  
   b = np.zeros(AT(y).shape)

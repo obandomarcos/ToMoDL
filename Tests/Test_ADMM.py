@@ -34,6 +34,7 @@ total_size = 5000
 n_angles = 72
 img_size = 100
 det_count = int((img_size+0.5)*np.sqrt(2))
+tv_iters = 3
 
 tensor_path = datasets_folder + 'Proj_{}_augmentFactor_{}_totalSize_{}_FullY.pt'.format(proj_num, augment_factor, total_size)                                            
 

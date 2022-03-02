@@ -60,6 +60,10 @@ print(callable(Phi))
 print(callable(Psi))
 
 img_true = fullY[3, 0, ...].to(device).cpu().numpy().T
+
+print(img_true.max())
+print(img_true.min())
+
 sino = hR(img_true)
 img_rec_FBP = hRT(sino)
 img_rec_ADMM,_,_,_ = RecTV.ADMM(y = sino, A =hR, AT = hRT, Den = Psi, alpha = 0.01, delta = 1, max_iter = 200, phi = Phi, tol = 10e-7, invert = 0, warm = 1, true_img = img_true)

@@ -61,6 +61,11 @@ fig_FBP, ax_FBP = plt.subplots((fullX.shape[0]//500)//3, 3)
 ax_ADMM = ax_ADMM.flatten()
 ax_FBP = ax_FBP.flatten()
 
+for a_ADMM, a_FBP in zip(ax_ADMM, ax_FBP):
+
+    a_ADMM.set_axis_off()
+    a_FBP.set_axis_off()
+
 for i, (imageX_test, imageY_test, imageFiltX_test) in enumerate(zip(fullX, fullX, fullFiltX)):
     
     imageY_test = imageY_test[0,...].to(device).cpu().numpy().T
@@ -72,7 +77,7 @@ for i, (imageX_test, imageY_test, imageFiltX_test) in enumerate(zip(fullX, fullX
     img_rec_ADMM,_,_,_ = RecTV.ADMM(y = sino, A = hR, AT = hRT, Den = Psi, alpha = 0.01, delta = 1, max_iter = 200, phi = Phi, tol = 10e-7, invert = 0, warm = 0, true_img = imageY_test)
     
     mse = ((imageFiltX_test - img_rec_ADMM)**2).sum()
-    psnr = modutils.psnr(img_size, mse, 1)
+    psnr = round(modutils.psnr(img_size, mse, 1), 3)
     loss_test_ADMM.append(psnr)
     
     if i%500 == 0:
@@ -80,6 +85,7 @@ for i, (imageX_test, imageY_test, imageFiltX_test) in enumerate(zip(fullX, fullX
         im1 = ax_ADMM[i//500].imshow(img_rec_ADMM)
         im2 = ax_FBP[i//500].imshow(imageFiltX_test)
         
+
         divider_ADMM = make_axes_locatable(ax_ADMM[i//500])
         divider_FBP = make_axes_locatable(ax_FBP[i//500])
         

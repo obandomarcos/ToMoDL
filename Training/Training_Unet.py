@@ -65,9 +65,10 @@ model_Unet = modl.UNet(1,1)
 loss_fn = torch.nn.MSELoss(reduction = 'sum')
 loss_fbp_fn = torch.nn.MSELoss(reduction = 'sum')
 loss_backproj_fn = torch.nn.MSELoss(reduction = 'sum')
-optimizer = torch.optim.Adam(model.parameters(), lr = lr)
+optimizer_ModlUnet = torch.optim.Adam(model_ModlUnet.parameters(), lr = lr)
+optimizer_Unet = torch.optim.Adam(model_Unet.parameters(), lr = lr)
 
-model_ModlUnet, train_info_ModlUnet = modutils.model_training(model_ModlUnet, loss_fn, loss_backproj_fn, loss_fbp_fn, optimizer, dataloaders, device, results_folder+train_name_UnetModl, num_epochs = epochs, disp = True, do_checkpoint = 0, title = train_name, plot_title = True)
+model_ModlUnet, train_info_ModlUnet = modutils.model_training(model_ModlUnet, loss_fn, loss_backproj_fn, loss_fbp_fn, optimizer_ModlUnet, dataloaders, device, results_folder+train_name_UnetModl, num_epochs = epochs, disp = True, do_checkpoint = 0, title = train_name, plot_title = True)
 
 print('Train MODL+UNet loss {}'.format(train_info_ModlUnet['train'][-1]))
 print('Train FBP loss {}'.format(train_info_ModlUnet['train_fbp'][-1]))

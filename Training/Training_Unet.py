@@ -55,7 +55,7 @@ tensor_path = datasets_folder+'Proj_{}_augmentFactor_{}_totalSize_{}_'.format(pr
 datasets = modutils.formRegDatasets(folder_paths, img_resize =img_size)
 dataloaders = modutils.formDataloaders(datasets, proj_num, total_size, train_factor, val_factor, test_factor, batch_size, img_size, tensor_path, augment_factor, load_tensor = True, save_tensor = False)    
 
-train_name_UnetModl = 'UnetModl_CorrectRegistration_Test53'
+train_name_ModlUnet = 'UnetModl_CorrectRegistration_Test53'
 train_name_Unet = 'Unet_CorrectRegistration_Test54'
 
 #  Train model + UNET plugged
@@ -68,23 +68,28 @@ loss_backproj_fn = torch.nn.MSELoss(reduction = 'sum')
 optimizer_ModlUnet = torch.optim.Adam(model_ModlUnet.parameters(), lr = lr)
 optimizer_Unet = torch.optim.Adam(model_Unet.parameters(), lr = lr)
 
-model_ModlUnet, train_info_ModlUnet = modutils.model_training(model_ModlUnet, loss_fn, loss_backproj_fn, loss_fbp_fn, optimizer_ModlUnet, dataloaders, device, results_folder+train_name_UnetModl, num_epochs = epochs, disp = True, do_checkpoint = 0, title = train_name_UnetModl, plot_title = True)
+model_ModlUnet, train_info_ModlUnet = modutils.model_training(model_ModlUnet, loss_fn, loss_backproj_fn, loss_fbp_fn, optimizer_ModlUnet, dataloaders, device, results_folder+train_name_ModlUnet, num_epochs = epochs, disp = True, do_checkpoint = 0, title = train_name_ModlUnet, plot_title = True)
 
 print('Train MODL+UNet loss {}'.format(train_info_ModlUnet['train'][-1]))
 print('Train FBP loss {}'.format(train_info_ModlUnet['train_fbp'][-1]))
 #%% save loss for fbp and modl network
-with open(results_folder+train_name+'ModlUNet_lr{}_shrink{}.pkl'.format(lr, shrink), 'wb') as f:
+with open(results_folder+train_name_ModlUnet+'ModlUNet_lr{}_shrink{}.pkl'.format(lr, shrink), 'wb') as f:
 
     pickle.dump(train_info_ModlUnet, f)
     print('Diccionario salvado para proyección {}'.format(proj_num))
 
-modutils.save_net(model_folder+train_name+'_MoDLUNet_lr{}_shrink{}'.format(lr, shrink), model_ModlUnet)
+modutils.save_net(model_folder+train_nameModlUnet+'_MoDLUNet_lr{}_shrink{}'.format(lr, shrink), model_ModlUnet)
 
 #  Train directly with Unet (inputs change)
 model_Unet, train_info_Unet = modutils.unet_training(model_Unet, loss_fn, loss_fbp_fn, optimizer, dataloaders,  results_folder+train_name_Unet, device, num_epochs = epochs, disp = True)
 
 print('Train UNET loss {}'.format(train_info_Unet['train'][-1]))
 print('Train FBP loss {}'.format(train_info_Unet['train_fbp'][-1]))
+
+with open(results_folder+train_name_Unet+'UNet_lr{}_shrink{}.pkl'.format(lr, shrink), 'wb') as f:
+
+    pickle.dump(train_info_Unet, f)
+    print('Diccionario salvado para proyección {}'.format(proj_num))
 
 ### Testing part
 test_loss_total_ModlUnet = []
@@ -113,12 +118,12 @@ modutils.plot_outputs(target, pred_Unet, results_folder+train_name+'Test_images_
 test_loss_dict_ModlUNet = {'loss_net': test_loss_total_ModlUnet, 'loss_fbp': test_loss_fbp_total, 'loss_backproj':test_loss_backproj_total}
 test_loss_dict_UNet = {'loss_net': test_loss_total_Unet, 'loss_fbp': test_loss_fbp_total, 'loss_backproj':test_loss_backproj_total}
                                                             
-with open(results_folder+train_name+'_UnetMoDL_lr{}_shrink{}.pkl'.format(lr, shrink), 'wb') as f:
+with open(results_folder+train_name_ModlUnet+'_UnetMoDL_lr{}_shrink{}.pkl'.format(lr, shrink), 'wb') as f:
     
     pickle.dump(test_loss_dict_ModlUNet, f)
     print('Diccionario salvado para proyección {}, MODL+UNET'.format(proj_num))
 
-with open(results_folder+train_name+'_Unet_lr{}_shrink{}.pkl'.format(lr, shrink), 'wb') as f:
+with open(results_folder+train_name_Unet+'_Unet_lr{}_shrink{}.pkl'.format(lr, shrink), 'wb') as f:
     
     pickle.dump(test_loss_dict_UNet, f)
     print('Diccionario salvado para proyección {}, UNET'.format(proj_num))

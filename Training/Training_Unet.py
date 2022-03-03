@@ -38,6 +38,7 @@ total_size= 5000
 batch_size= 5 
 img_size = 100
 augment_factor = 1
+K = 10
 
 lr = 5e-4
 lam = 0.05

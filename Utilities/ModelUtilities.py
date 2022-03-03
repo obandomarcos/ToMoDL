@@ -276,6 +276,139 @@ def maskDatasets(full_sino, num_beams, dataset_size, img_size, angle_seed = 0):
 
     return desired, undersampled, undersampled_filtered
 
+def model_training(model, criterion, crit_fbp, optimizer, dataloaders, device, root, num_epochs = 25, disp=False, do_checkpoint = 0, plot_title = False,title = ''):
+    """
+    Training routine for raw Unet
+    Params:
+        - model (nn.Module): PyTorch model to be trained
+        - criterion (nn.loss): Objective function to minimize. Compares network output with target image
+        - optimizer (nn.optimizer): Optimizer to train the network. currently using Adam optimizer
+        - dataloaders (dict): Dictionary of dataloaders, with train and val datasets
+        - device: GPU device currenly being used
+        - root (string): Folder path to save results
+        - num_epochs (int): number of epochs to run the training
+        - disp (bool): display training progress
+        - do_checkpoint (int): checkpoint every do_checkpoint epoch
+        - title (string): plot title
+    """
+    since = time.time()
+    best_loss = float('inf')
+    best_model_wts = copy.deepcopy(model.state_dict())
+ 
+    train_x = dataloaders['train']['filtX']
+    train_y = dataloaders['train']['y']
+    
+    val_x = dataloaders['val']['filtX']
+    val_y = dataloaders['val']['y']
+
+    train_info = {}
+    train_info['train'] = []
+    train_info['train_fbp'] = []
+
+    train_info['val'] = []
+    train_info['val_fbp'] = []
+
+    for epoch in range(num_epochs):
+        
+        prev_time = time.time()
+        
+        for phase in ['train', 'val']:
+            
+            if phase == 'train':
+                model.train()
+            else:
+                model.eval()
+ 
+            running_loss = 0.0    
+            fbp_loss = 0.0
+
+            for batch_i, (_, inputs, labels) in enumerate(zip(*dataloaders[phase].values())):
+               
+               inputs.to(device)
+               labels.to(device) 
+
+               optimizer.zero_grad() #zero the parameter gradients 
+               
+               # Track history in training only
+                with torch.set_grad_enabled(phase=='train'):
+                
+                    output = model(inputs)
+                    
+                    loss = criterion(output, labels)
+                    loss_fbp = crit_fbp(inputs, labels)
+
+                    if phase == 'train':
+                            
+                        if (np.isnan(loss.item())):
+                            # Solución provisoria
+                            print('FOUND A NAN IN BATCH {}'.format(batch_i))
+                            continue
+
+                        loss.backward()
+                        torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm = 1.0, norm_type =2.0)
+                        optimizer.step()
+                
+                running_loss += loss.item()*inputs.size(0)
+                fbp_loss += loss_fbp.item()*inputs.size(0)
+
+
+                if torch.cuda.is_available():
+                    torch.cuda.empty_cache()
+                
+                if disp:
+
+                    batches_done = epoch * len(dataloaders[phase]['x']) + batch_i
+                    batches_left = num_epochs * len(dataloaders[phase]['x']) - batches_done
+                    time_left = datetime.timedelta(seconds=batches_left * (time.time() - prev_time))
+                
+                    prev_time = time.time()
+                    
+                    sys.stdout.write(
+                            "\r[%s] [Epoch %d/%d] [Batch %d/%d] [Loss: %f] ETA: %s "
+                            % (
+                                phase,
+                                epoch+1,
+                                num_epochs,
+                                batch_i+1,
+                                len(dataloaders[phase]['x']),
+                                loss.item(),
+                                time_left,
+                            )
+                        )
+            
+            epoch_loss = running_loss/(len(dataloaders[phase]['x'])*inputs.size(0))
+            epoch_loss_fbp = fbp_loss/(len(dataloaders[phase]['x'])*inputs.size(0))
+
+            train_info[phase].append(epoch_loss)
+            train_info[phase+'_fbp'].append(epoch_loss_fbp)
+            
+            if disp:
+            
+                print('')
+                print('{} Loss: {:.4f} '.format(phase, epoch_loss))
+                print('{} Loss FBP: {:.4f} '.format(phase, epoch_loss_fbp))
+            
+            if phase == 'val' and epoch_loss < best_loss:
+                
+                best_loss = epoch_loss
+                best_model_wts = copy.deepcopy(model.state_dict())
+        
+        if do_checkpoint>0:
+            if epoch%do_checkpoint==0:
+                 checkpoint(root, epoch, model)  
+    
+    time_elapsed = time.time()-since
+    
+    if disp:
+        
+        print('Training complete in {:.0f}m {:.0f}s'.format(time_elapsed // 60, time_elapsed % 60))
+        print('Best val Loss: {:4f}'.format(best_loss))
+
+    # load best model weights
+    model.load_state_dict(best_model_wts)
+
+    return model , train_info    
+
 # Training function
 def model_training(model, criterion, crit_backproj, crit_fbp, optimizer, dataloaders, device, root, num_epochs = 25, disp=False, do_checkpoint = 0, plot_title = False,title = ''):
     """
@@ -393,7 +526,7 @@ def model_training(model, criterion, crit_backproj, crit_fbp, optimizer, dataloa
                    batches_done = epoch * len(dataloaders[phase]['x']) + batch_i
                    batches_left = num_epochs * len(dataloaders[phase]['x']) - batches_done
                    time_left = datetime.timedelta(seconds=batches_left * (time.time() - prev_time))
-               #    print(time.time()-prev_time)
+               
                    prev_time = time.time()
                    
                    sys.stdout.write(

@@ -55,8 +55,8 @@ hRT = lambda sino: iradon(sino, angles, circle = False)
 
 loss_test_ADMM = []
 
-fig_ADMM, ax_ADMM = plt.subplots((fullX.shape[0]//500)//3, 3)
-fig_FBP, ax_FBP = plt.subplots((fullX.shape[0]//500)//3, 3)
+fig_ADMM, ax_ADMM = plt.subplots((fullX.shape[0]//500)//3+1, 3)
+fig_FBP, ax_FBP = plt.subplots((fullX.shape[0]//500)//3+1, 3)
 
 ax_ADMM = ax_ADMM.flatten()
 ax_FBP = ax_FBP.flatten()
@@ -96,10 +96,10 @@ for i, (imageX_test, imageY_test, imageFiltX_test) in enumerate(zip(fullX, fullX
         plt.colorbar(im1, cax=cax_ADMM)
         plt.colorbar(im2, cax=cax_FBP)       
         
+        
         ax_ADMM[i//500].set_title('PSNR = {} dB'.format(psnr))
         ax_FBP[i//500].set_title('PSNR = {} dB'.format(psnr))
         
-        break
 print(np.array(loss_test_ADMM).mean())
 np.savetxt(results_folder+'TestADMM_Results.txt', np.array(loss_test_ADMM))
 

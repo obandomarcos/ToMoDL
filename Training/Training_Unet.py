@@ -44,7 +44,7 @@ lr = 5e-4
 lam = 0.05
 max_angle = 640
 nLayer = 8
-epochs = 50
+epochs = 3
 shrink = 0.5
 
 train_infos = {}        

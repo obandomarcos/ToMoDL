@@ -44,7 +44,7 @@ lr = 5e-4
 lam = 0.05
 max_angle = 640
 nLayer = 8
-epochs = 3
+epochs = 1
 shrink = 0.5
 
 train_infos = {}        
@@ -101,7 +101,7 @@ test_loss_backproj_total = []
 for inp, target, filt in tqdm(zip(dataloaders['test']['x'], dataloaders['test']['y'], dataloaders['test']['filtX'])): 
     
     pred_ModlUnet = model_ModlUnet(inp)
-    pred_Unet = model_Unet(filtX) # Input is FBP with less projections
+    pred_Unet = model_Unet(filt) # Input is FBP with less projections
 
     loss_test_ModlUnet = loss_fn(pred_ModlUnet['dc'+str(K)], target).item()
     loss_test_Unet = loss_fn(pred_Unet, target).item()

@@ -323,13 +323,13 @@ def model_training(model, criterion, crit_fbp, optimizer, dataloaders, device, r
             fbp_loss = 0.0
 
             for batch_i, (_, inputs, labels) in enumerate(zip(*dataloaders[phase].values())):
-               
-               inputs.to(device)
-               labels.to(device) 
+                
+                inputs.to(device)
+                labels.to(device) 
 
-               optimizer.zero_grad() #zero the parameter gradients 
-               
-               # Track history in training only
+                optimizer.zero_grad() #zero the parameter gradients 
+                
+                # Track history in training only
                 with torch.set_grad_enabled(phase=='train'):
                 
                     output = model(inputs)

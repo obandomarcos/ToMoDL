@@ -68,17 +68,17 @@ loss_backproj_fn = torch.nn.MSELoss(reduction = 'sum')
 optimizer_ModlUnet = torch.optim.Adam(model_ModlUnet.parameters(), lr = lr)
 optimizer_Unet = torch.optim.Adam(model_Unet.parameters(), lr = lr)
 
-model_ModlUnet, train_info_ModlUnet = modutils.model_training(model_ModlUnet, loss_fn, loss_backproj_fn, loss_fbp_fn, optimizer_ModlUnet, dataloaders, device, results_folder+train_name_ModlUnet, num_epochs = epochs, disp = True, do_checkpoint = 0, title = train_name_ModlUnet, plot_title = True)
+# model_ModlUnet, train_info_ModlUnet = modutils.model_training(model_ModlUnet, loss_fn, loss_backproj_fn, loss_fbp_fn, optimizer_ModlUnet, dataloaders, device, results_folder+train_name_ModlUnet, num_epochs = epochs, disp = True, do_checkpoint = 0, title = train_name_ModlUnet, plot_title = True)
 
-print('Train MODL+UNet loss {}'.format(train_info_ModlUnet['train'][-1]))
-print('Train FBP loss {}'.format(train_info_ModlUnet['train_fbp'][-1]))
-#%% save loss for fbp and modl network
-with open(results_folder+train_name_ModlUnet+'ModlUNet_lr{}_shrink{}.pkl'.format(lr, shrink), 'wb') as f:
+# print('Train MODL+UNet loss {}'.format(train_info_ModlUnet['train'][-1]))
+# print('Train FBP loss {}'.format(train_info_ModlUnet['train_fbp'][-1]))
+# #%% save loss for fbp and modl network
+# with open(results_folder+train_name_ModlUnet+'ModlUNet_lr{}_shrink{}.pkl'.format(lr, shrink), 'wb') as f:
 
-    pickle.dump(train_info_ModlUnet, f)
-    print('Diccionario salvado para proyección {}'.format(proj_num))
+#     pickle.dump(train_info_ModlUnet, f)
+#     print('Diccionario salvado para proyección {}'.format(proj_num))
 
-modutils.save_net(model_folder+train_name_ModlUnet+'_MoDLUNet_lr{}_shrink{}'.format(lr, shrink), model_ModlUnet)
+# modutils.save_net(model_folder+train_name_ModlUnet+'_MoDLUNet_lr{}_shrink{}'.format(lr, shrink), model_ModlUnet)
 
 #  Train directly with Unet (inputs change)
 model_Unet, train_info_Unet = modutils.unet_training(model_Unet, loss_fn, loss_fbp_fn, optimizer, dataloaders,  results_folder+train_name_Unet, device, num_epochs = epochs, disp = True)

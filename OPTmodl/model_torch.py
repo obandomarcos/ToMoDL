@@ -310,13 +310,13 @@ class double_conv(nn.Module):
         super(double_conv, self).__init__()
         self.conv = nn.Sequential(
             nn.Conv2d(in_ch, out_ch, 3, padding=1),
-            #nn.BatchNorm2d(out_ch),
+            nn.BatchNorm2d(out_ch),
             nn.ReLU(inplace=True),
-            #nn.Dropout2d(),
+            nn.Dropout2d(),
             nn.Conv2d(out_ch, out_ch, 3, padding=1),
-            #nn.BatchNorm2d(out_ch),
+            nn.BatchNorm2d(out_ch),
             nn.ReLU(inplace=True),
-            #nn.Dropout2d()
+            nn.Dropout2d()
         )
 
     def forward(self, x):
@@ -328,10 +328,10 @@ class inconv(nn.Module):
     def __init__(self, in_ch, out_ch):
         super(inconv, self).__init__()
         self.conv = double_conv(in_ch, out_ch)
-        #self.conv = nn.Sequential(
-        #    nn.BatchNorm2d(in_ch),
-        #    double_conv(in_ch, out_ch)
-        #)
+        self.conv = nn.Sequential(
+            nn.BatchNorm2d(in_ch),
+            double_conv(in_ch, out_ch)
+        )
     def forward(self, x):
         x = self.conv(x)
         return x

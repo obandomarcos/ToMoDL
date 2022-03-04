@@ -113,8 +113,8 @@ for inp, target, filt in tqdm(zip(dataloaders['test']['x'], dataloaders['test'][
     test_loss_fbp_total.append(modutils.psnr(img_size, loss_test_fbp.item(), 1))
     test_loss_backproj_total.append(modutils.psnr(img_size, loss_test_backproj.item(), 1))
 
-modutils.plot_outputs(target, pred_ModlUnet, results_folder+train_name+'Test_images_MODL_UNet_lr{}_shrink{}.pdf'.format(lr, shrink))
-modutils.plot_outputs(target, pred_Unet, results_folder+train_name+'Test_images_UNet_lr{}_shrink{}.pdf'.format(lr, shrink))
+modutils.plot_outputs(target, pred_ModlUnet, results_folder+train_name_ModlUnet+'Test_images_MODL_UNet_lr{}_shrink{}.pdf'.format(lr, shrink))
+modutils.plot_outputs(target, pred_Unet, results_folder+train_name_Unet+'Test_images_UNet_lr{}_shrink{}.pdf'.format(lr, shrink))
 
 test_loss_dict_ModlUNet = {'loss_net': test_loss_total_ModlUnet, 'loss_fbp': test_loss_fbp_total, 'loss_backproj':test_loss_backproj_total}
 test_loss_dict_UNet = {'loss_net': test_loss_total_Unet, 'loss_fbp': test_loss_fbp_total, 'loss_backproj':test_loss_backproj_total}

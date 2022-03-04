@@ -81,7 +81,7 @@ optimizer_Unet = torch.optim.Adam(model_Unet.parameters(), lr = lr)
 # modutils.save_net(model_folder+train_name_ModlUnet+'_MoDLUNet_lr{}_shrink{}'.format(lr, shrink), model_ModlUnet)
 
 #  Train directly with Unet (inputs change)
-model_Unet, train_info_Unet = modutils.unet_training(model_Unet, loss_fn, loss_fbp_fn, optimizer, dataloaders,  results_folder+train_name_Unet, device, num_epochs = epochs, disp = True)
+model_Unet, train_info_Unet = modutils.model_training_unet(model_Unet, loss_fn, loss_fbp_fn, optimizer, dataloaders,  results_folder+train_name_Unet, device, num_epochs = epochs, disp = True)
 
 print('Train UNET loss {}'.format(train_info_Unet['train'][-1]))
 print('Train FBP loss {}'.format(train_info_Unet['train_fbp'][-1]))

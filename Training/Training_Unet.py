@@ -61,7 +61,7 @@ train_name_Unet = 'Unet_CorrectRegistration_Test54'
 #  Train model + UNET plugged
 model_ModlUnet = modl.OPTmodl(nLayer, K, max_angle, proj_num, img_size, None, lam, True, results_folder, useUnet = True)
 model_Unet = modl.UNet(1,1)
-model_Unet.cuda(dev)
+model_Unet.cuda(device)
 
 loss_fn = torch.nn.MSELoss(reduction = 'sum')
 loss_fbp_fn = torch.nn.MSELoss(reduction = 'sum')

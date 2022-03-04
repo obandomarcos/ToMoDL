@@ -78,7 +78,7 @@ with open(results_folder+train_name_ModlUnet+'ModlUNet_lr{}_shrink{}.pkl'.format
     pickle.dump(train_info_ModlUnet, f)
     print('Diccionario salvado para proyección {}'.format(proj_num))
 
-modutils.save_net(model_folder+train_nameModlUnet+'_MoDLUNet_lr{}_shrink{}'.format(lr, shrink), model_ModlUnet)
+modutils.save_net(model_folder+train_name_ModlUnet+'_MoDLUNet_lr{}_shrink{}'.format(lr, shrink), model_ModlUnet)
 
 #  Train directly with Unet (inputs change)
 model_Unet, train_info_Unet = modutils.unet_training(model_Unet, loss_fn, loss_fbp_fn, optimizer, dataloaders,  results_folder+train_name_Unet, device, num_epochs = epochs, disp = True)

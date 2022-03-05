@@ -51,12 +51,12 @@ Psi = lambda x,th:  RecTV.TVdenoise(x,2/th,tv_iters)
 #  set the penalty function, to compute the objective
 Phi = lambda x: RecTV.TVnorm(x)
 hR = lambda x: radon(x, angles, circle = False)
-hRT = lambda sino: iradon(sino, angles, circle = False)
+hRT = lambda sino: iradon(sino, angles, circle = False, filter = None)
 
 loss_test_ADMM = []
 
-fig_ADMM, ax_ADMM = plt.subplots((fullX.shape[0]//500)//3+1, 3)
-fig_FBP, ax_FBP = plt.subplots((fullX.shape[0]//500)//3+1, 3)
+fig_ADMM, ax_ADMM = plt.subplots((fullX.shape[0]//500)//3+1, 3, figsize = (20, 20))
+fig_FBP, ax_FBP = plt.subplots((fullX.shape[0]//500)//3+1, 3, figsize = (20, 20))
 
 ax_ADMM = ax_ADMM.flatten()
 ax_FBP = ax_FBP.flatten()
@@ -73,11 +73,10 @@ for i, (imageX_test, imageY_test, imageFiltX_test) in enumerate(zip(fullX, fullX
     imageFiltX_test = imageFiltX_test[0,...].to(device).cpu().numpy().T
 
     sino = hR(imageFiltX_test)
-    img_rec_FBP = hRT(sino) 
-    img_rec_ADMM,_,_,_ = RecTV.ADMM(y = sino, A = hR, AT = hRT, Den = Psi, alpha = 0.01, delta = 1, max_iter = 200, phi = Phi, tol = 10e-7, invert = 1, warm = 0, true_img = imageY_test)
+    img_rec_ADMM,_,_,_ = RecTV.ADMM(y = sino, A = hR, AT = hRT, Den = Psi, alpha = 0.1, delta = 1, max_iter = 20, phi = Phi, tol = 10e-2, invert = 0, warm = 0, true_img = imageY_test)
     img_rec_ADMM = (img_rec_ADMM-img_rec_ADMM.min())/(img_rec_ADMM.max()-img_rec_ADMM.min())
 
-    mse = ((imageFiltX_test - img_rec_ADMM)**2).sum()
+    mse = ((imageY_test - img_rec_ADMM)**2).sum()
     psnr = round(modutils.psnr(img_size, mse, 1), 3)
     loss_test_ADMM.append(psnr)
     
@@ -99,9 +98,10 @@ for i, (imageX_test, imageY_test, imageFiltX_test) in enumerate(zip(fullX, fullX
         
         ax_ADMM[i//500].set_title('PSNR = {} dB'.format(psnr))
         ax_FBP[i//500].set_title('PSNR = {} dB'.format(psnr))
-        
+         
+        fig_ADMM.savefig(results_folder+'ADMMReconstructions.pdf', bbox_inches = 'tight')
+        fig_FBP.savefig(results_folder+'FBPReconstructions.pdf', bbox_inches = 'tight')
+
 print(np.array(loss_test_ADMM).mean())
 np.savetxt(results_folder+'TestADMM_Results.txt', np.array(loss_test_ADMM))
 
-fig_ADMM.savefig(results_folder+'ADMMReconstructions.pdf', bbox_inches = 'tight')
-fig_FBP.savefig(results_folder+'FBPReconstructions.pdf', bbox_inches = 'tight')

@@ -81,8 +81,8 @@ for a_ADMM, a_FBP, a_MODL in zip(ax_ADMM, ax_FBP, ax_MODL):
 
 for i, (imageX_test, imageY_test, imageFiltX_test) in enumerate(zip(fullX, fullY, fullFiltX)):
     
-    image_rec_MODL = model(imageX_test[None,...].to(device))['dc'+str(K)][0,...].detach().cpu().numpy().T
-
+    image_rec_MODL = model(imageX_test[None,...].to(device))['dc'+str(K)][0,0,...].detach().cpu().numpy().T
+    
     imageY_test = imageY_test[0,...].to(device).cpu().numpy().T
     imageX_test = imageX_test[0,...].to(device).cpu().numpy().T 
     imageFiltX_test = imageFiltX_test[0,...].to(device).cpu().numpy().T
@@ -99,16 +99,15 @@ for i, (imageX_test, imageY_test, imageFiltX_test) in enumerate(zip(fullX, fullY
     psnr_fbp = round(modutils.psnr(img_size, mse_fbp, 1), 3) 
     loss_test_fbp.append(psnr_fbp)
 
-    mse_modl = ((image_rec_MODL - imageY_test.T)**2).sum() 
-    psnr_modl = round(modutils.psnr(img_size, mse_modl, 1), 3)
-   
+    mse_modl = ((image_rec_MODL - imageY_test)**2).sum() 
+    psnr_modl = round(modutils.psnr(img_size, mse_modl, 1), 3) 
     loss_test_modl.append(psnr_modl)
     
     if i%500 == 0:
         
         im1 = ax_ADMM[i//500].imshow(img_rec_ADMM)
         im2 = ax_FBP[i//500].imshow(imageY_test)
-        im3 = ax_MODL[i//500].imshow(image_rec_MODL)
+        im3 = ax_MODL[i//500].imshow(abs(image_rec_MODL-imageY_test))
 
         divider_ADMM = make_axes_locatable(ax_ADMM[i//500])
         divider_FBP = make_axes_locatable(ax_FBP[i//500]) 

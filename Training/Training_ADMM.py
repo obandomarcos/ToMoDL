@@ -73,7 +73,7 @@ for i, (imageX_test, imageY_test, imageFiltX_test) in enumerate(zip(fullX, fullY
     imageFiltX_test = imageFiltX_test[0,...].to(device).cpu().numpy().T
 
     sino = hR(imageFiltX_test)
-    img_rec_ADMM,_,_,_ = RecTV.ADMM(y = sino, A = hR, AT = hRT, Den = Psi, alpha = 0.01, delta = 100, max_iter = 20, phi = Phi, tol = 10e-2, invert = 0, warm = 0, true_img = imageY_test)
+    img_rec_ADMM,_,_,_ = RecTV.ADMM(y = sino, A = hR, AT = hRT, Den = Psi, alpha = 0.01, delta = 0.01, max_iter = 20, phi = Phi, tol = 10e-2, invert = 0, warm = 0, true_img = imageY_test)
     img_rec_ADMM = (img_rec_ADMM-img_rec_ADMM.min())/(img_rec_ADMM.max()-img_rec_ADMM.min())
 
     mse_admm = ((imageY_test - img_rec_ADMM)**2).sum()

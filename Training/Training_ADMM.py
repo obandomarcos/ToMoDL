@@ -28,13 +28,21 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 #%% ADMM test on data
+K = 10
 proj_num = 72
+lam = 0.05
+nLayer = 8
 augment_factor = 1
 total_size = 5000
 n_angles = 72
+max_angle = 640
 img_size = 100
 det_count = int((img_size+0.5)*np.sqrt(2))
 tv_iters = 4
+train_name = 'Optimization_Layers_CorrectRegistration_Test52'
+
+model = modl.OPTmodl(nLayer, K, max_angle, proj_num, img_size, None, lam, True, results_folder)
+modutils.load_net(model_folder+train_name+'K_{}_lam_{}_nlay_{}_proj_{}'.format(K, lam, nLayer, proj_num), model, device)
 
 tensor_path_X = datasets_folder + 'Proj_{}_augmentFactor_{}_totalSize_{}_FullX.pt'.format(proj_num, augment_factor, total_size)                                            
 tensor_path_Y = datasets_folder + 'Proj_{}_augmentFactor_{}_totalSize_{}_FullY.pt'.format(proj_num, augment_factor, total_size)                                            
@@ -54,20 +62,27 @@ hR = lambda x: radon(x, angles, circle = False)
 hRT = lambda sino: iradon(sino, angles, circle = False, filter = None)
 
 loss_test_ADMM = []
+loss_test_fbp = []
+loss_test_modl = []
 
 fig_ADMM, ax_ADMM = plt.subplots((fullX.shape[0]//500)//3+1, 3, figsize = (20, 20))
 fig_FBP, ax_FBP = plt.subplots((fullX.shape[0]//500)//3+1, 3, figsize = (20, 20))
+fig_MODL, ax_MODL = plt.subplots((fullX.shape[0]//500)//3+1, 3, figsize = (20, 20))
 
 ax_ADMM = ax_ADMM.flatten()
 ax_FBP = ax_FBP.flatten()
+ax_MODL = ax_MODL.flatten()
 
-for a_ADMM, a_FBP in zip(ax_ADMM, ax_FBP):
+for a_ADMM, a_FBP, a_MODL in zip(ax_ADMM, ax_FBP, ax_MODL):
 
     a_ADMM.set_axis_off()
     a_FBP.set_axis_off()
+    a_MODL.set_axis_off()
 
 for i, (imageX_test, imageY_test, imageFiltX_test) in enumerate(zip(fullX, fullY, fullFiltX)):
     
+    image_rec_MODL = model(imageX_test[None,...].to(device))['dc'+str(K)][0,...].to(device).detach().cpu().numpy().T
+
     imageY_test = imageY_test[0,...].to(device).cpu().numpy().T
     imageX_test = imageX_test[0,...].to(device).cpu().numpy().T 
     imageFiltX_test = imageFiltX_test[0,...].to(device).cpu().numpy().T
@@ -82,29 +97,37 @@ for i, (imageX_test, imageY_test, imageFiltX_test) in enumerate(zip(fullX, fullY
 
     mse_fbp = ((imageFiltX_test - imageY_test)**2).sum() 
     psnr_fbp = round(modutils.psnr(img_size, mse_fbp, 1), 3) 
-    loss_test_ADMM.append(psnr_fbp)
+    loss_test_fbp.append(psnr_fbp)
 
+    mse_modl = ((image_rec_MODL - imageY_test)**2).sum() 
+    psnr_modl = round(modutils.psnr(img_size, mse_modl, 1), 3) 
+    loss_test_modl.append(psnr_modl)
+    
     if i%500 == 0:
         
         im1 = ax_ADMM[i//500].imshow(img_rec_ADMM)
         im2 = ax_FBP[i//500].imshow(imageY_test)
-        
+        im3 = ax_MODL[i//500].imshow(image_rec_MODL)
 
         divider_ADMM = make_axes_locatable(ax_ADMM[i//500])
-        divider_FBP = make_axes_locatable(ax_FBP[i//500])
-        
+        divider_FBP = make_axes_locatable(ax_FBP[i//500]) 
+        divider_MODL = make_axes_locatable(ax_MODL[i//500])
+
         cax_ADMM = divider_ADMM.append_axes("right", size="5%", pad=0.05) 
         cax_FBP = divider_FBP.append_axes("right", size="5%", pad=0.05)
+        cax_MODL = divider_MODL.append_axes("right", size="5%", pad=0.05)
 
         plt.colorbar(im1, cax=cax_ADMM)
         plt.colorbar(im2, cax=cax_FBP)       
-        
+        plt.colorbar(im3, cax=cax_MODL)
         
         ax_ADMM[i//500].set_title('PSNR = {} dB'.format(psnr_admm))
-        ax_FBP[i//500].set_title('PSNR = {} dB'.format(psnr_fbp))
-         
+        ax_FBP[i//500].set_title('PSNR = {} dB'.format(psnr_fbp)) 
+        ax_MODL[i//500].set_title('PSNR = {} dB'.format(psnr_modl))
+
         fig_ADMM.savefig(results_folder+'ADMMReconstructions.pdf', bbox_inches = 'tight')
         fig_FBP.savefig(results_folder+'FBPReconstructions.pdf', bbox_inches = 'tight')
+        fig_MODL.savefig(results_folder+'MODLReconstructions.pdf', bbox_inches = 'tight')
 
 print(np.array(loss_test_ADMM).mean())
 np.savetxt(results_folder+'TestADMM_Results.txt', np.array(loss_test_ADMM))

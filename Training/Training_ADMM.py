@@ -81,7 +81,7 @@ for a_ADMM, a_FBP, a_MODL in zip(ax_ADMM, ax_FBP, ax_MODL):
 
 for i, (imageX_test, imageY_test, imageFiltX_test) in enumerate(zip(fullX, fullY, fullFiltX)):
     
-    image_rec_MODL = model(imageX_test[None,...].to(device))['dc'+str(K)][0,...].to(device).detach().cpu().numpy().T
+    image_rec_MODL = model(imageX_test[None,...].to(device))['dc'+str(K)][0,...].detach().cpu().numpy().T
 
     imageY_test = imageY_test[0,...].to(device).cpu().numpy().T
     imageX_test = imageX_test[0,...].to(device).cpu().numpy().T 
@@ -99,8 +99,9 @@ for i, (imageX_test, imageY_test, imageFiltX_test) in enumerate(zip(fullX, fullY
     psnr_fbp = round(modutils.psnr(img_size, mse_fbp, 1), 3) 
     loss_test_fbp.append(psnr_fbp)
 
-    mse_modl = ((image_rec_MODL - imageY_test)**2).sum() 
-    psnr_modl = round(modutils.psnr(img_size, mse_modl, 1), 3) 
+    mse_modl = ((image_rec_MODL - imageY_test.T)**2).sum() 
+    psnr_modl = round(modutils.psnr(img_size, mse_modl, 1), 3)
+   
     loss_test_modl.append(psnr_modl)
     
     if i%500 == 0:

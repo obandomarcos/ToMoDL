@@ -34,7 +34,7 @@ total_size = 5000
 n_angles = 72
 img_size = 100
 det_count = int((img_size+0.5)*np.sqrt(2))
-tv_iters = 3
+tv_iters = 4
 
 tensor_path_X = datasets_folder + 'Proj_{}_augmentFactor_{}_totalSize_{}_FullX.pt'.format(proj_num, augment_factor, total_size)                                            
 tensor_path_Y = datasets_folder + 'Proj_{}_augmentFactor_{}_totalSize_{}_FullY.pt'.format(proj_num, augment_factor, total_size)                                            
@@ -73,7 +73,7 @@ for i, (imageX_test, imageY_test, imageFiltX_test) in enumerate(zip(fullX, fullY
     imageFiltX_test = imageFiltX_test[0,...].to(device).cpu().numpy().T
 
     sino = hR(imageFiltX_test)
-    img_rec_ADMM,_,_,_ = RecTV.ADMM(y = sino, A = hR, AT = hRT, Den = Psi, alpha = 0.01, delta = 1, max_iter = 20, phi = Phi, tol = 10e-2, invert = 0, warm = 0, true_img = imageY_test)
+    img_rec_ADMM,_,_,_ = RecTV.ADMM(y = sino, A = hR, AT = hRT, Den = Psi, alpha = 0.01, delta = 5, max_iter = 20, phi = Phi, tol = 10e-2, invert = 0, warm = 0, true_img = imageY_test)
     img_rec_ADMM = (img_rec_ADMM-img_rec_ADMM.min())/(img_rec_ADMM.max()-img_rec_ADMM.min())
 
     mse_admm = ((imageY_test - img_rec_ADMM)**2).sum()

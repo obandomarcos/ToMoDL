@@ -76,7 +76,7 @@ for i, (imageX_test, imageY_test, imageFiltX_test) in enumerate(zip(fullX, fullX
     img_rec_ADMM,_,_,_ = RecTV.ADMM(y = sino, A = hR, AT = hRT, Den = Psi, alpha = 0.01, delta = 1, max_iter = 20, phi = Phi, tol = 10e-2, invert = 0, warm = 0, true_img = imageY_test)
     img_rec_ADMM = (img_rec_ADMM-img_rec_ADMM.min())/(img_rec_ADMM.max()-img_rec_ADMM.min())
 
-    mse = ((imageY_test - img_rec_ADMM)**2).sum()
+    mse = ((imageFiltX_test - img_rec_ADMM)**2).sum()
     psnr = round(modutils.psnr(img_size, mse, 1), 3)
     loss_test_ADMM.append(psnr)
     

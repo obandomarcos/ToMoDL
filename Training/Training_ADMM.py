@@ -76,10 +76,14 @@ for i, (imageX_test, imageY_test, imageFiltX_test) in enumerate(zip(fullX, fullY
     img_rec_ADMM,_,_,_ = RecTV.ADMM(y = sino, A = hR, AT = hRT, Den = Psi, alpha = 0.001, delta = 1, max_iter = 20, phi = Phi, tol = 10e-2, invert = 0, warm = 0, true_img = imageY_test)
     img_rec_ADMM = (img_rec_ADMM-img_rec_ADMM.min())/(img_rec_ADMM.max()-img_rec_ADMM.min())
 
-    mse = ((imageY_test - img_rec_ADMM)**2).sum()
-    psnr = round(modutils.psnr(img_size, mse, 1), 3)
-    loss_test_ADMM.append(psnr)
-    
+    mse_admm = ((imageY_test - img_rec_ADMM)**2).sum()
+    psnr_admm = round(modutils.psnr(img_size, mse_admm, 1), 3) 
+    loss_test_ADMM.append(psnr_admm)
+
+    mse_fbp = ((imageFiltX_test - imageY_test)**2).sum() 
+    psnr_fbp = round(modutils.psnr(img_size, mse_fbp, 1), 3) 
+    loss_test_ADMM.append(psnr_fbp)
+
     if i%500 == 0:
         
         im1 = ax_ADMM[i//500].imshow(img_rec_ADMM)
@@ -96,8 +100,8 @@ for i, (imageX_test, imageY_test, imageFiltX_test) in enumerate(zip(fullX, fullY
         plt.colorbar(im2, cax=cax_FBP)       
         
         
-        ax_ADMM[i//500].set_title('PSNR = {} dB'.format(psnr))
-        ax_FBP[i//500].set_title('PSNR = {} dB'.format(psnr))
+        ax_ADMM[i//500].set_title('PSNR = {} dB'.format(psnr_admm))
+        ax_FBP[i//500].set_title('PSNR = {} dB'.format(psnr_fbp))
          
         fig_ADMM.savefig(results_folder+'ADMMReconstructions.pdf', bbox_inches = 'tight')
         fig_FBP.savefig(results_folder+'FBPReconstructions.pdf', bbox_inches = 'tight')

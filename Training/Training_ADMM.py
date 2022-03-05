@@ -81,7 +81,7 @@ for a_ADMM, a_FBP, a_MODL in zip(ax_ADMM, ax_FBP, ax_MODL):
 
 for i, (imageX_test, imageY_test, imageFiltX_test) in enumerate(zip(fullX, fullY, fullFiltX)):
     
-    image_rec_MODL = model(imageX_test[None,...].to(device))['dc'+str(K)][0,0,...].detach().cpu().numpy()
+    image_rec_MODL = model(imageX_test[None,...].to(device))['dc'+str(K)][0,0,...].detach().cpu().numpy().T
     
     imageY_test = imageY_test[0,...].to(device).cpu().numpy().T
     imageX_test = imageX_test[0,...].to(device).cpu().numpy().T 

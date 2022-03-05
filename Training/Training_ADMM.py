@@ -66,7 +66,7 @@ for a_ADMM, a_FBP in zip(ax_ADMM, ax_FBP):
     a_ADMM.set_axis_off()
     a_FBP.set_axis_off()
 
-for i, (imageX_test, imageY_test, imageFiltX_test) in enumerate(zip(fullX, fullX, fullFiltX)):
+for i, (imageX_test, imageY_test, imageFiltX_test) in enumerate(zip(fullX, fullY, fullFiltX)):
     
     imageY_test = imageY_test[0,...].to(device).cpu().numpy().T
     imageX_test = imageX_test[0,...].to(device).cpu().numpy().T 

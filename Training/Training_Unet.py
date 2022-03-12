@@ -35,12 +35,12 @@ train_factor = 0.7
 val_factor = 0.2
 test_factor = 0.1 
 total_size= 5000                  
-batch_size= 5 
+batch_size= 16 
 img_size = 100
 augment_factor = 1
 K = 5 
 
-lr = 5e-4
+lr = 0.001
 lam = 0.05
 max_angle = 640
 nLayer = 8
@@ -63,23 +63,22 @@ model_ModlUnet = modl.OPTmodl(nLayer, K, max_angle, proj_num, img_size, None, la
 model_Unet = modl.UNet(1,1)
 model_Unet.cuda(device)
 
-loss_fn = torch.nn.MSELoss(reduction = 'sum')
-loss_fbp_fn = torch.nn.MSELoss(reduction = 'sum')
-loss_backproj_fn = torch.nn.MSELoss(reduction = 'sum')
+loss_fn = torch.nn.L1Loss(reduction = 'mean')
+loss_fbp_fn = torch.nn.L1Loss(reduction = 'mean')
+loss_backproj_fn = torch.nn.L1Loss(reduction = 'mean')
 optimizer_ModlUnet = torch.optim.Adam(model_ModlUnet.parameters(), lr = lr)
 optimizer_Unet = torch.optim.Adam(model_Unet.parameters(), lr = lr)
 
-# model_ModlUnet, train_info_ModlUnet = modutils.model_training(model_ModlUnet, loss_fn, loss_backproj_fn, loss_fbp_fn, optimizer_ModlUnet, dataloaders, device, results_folder+train_name_ModlUnet, num_epochs = epochs, disp = True, do_checkpoint = 0, title = train_name_ModlUnet, plot_title = True)
+model_ModlUnet, train_info_ModlUnet = modutils.model_training(model_ModlUnet, loss_fn, loss_backproj_fn, loss_fbp_fn, optimizer_ModlUnet, dataloaders, device, results_folder+train_name_ModlUnet, num_epochs = epochs, disp = True, do_checkpoint = 0, title = train_name_ModlUnet, plot_title = True)
 
-# print('Train MODL+UNet loss {}'.format(train_info_ModlUnet['train'][-1]))
-# print('Train FBP loss {}'.format(train_info_ModlUnet['train_fbp'][-1]))
-# #%% save loss for fbp and modl network
-# with open(results_folder+train_name_ModlUnet+'ModlUNet_lr{}_shrink{}.pkl'.format(lr, shrink), 'wb') as f:
+print('Train MODL+UNet loss {}'.format(train_info_ModlUnet['train'][-1]))
+print('Train FBP loss {}'.format(train_info_ModlUnet['train_fbp'][-1]))
+#%% save loss for fbp and modl network
+with open(results_folder+train_name_ModlUnet+'ModlUNet_lr{}_shrink{}.pkl'.format(lr, shrink), 'wb') as f:
+     pickle.dump(train_info_ModlUnet, f)
+     print('Diccionario salvado para proyección {}'.format(proj_num))
 
-#     pickle.dump(train_info_ModlUnet, f)
-#     print('Diccionario salvado para proyección {}'.format(proj_num))
-
-# modutils.save_net(model_folder+train_name_ModlUnet+'_MoDLUNet_lr{}_shrink{}'.format(lr, shrink), model_ModlUnet)
+modutils.save_net(model_folder+train_name_ModlUnet+'_MoDLUNet_lr{}_shrink{}'.format(lr, shrink), model_ModlUnet)
 
 #  Train directly with Unet (inputs change)
 model_Unet, train_info_Unet = modutils.model_training_unet(model_Unet, loss_fn, loss_fbp_fn, optimizer_Unet, dataloaders,  device, results_folder+train_name_Unet, num_epochs = epochs, disp = True)
@@ -98,20 +97,22 @@ test_loss_total_Unet = []
 test_loss_fbp_total = []           
 test_loss_backproj_total = []
 
+loss_mse = torch.nn.MSELoss(reduction = 'sum')
+
 for inp, target, filt in tqdm(zip(dataloaders['test']['x'], dataloaders['test']['y'], dataloaders['test']['filtX'])): 
     
     pred_ModlUnet = model_ModlUnet(inp)
     pred_Unet = model_Unet(filt) # Input is FBP with less projections
 
-    loss_test_ModlUnet = loss_fn(pred_ModlUnet['dc'+str(K)], target).item()
-    loss_test_Unet = loss_fn(pred_Unet, target).item()
+    loss_test_ModlUnet = loss_mse(pred_ModlUnet['dc'+str(K)], target).item()
+    loss_test_Unet = loss_mse(pred_Unet, target).item()
     
-    loss_test_backproj = loss_backproj_fn(inp, target)
-    loss_test_fbp = loss_fbp_fn(filt, target)                                                                                            
+    loss_test_backproj = loss_mse(inp, target).item()
+    loss_test_fbp = loss_mse(filt, target).item()                                                                                            
     test_loss_total_ModlUnet.append(modutils.psnr(img_size, loss_test_ModlUnet, 1))
     test_loss_total_Unet.append(modutils.psnr(img_size, loss_test_Unet, 1))
-    test_loss_fbp_total.append(modutils.psnr(img_size, loss_test_fbp.item(), 1))
-    test_loss_backproj_total.append(modutils.psnr(img_size, loss_test_backproj.item(), 1))
+    test_loss_fbp_total.append(modutils.psnr(img_size, loss_test_fbp, 1))
+    test_loss_backproj_total.append(modutils.psnr(img_size, loss_test_backproj, 1))
 
 modutils.plot_outputs(target, pred_ModlUnet, results_folder+train_name_ModlUnet+'Test_images_MODL_UNet_lr{}_shrink{}.pdf'.format(lr, shrink))
 # modutils.plot_outputs(target, pred_Unet, results_folder+train_name_Unet+'Test_images_UNet_lr{}_shrink{}.pdf'.format(lr, shrink))

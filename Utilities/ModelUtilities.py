@@ -345,7 +345,7 @@ def model_training_unet(model, criterion, crit_fbp, optimizer, dataloaders, devi
                             continue
 
                         loss.backward()
-                        torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm = 1.0, norm_type =2.0)
+                        #torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm = 1.0, norm_type =2.0)
                         optimizer.step()
                 
                 running_loss += loss.item()*inputs.size(0)

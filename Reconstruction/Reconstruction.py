@@ -359,14 +359,14 @@ def TwIST(y, A, AT, tau, kwarg, true_img = None):
           TwIST_iters = TwIST_iters + 1
           break  # break loop while        
                 
-    xm2 = xm1;
-    xm1 = x;
+    xm2 = xm1
+    xm1 = x
 
     #update the number of nonzero components and its variation
     nz_x_prev = nz_x
     nz_x = np.int64(x!=0.0)
     num_nz_x = np.sum(nz_x.flatten())
-    num_changes_active = (np.sum(nz_x.flatten() != nz_x_prev.flatten()));
+    num_changes_active = (np.sum(nz_x.flatten() != nz_x_prev.flatten()))
     
     #take no less than miniter and no more than maxiter iterations
     if stopCriterion == 0:
@@ -420,7 +420,7 @@ def TwIST(y, A, AT, tau, kwarg, true_img = None):
     print('Objective function = {}\n'.format(f))
     print('Number of non-zero components = {}\n'.format(num_nz_x))
     print('CPU time so far = {}\n'.format(times[it-1]))
-    print('\n');
+    print('\n')
 
   #--------------------------------------------------------------
   # If the 'Debias' option is set to 1, we try to

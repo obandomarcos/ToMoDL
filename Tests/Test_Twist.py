@@ -52,7 +52,7 @@ Phi = lambda x: RecTV.TVnorm(x)
 hR = lambda x: radon(x, angles, circle = False)
 hRT = lambda sino: iradon(sino, angles, circle = False)
 
-kwarg = {'PSI': Psi, 'PHI':Phi, 'LAMBDA':1e-4, 'TOLERANCEA':1e-4, 'STOPCRITERION': 1, 'VERBOSE': 1, 'INITIALIZATION': 0, 'MAXITERA':10000}
+kwargs = {'PSI': Psi, 'PHI':Phi, 'LAMBDA':1e-4, 'TOLERANCEA':1e-4, 'STOPCRITERION': 1, 'VERBOSE': 1, 'INITIALIZATION': 0, 'MAXITERA':10000, 'GPU' : 0}
 
 # Test Image
 img_true = fullY[3, 0, ...].to(device).cpu().numpy().T
@@ -60,6 +60,10 @@ img_true = fullY[3, 0, ...].to(device).cpu().numpy().T
 sino = hR(img_true)
 img_rec_FBP = hRT(sino)
 img_rec_TWIST,_,_,_ = RecTV.TwIST(y = sino, A =hR, AT = hRT, tau = 0.01, kwarg = kwargs , true_img = img_true)
+
+mse = ((img_rec_TWIST-img_rec_FBP)**2).mean()
+print(img_rec_TWIST.max())
+psnr = 10*np.log10(1/mse)
 
 # Have to send FiltX to Sinogram space in order to use ADMM
 fig, ax = plt.subplots(1,4, figsize = (16,8))
@@ -71,6 +75,6 @@ ax[1].set_title('Sinogram')
 ax[2].imshow(img_rec_TWIST)
 ax[2].set_title('Reconstruction Twist')
 ax[3].imshow(np.abs(img_rec_TWIST-img_rec_FBP))
-ax[3].set_title('Difference')
+ax[3].set_title('Difference\nPSNR = {} dB'.format(round(psnr,2)))
 
 fig.savefig(results_folder+'TestTwist.pdf', bbox_inches = 'tight')

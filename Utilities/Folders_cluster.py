@@ -17,5 +17,4 @@ f140827_5dpf_4X = '/home/marcos/DeepOPT/DataOPT/140827_5dpf_4X'
 
 results_folder = '/home/marcos/DeepOPT/Resultados/'
 model_folder = '/home/marcos/DeepOPT/Models/'
-
-
+datasets_folder = '/home/marcos/DeepOPT/Datasets/'

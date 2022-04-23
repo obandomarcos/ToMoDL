@@ -18,6 +18,7 @@ import pickle
 import os.path
 from tqdm import tqdm
 # import albumentations
+import torch.nn.functional as nnf
 
 results_folder = '/home/marcos/DeepOPT/Resultados/'
 
@@ -276,7 +277,7 @@ def maskDatasets(full_sino, num_beams, dataset_size, img_size, angle_seed = 0):
 
     return desired, undersampled, undersampled_filtered
 
-def model_training_unet(model, criterion, crit_fbp, optimizer, dataloaders, device, root, num_epochs = 25, disp=False, do_checkpoint = 0, plot_title = False,title = ''):
+def model_training_unet(model, criterion, crit_fbp, optimizer, dataloaders, device, root, num_epochs = 25, disp=False, do_checkpoint = 0, plot_title = False,title = '', compute_mse = True, monai = True):
     """
     Training routine for raw Unet
     Params:
@@ -294,7 +295,10 @@ def model_training_unet(model, criterion, crit_fbp, optimizer, dataloaders, devi
     since = time.time()
     best_loss = float('inf')
     best_model_wts = copy.deepcopy(model.state_dict())
- 
+
+    if compute_mse == True:
+        mse_loss = torch.nn.MSELoss(reduction = 'sum')
+
     train_x = dataloaders['train']['filtX']
     train_y = dataloaders['train']['y']
     
@@ -304,9 +308,11 @@ def model_training_unet(model, criterion, crit_fbp, optimizer, dataloaders, devi
     train_info = {}
     train_info['train'] = []
     train_info['train_fbp'] = []
+    train_info['train_mse'] = []
 
     train_info['val'] = []
     train_info['val_fbp'] = []
+    train_info['val_mse'] = []
 
     for epoch in range(num_epochs):
         
@@ -321,6 +327,7 @@ def model_training_unet(model, criterion, crit_fbp, optimizer, dataloaders, devi
  
             running_loss = 0.0    
             fbp_loss = 0.0
+            mse_loss_count = 0.0
 
             for batch_i, (_, inputs, labels) in enumerate(zip(*dataloaders[phase].values())):
                 
@@ -329,13 +336,20 @@ def model_training_unet(model, criterion, crit_fbp, optimizer, dataloaders, devi
 
                 optimizer.zero_grad() #zero the parameter gradients 
                 
+                if monai == True:
+                    inputs = nnf.interpolate(inputs, size=(model.imageSize, model.imageSize), mode='bicubic', align_corners=False)           
+                    labels = nnf.interpolate(labels, size=(model.imageSize, model.imageSize), mode='bicubic', align_corners=False)           
+                
                 # Track history in training only
                 with torch.set_grad_enabled(phase=='train'):
-                
+                     
                     output = model(inputs)
                     
                     loss = criterion(output, labels)
                     loss_fbp = crit_fbp(inputs, labels)
+                    
+                    if compute_mse == True:
+                        mse = mse_loss(output, labels) 
 
                     if phase == 'train':
                             
@@ -351,6 +365,8 @@ def model_training_unet(model, criterion, crit_fbp, optimizer, dataloaders, devi
                 running_loss += loss.item()*inputs.size(0)
                 fbp_loss += loss_fbp.item()*inputs.size(0)
 
+                if compute_mse == True:
+                    mse_loss_count += mse.item()*inputs.size(0)        
 
                 if torch.cuda.is_available():
                     torch.cuda.empty_cache()
@@ -381,7 +397,11 @@ def model_training_unet(model, criterion, crit_fbp, optimizer, dataloaders, devi
 
             train_info[phase].append(epoch_loss)
             train_info[phase+'_fbp'].append(epoch_loss_fbp)
-            
+ 
+            if compute_mse == True:
+                epoch_loss_mse = mse_loss_count/(len(dataloaders[phase]['x'])*inputs.size(0))
+                train_info[phase+'_mse'].append(epoch_loss_mse)
+
             if disp:
             
                 print('')
@@ -410,7 +430,7 @@ def model_training_unet(model, criterion, crit_fbp, optimizer, dataloaders, devi
     return model , train_info    
 
 # Training function
-def model_training(model, criterion, crit_backproj, crit_fbp, optimizer, dataloaders, device, root, num_epochs = 25, disp=False, do_checkpoint = 0, plot_title = False,title = ''):
+def model_training(model, criterion, crit_backproj, crit_fbp, optimizer, dataloaders, device, root, num_epochs = 25, disp=False, do_checkpoint = 0, plot_title = False,title = '', compute_mse = True, monai = True):
     """
     Training routine for model
     Params:
@@ -430,7 +450,10 @@ def model_training(model, criterion, crit_backproj, crit_fbp, optimizer, dataloa
     since = time.time()
     best_loss = float('inf')
     best_model_wts = copy.deepcopy(model.state_dict())
- 
+    
+    if compute_mse == True:
+        mse_loss = torch.nn.MSELoss(reduction = 'sum')
+
     train_x = dataloaders['train']['x']   
     filtTrain_x = dataloaders['train']['filtX']
     train_y = dataloaders['train']['y']
@@ -444,11 +467,13 @@ def model_training(model, criterion, crit_backproj, crit_fbp, optimizer, dataloa
     train_info['train_backproj'] = []
     train_info['train_fbp'] = []
     train_info['train_norm'] = []
+    train_info['train_mse'] = []
 
     train_info['val'] = []
     train_info['val_backproj'] = []
     train_info['val_fbp'] = []
     train_info['val_norm'] = []
+    train_info['val_mse'] = []
 
     loss_std = []
     loss_std_fbp = []
@@ -468,6 +493,7 @@ def model_training(model, criterion, crit_backproj, crit_fbp, optimizer, dataloa
             fbp_loss = 0.0
             backproj_loss = 0.0
             norm_loss = 0.0
+            mse_loss_count = 0.0
 
             for batch_i, (inputs, inputs_fbp, labels) in enumerate(zip(*dataloaders[phase].values())):
 
@@ -475,18 +501,26 @@ def model_training(model, criterion, crit_backproj, crit_fbp, optimizer, dataloa
                inputs_fbp.to(device)
                labels.to(device) 
 
+               if monai == True:
+                   inputs = nnf.interpolate(inputs, size=(model.imageSize, model.imageSize), mode='bicubic', align_corners=False)           
+                   labels = nnf.interpolate(labels, size=(model.imageSize, model.imageSize), mode='bicubic', align_corners=False)           
+                   inputs_fbp = nnf.interpolate(inputs_fbp, size=(model.imageSize, model.imageSize), mode='bicubic', align_corners=False)           
                optimizer.zero_grad() #zero the parameter gradients 
                
                # Track history in training only
                with torch.set_grad_enabled(phase=='train'):
                     
                    #inputs = (model.nAngles/model.proj_num)*inputs
-
+                   #print(inputs.size()) 
                    outputs = model(inputs)
                    loss = criterion(outputs['dc'+str(model.K)], labels)
                    loss_backproj = crit_backproj(inputs, labels)
                    loss_fbp = crit_fbp(inputs_fbp, labels)
                    
+                   if compute_mse == True:
+
+                       mse = mse_loss(outputs['dc'+str(model.K)], labels) 
+
                    #print('output max:', outputs['dc'+str(model.K)].max(), ' min:', outputs['dc'+str(model.K)].max())
                    #print('labels max:', labels.max(), 'min ', labels.min())
 
@@ -518,6 +552,9 @@ def model_training(model, criterion, crit_backproj, crit_fbp, optimizer, dataloa
                fbp_loss += loss_fbp.item()*inputs.size(0)
                norm_loss += loss_norm.item()*inputs.size(0)
 
+               if compute_mse == True:
+                   mse_loss_count += mse.item()*inputs.size(0)        
+    
                if torch.cuda.is_available():
                    torch.cuda.empty_cache()
 
@@ -551,6 +588,10 @@ def model_training(model, criterion, crit_backproj, crit_fbp, optimizer, dataloa
             train_info[phase+'_fbp'].append(epoch_loss_fbp)
             train_info[phase+'_backproj'].append(epoch_loss_backproj)
             train_info[phase+'_norm'].append(epoch_loss_norm)
+            
+            if compute_mse == True:
+                epoch_loss_mse = mse_loss_count/(len(dataloaders[phase]['x'])*inputs.size(0))
+                train_info[phase+'_mse'].append(epoch_loss_mse)
 
             if disp:
                 print('')
@@ -954,3 +995,9 @@ def formUniqueDataset(sino_datasets, dataset_size, num_beams, slice_idx):
     #target_img = transform.forward(torch.unsqueeze(target_img_sub, 0))
     
     return training_Atb, target_img, n_angles
+
+def mse(img1, img2):
+
+    return ((img1 - img2)**2).sum()
+
+

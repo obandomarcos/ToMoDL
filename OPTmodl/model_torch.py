@@ -5,7 +5,6 @@ This code creates the model described in MoDL: Model-Based Deep Learning Archite
 """
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 import numpy as np
 from torch_radon import Radon, RadonFanbeam
 from torch_radon.solvers import cg
@@ -13,7 +12,7 @@ import matplotlib.pyplot as plt
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-
+import monai
 
 dev=torch.device("cuda") 
 
@@ -215,7 +214,7 @@ def dc(Aobj, rhs, useTorchRadon = False):
 
 class OPTmodl(nn.Module):
   
-  def __init__(self, nLayer, K, n_angles, proj_num, image_size, mask, lam, shared, results_folder, useUnet = False):
+  def __init__(self, nLayer, K, n_angles, proj_num, image_size, mask, lam, results_folder, shared = True, useUnet = False, unet_options = None):
     """
     Main function that creates the model
     Params : 
@@ -235,10 +234,21 @@ class OPTmodl(nn.Module):
     self.proj_num = proj_num
     self.epochs_save = 0
     
-    if useUnet == True:
+    if useUnet == 'unet':
         
-        self.dw = UNet(1,1)
-        
+        self.dw = UNet(1,1, residual = unet_options['residual'], up_conv = unet_options['up_conv'], batch_norm = unet_options['batch_norm'], batch_norm_inconv = unet_options['batch_norm_inconv'])
+    
+    elif useUnet == 'monai':
+
+        self.dw = monai.networks.nets.UNet(spatial_dims = 2, 
+                                      in_channels = 1,
+                                      out_channels = 1,
+                                      channels = (64, 64,128, 128, 256,256, 512, 512, 512,512),
+                                      strides = (2,2,2,2,2,2,2,2,2), 
+                                      act = 'RELU',
+                                      norm = 'BATCH',
+                                      dropout = 0.5)                                                  
+    
     else:
 
         if shared == True:
@@ -271,6 +281,7 @@ class OPTmodl(nn.Module):
     for i in range(1,self.K+1):
     
         j = str(i)
+        #print(self.out['dc'+str(i-1)].size())
         self.out['dw'+j] = self.dw.forward(self.out['dc'+str(i-1)])
         rhs = atb/self.lam+self.out['dw'+j]
 
@@ -306,18 +317,30 @@ def normalize01(images):
 
 class double_conv(nn.Module):
     '''(conv => BN => ReLU) * 2'''
-    def __init__(self, in_ch, out_ch):
+    def __init__(self, in_ch, out_ch, batch_norm = False):
         super(double_conv, self).__init__()
-        self.conv = nn.Sequential(
-            nn.Conv2d(in_ch, out_ch, 3, padding=1),
-            nn.BatchNorm2d(out_ch),
-            nn.ReLU(inplace=True),
-            nn.Dropout2d(),
-            nn.Conv2d(out_ch, out_ch, 3, padding=1),
-            nn.BatchNorm2d(out_ch),
-            nn.ReLU(inplace=True),
-            nn.Dropout2d()
-        )
+        
+        if batch_norm == True:
+            self.conv = nn.Sequential(
+                nn.Conv2d(in_ch, out_ch, 3, padding=1),
+                nn.BatchNorm2d(out_ch),
+                nn.ReLU(inplace=True),
+                nn.Dropout2d(),
+                nn.Conv2d(out_ch, out_ch, 3, padding=1),
+                nn.BatchNorm2d(out_ch),
+                nn.ReLU(inplace=True),
+                nn.Dropout2d()
+            )
+        else:
+
+            self.conv = nn.Sequential(
+              nn.Conv2d(in_ch, out_ch, 3, padding=1),
+              nn.ReLU(inplace=True),
+              nn.Dropout2d(),
+              nn.Conv2d(out_ch, out_ch, 3, padding=1),
+              nn.ReLU(inplace=True),
+              nn.Dropout2d()
+            )
 
     def forward(self, x):
         x = self.conv(x)
@@ -325,24 +348,30 @@ class double_conv(nn.Module):
 
 
 class inconv(nn.Module):
-    def __init__(self, in_ch, out_ch):
+    def __init__(self, in_ch, out_ch, batch_norm):
         super(inconv, self).__init__()
-        self.conv = double_conv(in_ch, out_ch)
-        self.conv = nn.Sequential(
-            nn.BatchNorm2d(in_ch),
-            double_conv(in_ch, out_ch)
-        )
+        self.conv = double_conv(in_ch, out_ch, batch_norm = batch_norm)
+        
+        if batch_norm == True:
+
+            self.conv = nn.Sequential(
+                nn.BatchNorm2d(in_ch),
+                double_conv(in_ch, out_ch)
+            )
+#        else :
+#            self.conv = nn.Sequential(double_conv(in_ch, out_ch))
+
     def forward(self, x):
         x = self.conv(x)
         return x
 
 
 class down(nn.Module):
-    def __init__(self, in_ch, out_ch):
+    def __init__(self, in_ch, out_ch, batch_norm):
         super(down, self).__init__()
         self.mpconv = nn.Sequential(
             nn.MaxPool2d(2),
-            double_conv(in_ch, out_ch)
+            double_conv(in_ch, out_ch, batch_norm)
         )
 
     def forward(self, x):
@@ -351,7 +380,7 @@ class down(nn.Module):
 
 
 class up(nn.Module):
-    def __init__(self, in_ch, out_ch, bilinear=True):
+    def __init__(self, in_ch, out_ch, bilinear=True, batch_norm = False):
         super(up, self).__init__()
 
         #  would be a nice idea if the upsampling could be learned too,
@@ -361,7 +390,7 @@ class up(nn.Module):
         else:
             self.up = nn.ConvTranspose2d(in_ch//2, in_ch//2, 2, stride=2)
 
-        self.conv = double_conv(in_ch, out_ch)
+        self.conv = double_conv(in_ch, out_ch, batch_norm)
 
     def forward(self, x1, x2):
         x1 = self.up(x1)
@@ -383,23 +412,27 @@ class outconv(nn.Module):
         x = self.conv(x)
         return x
 
-
-
 class UNet(nn.Module):
-    def __init__(self, n_channels, n_classes):
+    def __init__(self, n_channels, n_classes, up_conv = False, residual = False, batch_norm = False, batch_norm_inconv = False):
+        
         super(UNet, self).__init__()
-        self.inc = inconv(n_channels, 64)
-        self.down1 = down(64, 128)
-        self.down2 = down(128, 256)
-        self.down3 = down(256, 512)
-        self.down4 = down(512, 512)
-        self.up1 = up(1024, 256)
-        self.up2 = up(512, 128)
-        self.up3 = up(256, 64)
-        self.up4 = up(128, 64)
+        
+        self.residual = residual
+        if self.residual is True:
+            self.lam = torch.nn.Parameter(torch.tensor([0.1], requires_grad = True, device = dev))
+        self.inc = inconv(n_channels, 64, batch_norm = batch_norm_inconv)
+        self.down1 = down(64, 128, batch_norm = batch_norm)
+        self.down2 = down(128, 256, batch_norm = batch_norm)
+        self.down3 = down(256, 512,  batch_norm = batch_norm)
+        self.down4 = down(512, 512, batch_norm = batch_norm)
+        self.up1 = up(1024, 256, bilinear = up_conv, batch_norm = batch_norm)
+        self.up2 = up(512, 128, bilinear = up_conv, batch_norm = batch_norm)
+        self.up3 = up(256, 64, bilinear = up_conv, batch_norm = batch_norm)
+        self.up4 = up(128, 64 , bilinear = up_conv, batch_norm = batch_norm)
         self.outc = outconv(64, n_classes)
-
+    
     def forward(self, x0):
+        
         x1 = self.inc(x0)
         x2 = self.down1(x1)
         x3 = self.down2(x2)
@@ -410,6 +443,9 @@ class UNet(nn.Module):
         x = self.up3(x, x2)
         x = self.up4(x, x1)
         x = self.outc(x)
+        if self.residual is True:        
+            x = x+self.lam*x0
+
         return x#F.sigmoid(x)
 
 

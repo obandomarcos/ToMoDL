@@ -430,7 +430,7 @@ def model_training_unet(model, criterion, crit_fbp, optimizer, dataloaders, devi
     return model , train_info    
 
 # Training function
-def model_training(model, criterion, crit_backproj, crit_fbp, optimizer, dataloaders, device, root, num_epochs = 25, disp=False, do_checkpoint = 0, plot_title = False,title = '', compute_mse = True, monai = True):
+def model_training(model, criterion, crit_backproj, crit_fbp, optimizer, dataloaders, device, root, num_epochs = 25, disp=False, do_checkpoint = 0, plot_title = False,title = '', compute_mse = True, monai = False, compute_ssim = False):
     """
     Training routine for model
     Params:
@@ -510,19 +510,24 @@ def model_training(model, criterion, crit_backproj, crit_fbp, optimizer, dataloa
                # Track history in training only
                with torch.set_grad_enabled(phase=='train'):
                     
-                   #inputs = (model.nAngles/model.proj_num)*inputs
-                   #print(inputs.size()) 
                    outputs = model(inputs)
-                   loss = criterion(outputs['dc'+str(model.K)], labels)
-                   loss_backproj = crit_backproj(inputs, labels)
-                   loss_fbp = crit_fbp(inputs_fbp, labels)
+
+                   if compute_ssim == True: 
+            
+                       loss = 1-criterion(outputs['dc'+str(model.K)], labels)
+                       loss_backproj = 1-crit_backproj(inputs, labels)
+                       loss_fbp = 1-crit_fbp(inputs_fbp, labels)
                    
+                   else:
+
+                       loss = criterion(outputs['dc'+str(model.K)], labels)
+                       loss_backproj = crit_backproj(inputs, labels)
+                       loss_fbp = crit_fbp(inputs_fbp, labels)
+
+
                    if compute_mse == True:
 
                        mse = mse_loss(outputs['dc'+str(model.K)], labels) 
-
-                   #print('output max:', outputs['dc'+str(model.K)].max(), ' min:', outputs['dc'+str(model.K)].max())
-                   #print('labels max:', labels.max(), 'min ', labels.min())
 
                    # Output normalization
                    loss_norm = psnr_normalize(outputs['dc'+str(model.K)], labels)
@@ -541,11 +546,10 @@ def model_training(model, criterion, crit_backproj, crit_fbp, optimizer, dataloa
                # Plot images
                if (plot_title == True) and (epoch in [0, num_epochs-1]) and (batch_i in [0, 10, 20]):                                                                                           
                    print('Plotted {}'.format(phase))
-                   path_plot = '{}_images_epoch{}_proj{}_batch{}_K{}_lam{}.pdf'.format(phase, epoch, model.proj_num, batch_i, model.K, model.lam)
-                   title_plot = title+'{} images epoch{} proj{} batch{} K{} lam{}'.format(phase, epoch, model.proj_num, batch_i, model.K, model.lam)
+                   path_plot = '{}_images_epoch{}_proj{}_batch{}_K{}_lam{}.pdf'.format(phase, epoch, model.proj_num, batch_i, model.K, model.lam.data)
+                   title_plot = title+'{} images epoch{} proj{} batch{} K{} lam{}'.format(phase, epoch, model.proj_num, batch_i, model.K, model.lam.data)
                    plot_outputs(labels, outputs, root+path_plot, title_plot)
                 
-            #    print(loss.item(), inputs.size(0), len(dataloaders[phase]['x']))
 
                running_loss += loss.item()*inputs.size(0)
                backproj_loss += loss_backproj.item()*inputs.size(0)
@@ -583,7 +587,7 @@ def model_training(model, criterion, crit_backproj, crit_fbp, optimizer, dataloa
             epoch_loss_fbp = fbp_loss/(len(dataloaders[phase]['x'])*inputs.size(0))
             epoch_loss_backproj = backproj_loss/(len(dataloaders[phase]['x'])*inputs.size(0))
             epoch_loss_norm = norm_loss/(len(dataloaders[phase]['x'])*inputs.size(0))
-
+            
             train_info[phase].append(epoch_loss)
             train_info[phase+'_fbp'].append(epoch_loss_fbp)
             train_info[phase+'_backproj'].append(epoch_loss_backproj)
@@ -600,13 +604,10 @@ def model_training(model, criterion, crit_backproj, crit_fbp, optimizer, dataloa
                 print('{} Loss Backprojection: {:.4f} '.format(phase, epoch_loss_backproj))
                 print('{} Loss Norm: {:.4f}'.format(phase, epoch_loss_norm))
 
-
             if phase == 'val' and epoch_loss < best_loss:
                 
                 best_loss = epoch_loss
                 best_model_wts = copy.deepcopy(model.state_dict())
-        
-            #checkpoint_plot(outputs, root, epoch)
 
         if do_checkpoint>0:
             if epoch%do_checkpoint==0:

@@ -548,7 +548,15 @@ class ZebraDataset:
 
 # Multi-dataset to dataloader
 class ZebraDataloader:
-
+  '''
+  List of tasks:
+    1 - Load ZebraDatasets
+    2 - Reshape
+    3 - Register and correct artifacts
+    4 - Create torch.Dataset
+    5 - Load Dataloader
+  
+  '''
   def __init__(self, folder_paths):
     '''
     Initializes dataloader with paths of folders
@@ -571,7 +579,7 @@ class ZebraDataloader:
     for dataset_num, folder_path in enumerate(self.folder_paths):                                     
         
         # Loads dataset registered
-        df = ZebraDataset(folder_path, 'Datasets', 'Bassi')
+        df = ZebraDataset(folder_path, 'Datasets', experiment)
         fish_parts = df.get_fish_parts()    
         
         for sample in fish_parts:
@@ -608,7 +616,7 @@ class ZebraDataloader:
                 
     return datasets_registered
 
-  def openDataset(self, dataset_path):
+  def open_dataset(self, dataset_path):
     '''
     Opens pickled registered dataset
     Params: 
@@ -746,7 +754,8 @@ class ZebraDataloader:
 
       return dataloaders
 
-  def maskDatasets(full_sino, num_beams, dataset_size, img_size, angle_seed = 0, use_rand = True):
+  # This should become a pytorch.Transform!
+  def maskDatasets(self, full_sino, num_beams, dataset_size, img_size, angle_seed = 0, use_rand = True):
       '''
       Mask datasets in order to undersample sinograms, obtaining undersampled and fully reconstruction datasets for training.
       Params:

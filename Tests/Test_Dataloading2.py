@@ -26,5 +26,5 @@ folder_paths = [f140115_1dpf]
 for folder_path in folder_paths:
 
     zebra_dataset = dlutils.ZebraDataset(folder_path, 'Datasets', 'Bassi')
+    
 
-    print(zebra_dataset._search_all_files(zebra_dataset.folder_path))

@@ -14,13 +14,14 @@ import pathlib
 from PIL import Image
 import re
 import torch, torchvision
+import os 
 from tqdm import tqdm
 import SimpleITK as sitk
 from torch_radon import Radon, RadonFanbeam
 from skimage.transform import radon, iradon
 import pickle
 import h5py
-import cv2z
+import cv2
 import scipy.ndimage as ndi
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -83,6 +84,9 @@ class ZebraDataset:
   def _search_all_files(self, x):
     '''
     Searches all files corresponding to images of the dataset
+
+    Params:
+      - x (string): Folder path
     '''
     dirpath = x
     assert(dirpath.is_dir())
@@ -98,6 +102,8 @@ class ZebraDataset:
 
   def loaded_images(self, sample = None):
     '''
+    Loads images in volume
+
     Params:
       - sample (string): {None, body, head, tail}
     '''
@@ -148,13 +154,13 @@ class ZebraDataset:
     self.image_volume = np.moveaxis(np.stack(self.dataset['Image'].to_numpy()), 1, 2)
     del self.dataset
   
-  def correctRotationAxis(self,  max_shift = 200, shift_step = 4, center_shift_top = 0, center_shift_bottom = 0, sample = 'head', load_shifts = False, save_shifts = True):
+  def correct_rotation_axis(self,  max_shift = 200, shift_step = 4, center_shift_top = 0, center_shift_bottom = 0, sample = 'head', load_shifts = False, save_shifts = True):
     '''
     Corrects rotation axis by finding optimal registration via maximising reconstructed image's intensity variance.
 
     Based on 'Walls, J. R., Sled, J. G., Sharpe, J., & Henkelman, R. M. (2005). Correction of artefacts in optical projection tomography. Physics in Medicine & Biology, 50(19), 4645.'
     '''
-
+    
     if load_shifts == True:
       
       with open(str(self.shifts_path)+"_{}".format(sample)+".pickle", 'rb') as f:
@@ -164,14 +170,14 @@ class ZebraDataset:
     else:
     
       # Grab top and bottom sinograms (automate to grab non-empty sinograms)
-      top_index, bottom_index = self._grabImageIndexes()
+      top_index, bottom_index = self._grab_image_indexes()
 
       self.top_sino = np.copy(self.registered_volume[sample][:,:,top_index].T)
       self.bottom_sino = np.copy(self.registered_volume[sample][:,:,bottom_index].T)
       self.angles = np.linspace(0, 2*180, self.top_sino.shape[1] ,endpoint = False)
 
       # Iteratively sweep from -maxShift pixels to maxShift pixels
-      (top_shift_max, bottom_shift_max) = self._searchShifts(max_shift, shift_step, center_shift_top, center_shift_bottom)
+      (top_shift_max, bottom_shift_max) = self._search_shifts(max_shift, shift_step, center_shift_top, center_shift_bottom)
 
       # Interpolation 
       # (top_shift_max, bottom_shift_max) = (abs(top_shift_max), abs(bottom_shift_max))
@@ -190,7 +196,9 @@ class ZebraDataset:
 
   def _registerVolume(self, sample):
     """
-    Register volume with interpolated shifts
+    Register volume with interpolated shifts.
+    Params:
+      - sample (string): Name of sample
     """
     assert(self.shifts is not None)
 
@@ -199,7 +207,7 @@ class ZebraDataset:
       
       self.registered_volume[sample][:,:,idx] = ndi.shift(self.registered_volume[sample][:,:,idx], (0, shift), mode = 'nearest')
 
-  def datasetResize(self, sample, img_resize, number_projections):
+  def dataset_resize(self, sample, img_resize, number_projections):
     """
     Resizes sinograms according to reconstruction image size
     """
@@ -213,7 +221,7 @@ class ZebraDataset:
     
     self.registered_volume[sample] = np.moveaxis(self.registered_volume[sample], 0,-1)
 
-  def _grabImageIndexes(self, threshold = 50):
+  def _grab_image_indexes(self, threshold = 50):
     """
     Grabs top and bottom non-empty indexes
     """
@@ -228,7 +236,7 @@ class ZebraDataset:
     
     return top_index, bottom_index
 
-  def _searchShifts(self, max_shift, shift_step, center_shift_top, center_shift_bottom):
+  def _search_shifts(self, max_shift, shift_step, center_shift_top, center_shift_bottom):
 
     # Sweep through all shifts
     top_shifts = np.arange(-max_shift, max_shift, shift_step)+center_shift_top
@@ -260,11 +268,11 @@ class ZebraDataset:
 
     return (max_shift_top, max_shift_bottom)
 
-  def getfish_parts(self):
+  def get_fish_parts(self):
 
     return self.fish_parts_available
 
-  def registerDataset(self, sample, inPlace = False):
+  def register_dataset(self, sample, inPlace = False):
 
     """
     Registers full dataset, by sample. (deprecated method)
@@ -439,7 +447,7 @@ class ZebraDataset:
     self.registered_dataset = self.registered_dataset.sort_values(['Sample','Angle'], axis = 0).reset_index(drop=True)
     del self.dataset
   
-  def getregistered_volume(self, sample ,saveDataset = True, margin = 10, useSegmented = False):
+  def get_registered_volume(self, sample ,saveDataset = True, margin = 10, useSegmented = False):
     '''
     Returns registered and stacked numpy volume, ordered by angle
     Calculates lower and upper non-zero limits for sinograms, with a safety
@@ -530,13 +538,24 @@ class ZebraDataset:
       self.registered_dataset = reg['reg_dataset']
       self.Tparams = reg['reg_transform']
 
-  def deleteSection(self, sample):
+  def delete_section(self, sample):
 
     self.registered_dataset = self.registered_dataset.drop(self.registered_dataset[self.registered_dataset.Sample == sample].index)
 
-# Dataloaders formation
+  def delete_registered_volume(self, sample):
+    
+    del self.registered_volume[sample]
 
-def formRegDatasets(folder_paths, img_resize = 100, number_projections = 640, experiment = 'Bassi', fish_parts = None):
+# Multi-dataset to dataloader
+class ZebraDataloader:
+
+  def __init__(self, folder_paths):
+    '''
+    Initializes dataloader with paths of folders
+    '''    
+    self.folder_paths = folder_paths
+
+  def formRegDatasets(self, img_resize = 100, number_projections = 640, experiment = 'Bassi', fish_parts = None):
     """
     Forms registered datasets from raw projection data.
     params:
@@ -549,13 +568,11 @@ def formRegDatasets(folder_paths, img_resize = 100, number_projections = 640, ex
     # Paths of pickled registered datasets
     datasets_registered = []
 
-    for dataset_num, folder_path in enumerate(folder_paths):                                     
+    for dataset_num, folder_path in enumerate(self.folder_paths):                                     
         
         # Loads dataset registered
-        df = DL.ZebraDataset(folder_path, 'Datasets', 'Bassi')
-        print('Loading image for dataset {}'.format(df.folderName))
-
-        fish_parts = df.getFishParts()    
+        df = ZebraDataset(folder_path, 'Datasets', 'Bassi')
+        fish_parts = df.get_fish_parts()    
         
         for sample in fish_parts:
             # If the registered dataset exist, just add it to the list
@@ -571,244 +588,246 @@ def formRegDatasets(folder_paths, img_resize = 100, number_projections = 640, ex
                 df.loadImages(sample = sample)
                 # Load corresponding registrations
                 
-                df.correctRotationAxis(sample = sample, max_shift = 200, shift_step = 1, load_shifts = True, save_shifts = False)
+                df.correct_rotation_axis(sample = sample, max_shift = 200, shift_step = 1, load_shifts = True, save_shifts = False)
                 
                 print(df.registeredVolume[sample].shape)
                 # Append volumes        
                 print("Dataset {}/{} loaded - {} {}".format(dataset_num+1, len(folder_paths), str(df.folderName), sample))
                 
                 # Resize registered volume to desired
-                df.datasetResize(sample, img_resize, number_projections)
+                df.dataset_resize(sample, img_resize, number_projections)
 
                 with open(registered_dataset_path, 'wb') as f:
                     
                     print(df.registeredVolume[sample].shape)
                     pickle.dump(df.registeredVolume[sample], f)
                     datasets_registered.append(registered_dataset_path)
+                
                 # Save memory deleting sample volume
-                del df.registeredVolume[sample]
+                df.delete_registered_volume(sample)
+                
             
     return datasets_registered
 
-def openDataset(dataset_path):
-            
-    with open(str(dataset_path), 'rb') as f:
-                    
-        datasets_reg = pickle.load(f)
+  def openDataset(self, dataset_path):
+              
+      with open(str(dataset_path), 'rb') as f:
+                      
+          datasets_reg = pickle.load(f)
 
-    return datasets_reg
+      return datasets_reg
 
-def formDataloaders(datasets, number_projections, total_size, train_factor, val_factor, test_factor, batch_size, img_size, tensor_path, augment_factor = 1, load_tensor = True, save_tensor = False, use_rand = True, k_fold_datasets = True):
-    """
-    Form torch dataloaders for training and testing, full and undersampled
-    params:
-        - number_projections is the number of projections the sinogram is reconstructed with for undersampled FBP
-        - train size (test_size) is the number of training (test) images to be taken from the volumes. They are taken randomly using formDatasets
-        - batch_size is the number of images a batch contains in the dataloader
-        - img_size is the size of the new images to be reconstructed
-        - augment_factor determines how many times the dataset will be resampled with different seed angles
-        - k_fold_datasets sets the number of datasets to be used for k-folding
-    """
+  def formDataloaders(datasets, number_projections, total_size, train_factor, val_factor, test_factor, batch_size, img_size, tensor_path, augment_factor = 1, load_tensor = True, save_tensor = False, use_rand = True, k_fold_datasets = True):
+      """
+      Form torch dataloaders for training and testing, full and undersampled
+      params:
+          - number_projections is the number of projections the sinogram is reconstructed with for undersampled FBP
+          - train size (test_size) is the number of training (test) images to be taken from the volumes. They are taken randomly using formDatasets
+          - batch_size is the number of images a batch contains in the dataloader
+          - img_size is the size of the new images to be reconstructed
+          - augment_factor determines how many times the dataset will be resampled with different seed angles
+          - k_fold_datasets sets the number of datasets to be used for k-folding
+      """
 
-    fullX = []
-    fullY = []
-    filtFullX = []
+      fullX = []
+      fullY = []
+      filtFullX = []
 
-    testX = []
-    testY = []
-    filtTestX = []
-    
-    if load_tensor == False:
+      testX = []
+      testY = []
+      filtTestX = []
+      
+      if load_tensor == False:
 
-        l = len(datasets)*augment_factor
-        # Augment factor iterates over the datasets for data augmentation
-        for i in range(augment_factor):
-            
-            # Seed angle for data augmentation
-            rand_angle = np.random.randint(0, number_projections)
+          l = len(datasets)*augment_factor
+          # Augment factor iterates over the datasets for data augmentation
+          for i in range(augment_factor):
+              
+              # Seed angle for data augmentation
+              rand_angle = np.random.randint(0, number_projections)
 
-            # Dataset train
-            # Masks chosen dataset with the number of projections required
-            for k_dataset, dataset_path in enumerate(tqdm(datasets)):
-                
-                dataset = openDataset(dataset_path).astype(float)
+              # Dataset train
+              # Masks chosen dataset with the number of projections required
+              for k_dataset, dataset_path in enumerate(tqdm(datasets)):
+                  
+                  dataset = openDataset(dataset_path).astype(float)
 
-                #print(dataset.shape, dataset_path)
-                print(total_size)
-                tY, tX, filtX = maskDatasets(dataset, number_projections, total_size//l, img_size, rand_angle, use_rand = use_rand)
+                  #print(dataset.shape, dataset_path)
+                  print(total_size)
+                  tY, tX, filtX = maskDatasets(dataset, number_projections, total_size//l, img_size, rand_angle, use_rand = use_rand)
 
-                if k_dataset < k_fold_datasets:
-                    
-                    fullX.append(tX)
-                    fullY.append(tY)
-                    filtFullX.append(filtX)
+                  if k_dataset < k_fold_datasets:
+                      
+                      fullX.append(tX)
+                      fullY.append(tY)
+                      filtFullX.append(filtX)
 
-                else:
+                  else:
 
-                    testX.append(tX)
-                    testY.append(tY)
-                    filtTestX.append(filtX)
-                    
-        # Stack augmented datasets
-        fullX = torch.vstack(fullX)
-        filtFullX = torch.vstack(filtFullX)
-        fullY = torch.vstack(fullY)
-        
-        # Stack test dataset separately
-        testX = torch.vstack(testX)
-        filtTestX = torch.vstack(filtTestX)
-        testY = torch.vstack(testY)
-        
-    else:
-        # In order to prevent writing numerous copies of these tensors, loading should be avoided
+                      testX.append(tX)
+                      testY.append(tY)
+                      filtTestX.append(filtX)
+                      
+          # Stack augmented datasets
+          fullX = torch.vstack(fullX)
+          filtFullX = torch.vstack(filtFullX)
+          fullY = torch.vstack(fullY)
+          
+          # Stack test dataset separately
+          testX = torch.vstack(testX)
+          filtTestX = torch.vstack(filtTestX)
+          testY = torch.vstack(testY)
+          
+      else:
+          # In order to prevent writing numerous copies of these tensors, loading should be avoided
 
-        fullX = torch.load(tensor_path+'FullX.pt')
-        filtFullX = torch.load(tensor_path+'FiltFullX.pt')
-        fullY = torch.load(tensor_path+'FullY.pt')
-    
-    if save_tensor == True:
-        # In order to prevent writing numerous copies of these tensors, loading should be avoided
-        torch.save(fullX, tensor_path+'FullX.pt')
-        torch.save(filtFullX, tensor_path+'FiltFullX.pt')
-        torch.save(fullY, tensor_path+'FullY.pt')
+          fullX = torch.load(tensor_path+'FullX.pt')
+          filtFullX = torch.load(tensor_path+'FiltFullX.pt')
+          fullY = torch.load(tensor_path+'FullY.pt')
+      
+      if save_tensor == True:
+          # In order to prevent writing numerous copies of these tensors, loading should be avoided
+          torch.save(fullX, tensor_path+'FullX.pt')
+          torch.save(filtFullX, tensor_path+'FiltFullX.pt')
+          torch.save(fullY, tensor_path+'FullY.pt')
 
-    if use_rand == True:
-        
-        # Randomly shuffle the images
-        idx = torch.randperm(fullX.shape[0])
-        fullX = fullX[idx].view(fullX.size())
-        filtFullX = filtFullX[idx].view(fullX.size())
-        fullY = fullY[idx].view(fullX.size())
+      if use_rand == True:
+          
+          # Randomly shuffle the images
+          idx = torch.randperm(fullX.shape[0])
+          fullX = fullX[idx].view(fullX.size())
+          filtFullX = filtFullX[idx].view(fullX.size())
+          fullY = fullY[idx].view(fullX.size())
 
-        # Stack test dataset separately and random shuffle
-        idx_test = torch.randperm(testX.shape[0])
-        testX = testX[idx_test].view(testX.size())
-        filtTestX = filtTestX[idx_test].view(filtTestX.size())
-        testY = testY[idx_test].view(testY.size())
-        
+          # Stack test dataset separately and random shuffle
+          idx_test = torch.randperm(testX.shape[0])
+          testX = testX[idx_test].view(testX.size())
+          filtTestX = filtTestX[idx_test].view(filtTestX.size())
+          testY = testY[idx_test].view(testY.size())
+          
 
-    len_full = fullX.shape[0]
+      len_full = fullX.shape[0]
 
-    # Grab validation slice 
-    valX = torch.clone(fullX[:int(val_factor*len_full),...])
-    filtValX = torch.clone(filtFullX[:int(val_factor*len_full),...])
-    valY = torch.clone(fullY[:int(val_factor*len_full),...])
-    
-    # Grab train slice
-    trainX = torch.clone(fullX[int(val_factor*len_full):,...])
-    filtTrainX = torch.clone(filtFullX[int(val_factor*len_full):,...])
-    trainY = torch.clone(fullY[int(val_factor*len_full):,...])
+      # Grab validation slice 
+      valX = torch.clone(fullX[:int(val_factor*len_full),...])
+      filtValX = torch.clone(filtFullX[:int(val_factor*len_full),...])
+      valY = torch.clone(fullY[:int(val_factor*len_full),...])
+      
+      # Grab train slice
+      trainX = torch.clone(fullX[int(val_factor*len_full):,...])
+      filtTrainX = torch.clone(filtFullX[int(val_factor*len_full):,...])
+      trainY = torch.clone(fullY[int(val_factor*len_full):,...])
 
-    # Build dataloaders
-    trainX = torch.utils.data.DataLoader(trainX,
-                                          batch_size=batch_size,
-                                          shuffle=False, num_workers=0)
+      # Build dataloaders
+      trainX = torch.utils.data.DataLoader(trainX,
+                                            batch_size=batch_size,
+                                            shuffle=False, num_workers=0)
 
-    filtTrainX = torch.utils.data.DataLoader(filtTrainX,
-                                              batch_size=batch_size,
-                                              shuffle=False, num_workers=0)
+      filtTrainX = torch.utils.data.DataLoader(filtTrainX,
+                                                batch_size=batch_size,
+                                                shuffle=False, num_workers=0)
 
-    trainY = torch.utils.data.DataLoader(trainY, batch_size=batch_size,shuffle=False, num_workers=0)                                 
+      trainY = torch.utils.data.DataLoader(trainY, batch_size=batch_size,shuffle=False, num_workers=0)                                 
 
-    testX = torch.utils.data.DataLoader(testX, batch_size=1,shuffle=False, num_workers=0)
-    filtTestX = torch.utils.data.DataLoader(filtTestX, batch_size=1, shuffle=False, num_workers=0)
-    testY = torch.utils.data.DataLoader(testY, batch_size=1,shuffle=False, num_workers=0)
-    
-    valX = torch.utils.data.DataLoader(valX, batch_size=batch_size, shuffle=False, num_workers=0)
-    filtValX = torch.utils.data.DataLoader(filtValX,batch_size=batch_size, shuffle=False, num_workers=0)
-    valY = torch.utils.data.DataLoader(valY, batch_size=batch_size, shuffle=False, num_workers=0)
+      testX = torch.utils.data.DataLoader(testX, batch_size=1,shuffle=False, num_workers=0)
+      filtTestX = torch.utils.data.DataLoader(filtTestX, batch_size=1, shuffle=False, num_workers=0)
+      testY = torch.utils.data.DataLoader(testY, batch_size=1,shuffle=False, num_workers=0)
+      
+      valX = torch.utils.data.DataLoader(valX, batch_size=batch_size, shuffle=False, num_workers=0)
+      filtValX = torch.utils.data.DataLoader(filtValX,batch_size=batch_size, shuffle=False, num_workers=0)
+      valY = torch.utils.data.DataLoader(valY, batch_size=batch_size, shuffle=False, num_workers=0)
 
-    # Dictionary reshape
-    dataloaders = {'train':{'x':trainX, 'filtX':filtTrainX, 'y':trainY}, 'val':{'x':valX, 'filtX':filtValX, 'y':valY}, 'test':{'x':testX, 'filtX':filtTestX, 'y':testY}}
+      # Dictionary reshape
+      dataloaders = {'train':{'x':trainX, 'filtX':filtTrainX, 'y':trainY}, 'val':{'x':valX, 'filtX':filtValX, 'y':valY}, 'test':{'x':testX, 'filtX':filtTestX, 'y':testY}}
 
-    return dataloaders
+      return dataloaders
 
-def maskDatasets(full_sino, num_beams, dataset_size, img_size, angle_seed = 0, use_rand = True):
-    '''
-    Mask datasets in order to undersample sinograms, obtaining undersampled and fully reconstruction datasets for training.
-    Params:
-        - full_sino (ndarray): Fully sampled volume of sinograms, with size (n_projections, detector_number, z-slices)
-        - num_beams (int): Number of beams to undersample the dataset. The function builds an masking array clamping to zero the values
-        that are not sampled in the sinogram.
-        - dataset_size (int): number to slices to take from the original sinogram's volume 
-        - img_size (int): Size of reconstructed images, in pixels.
-        - angle_seed (int): Starting angle to subsample evenly spaced
-    '''
-    # Copy of input sinogram dataset
-    det_count = int((img_size+0.5)*np.sqrt(2))
-    undersampled_sino = np.copy(full_sino)
+  def maskDatasets(full_sino, num_beams, dataset_size, img_size, angle_seed = 0, use_rand = True):
+      '''
+      Mask datasets in order to undersample sinograms, obtaining undersampled and fully reconstruction datasets for training.
+      Params:
+          - full_sino (ndarray): Fully sampled volume of sinograms, with size (n_projections, detector_number, z-slices)
+          - num_beams (int): Number of beams to undersample the dataset. The function builds an masking array clamping to zero the values
+          that are not sampled in the sinogram.
+          - dataset_size (int): number to slices to take from the original sinogram's volume 
+          - img_size (int): Size of reconstructed images, in pixels.
+          - angle_seed (int): Starting angle to subsample evenly spaced
+      '''
+      # Copy of input sinogram dataset
+      det_count = int((img_size+0.5)*np.sqrt(2))
+      undersampled_sino = np.copy(full_sino)
 
-    # Using boolean mask, keep values sampled and clamp to zero others
-    print('Init mask datasets')
-    zeros_idx = np.linspace(0, full_sino.shape[0], num_beams, endpoint = False).astype(int)
-    zeros_idx = (zeros_idx+angle_seed)%full_sino.shape[0]
-    zeros_mask = np.full(full_sino.shape[0], True, dtype = bool)
-    zeros_mask[zeros_idx] = False
-    undersampled_sino[zeros_mask, :, :] = 0
+      # Using boolean mask, keep values sampled and clamp to zero others
+      print('Init mask datasets')
+      zeros_idx = np.linspace(0, full_sino.shape[0], num_beams, endpoint = False).astype(int)
+      zeros_idx = (zeros_idx+angle_seed)%full_sino.shape[0]
+      zeros_mask = np.full(full_sino.shape[0], True, dtype = bool)
+      zeros_mask[zeros_idx] = False
+      undersampled_sino[zeros_mask, :, :] = 0
 
-    # Grab number of angles
-    n_angles = full_sino.shape[0]
-    angles = np.linspace(0, 2*np.pi, n_angles, endpoint = False)
-     
-    radon = Radon(img_size, angles, clip_to_circle = False, det_count = det_count)
-    
-    undersampled = []
-    undersampled_filtered = []
-    desired = []
-    # print('Rand {}'.format(use_rand))
-    # print(dataset_size)
-    # print('Shape sino samples{}'.format(full_sino.shape[2]))
-    # Grab random slices
-    assert(dataset_size <= full_sino.shape[2])
-    if use_rand == True:
-        rand = np.random.choice(range(full_sino.shape[2]), dataset_size, replace=False)
-    else:
-        rand = np.arange(full_sino.shape[2], dataset_size)
-    
-    # print(rand)
-    # print('Zero masked')
-    # Inputs
-    for i, sino in enumerate(np.rollaxis(undersampled_sino[:,:,rand], 2)):
-        
-        # Normalization of input sinogram
-        sino = torch.FloatTensor(sino).to(device)
-        sino = (sino - sino.min())/(sino.max()-sino.min())
-        img = radon.backward(sino)*np.pi/n_angles 
-        img = (img-img.min())-(img.max()-img.min())
+      # Grab number of angles
+      n_angles = full_sino.shape[0]
+      angles = np.linspace(0, 2*np.pi, n_angles, endpoint = False)
+      
+      radon = Radon(img_size, angles, clip_to_circle = False, det_count = det_count)
+      
+      undersampled = []
+      undersampled_filtered = []
+      desired = []
+      # print('Rand {}'.format(use_rand))
+      # print(dataset_size)
+      # print('Shape sino samples{}'.format(full_sino.shape[2]))
+      # Grab random slices
+      assert(dataset_size <= full_sino.shape[2])
+      if use_rand == True:
+          rand = np.random.choice(range(full_sino.shape[2]), dataset_size, replace=False)
+      else:
+          rand = np.arange(full_sino.shape[2], dataset_size)
+      
+      # print(rand)
+      # print('Zero masked')
+      # Inputs
+      for i, sino in enumerate(np.rollaxis(undersampled_sino[:,:,rand], 2)):
+          
+          # Normalization of input sinogram
+          sino = torch.FloatTensor(sino).to(device)
+          sino = (sino - sino.min())/(sino.max()-sino.min())
+          img = radon.backward(sino)*np.pi/n_angles 
+          img = (img-img.min())-(img.max()-img.min())
 
-        undersampled.append(img)
-    print('Undersampled reconstruction raw')
-    # Grab filtered backprojection
-    
-    for sino in np.rollaxis(undersampled_sino[:,:,rand],2):
-        
-        sino = torch.FloatTensor(sino).to(device)
-        img = radon.filter_sinogram(sino)
-        #sino = (sino - sino.min())/(sino.max()-sino.min())
-        img = radon.backward(radon.filter_sinogram(sino))
-        img = (img - img.min())/(img.max()-img.min())
-        del sino
+          undersampled.append(img)
+      print('Undersampled reconstruction raw')
+      # Grab filtered backprojection
+      
+      for sino in np.rollaxis(undersampled_sino[:,:,rand],2):
+          
+          sino = torch.FloatTensor(sino).to(device)
+          img = radon.filter_sinogram(sino)
+          #sino = (sino - sino.min())/(sino.max()-sino.min())
+          img = radon.backward(radon.filter_sinogram(sino))
+          img = (img - img.min())/(img.max()-img.min())
+          del sino
 
-        undersampled_filtered.append(img)
-    
-    del undersampled_sino
-    print('Undersampled reconstruction filtered')
-    # Target
-    for sino in np.rollaxis(full_sino[:,:,rand], 2):
-        
-        # Normalization of input sinogram
-        sino = torch.FloatTensor(sino).to(device)
-        #sino = (sino - sino.min())/(sino.max()-sino.min())
-        img = radon.backward(radon.filter_sinogram(sino))
-        img = (img - img.min())/(img.max()-img.min())
+          undersampled_filtered.append(img)
+      
+      del undersampled_sino
+      print('Undersampled reconstruction filtered')
+      # Target
+      for sino in np.rollaxis(full_sino[:,:,rand], 2):
+          
+          # Normalization of input sinogram
+          sino = torch.FloatTensor(sino).to(device)
+          #sino = (sino - sino.min())/(sino.max()-sino.min())
+          img = radon.backward(radon.filter_sinogram(sino))
+          img = (img - img.min())/(img.max()-img.min())
 
-        desired.append(img)
+          desired.append(img)
 
-    print('Undersampled reconstruction full')
-    
-    # Format dataset to feed network
-    desired = torch.unsqueeze(torch.stack(desired), 1)
-    undersampled = torch.unsqueeze(torch.stack(undersampled), 1)
-    undersampled_filtered = torch.unsqueeze(torch.stack(undersampled_filtered), 1)
+      print('Undersampled reconstruction full')
+      
+      # Format dataset to feed network
+      desired = torch.unsqueeze(torch.stack(desired), 1)
+      undersampled = torch.unsqueeze(torch.stack(undersampled), 1)
+      undersampled_filtered = torch.unsqueeze(torch.stack(undersampled_filtered), 1)
 
-    return desired, undersampled, undersampled_filtered
+      return desired, undersampled, undersampled_filtered

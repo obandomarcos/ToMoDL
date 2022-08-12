@@ -548,7 +548,15 @@ class ZebraDataset:
 
 # Multi-dataset to dataloader
 class ZebraDataloader:
-
+  '''
+  List of tasks:
+    1 - Load ZebraDatasets
+    2 - Reshape
+    3 - Register and correct artifacts
+    4 - Create torch.Dataset
+    5 - Load Dataloader
+  
+  '''
   def __init__(self, folder_paths):
     '''
     Initializes dataloader with paths of folders

@@ -585,39 +585,43 @@ class ZebraDataloader:
 
             else:
                 # Load sample dataset
-                df.loadImages(sample = sample)
+                df.loaded_images(sample = sample)
                 # Load corresponding registrations
                 
                 df.correct_rotation_axis(sample = sample, max_shift = 200, shift_step = 1, load_shifts = True, save_shifts = False)
                 
-                print(df.registeredVolume[sample].shape)
+                print(df.registered_volume[sample].shape)
                 # Append volumes        
-                print("Dataset {}/{} loaded - {} {}".format(dataset_num+1, len(folder_paths), str(df.folderName), sample))
+                print("Dataset {}/{} loaded - {} {}".format(dataset_num+1, len(self.folder_paths), str(df.folder_name), sample))
                 
                 # Resize registered volume to desired
                 df.dataset_resize(sample, img_resize, number_projections)
 
                 with open(registered_dataset_path, 'wb') as f:
                     
-                    print(df.registeredVolume[sample].shape)
-                    pickle.dump(df.registeredVolume[sample], f)
+                    print(df.registered_volume[sample].shape)
+                    pickle.dump(df.registered_volume[sample], f)
                     datasets_registered.append(registered_dataset_path)
                 
                 # Save memory deleting sample volume
                 df.delete_registered_volume(sample)
                 
-            
     return datasets_registered
 
   def openDataset(self, dataset_path):
+    '''
+    Opens pickled registered dataset
+    Params: 
+      - dataset_path (string)
+    '''
               
-      with open(str(dataset_path), 'rb') as f:
-                      
-          datasets_reg = pickle.load(f)
+    with open(str(dataset_path), 'rb') as f:
+                    
+        datasets_reg = pickle.load(f)
 
-      return datasets_reg
+    return datasets_reg
 
-  def formDataloaders(datasets, number_projections, total_size, train_factor, val_factor, test_factor, batch_size, img_size, tensor_path, augment_factor = 1, load_tensor = True, save_tensor = False, use_rand = True, k_fold_datasets = True):
+  def formDataloaders(self, datasets, number_projections, total_size, train_factor, val_factor, test_factor, batch_size, img_size, tensor_path, augment_factor = 1, load_tensor = True, save_tensor = False, use_rand = True, k_fold_datasets = True):
       """
       Form torch dataloaders for training and testing, full and undersampled
       params:

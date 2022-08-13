@@ -574,7 +574,7 @@ class ZebraDataloader:
     5 - Load Dataloader
   
   '''
-  def __init__(self, folder_paths, img_resize, experiment_name = 'Bassi'):
+  def __init__(self, folder_paths, img_resize, experiment_name = 'Bassi', **kwargs):
     '''
     Initializes dataloader with paths of folders.
     Params: 
@@ -586,6 +586,10 @@ class ZebraDataloader:
     self.folder_paths = folder_paths
     self.zebra_datasets = {}
     self.img_resize = img_resize
+
+    self.datasets_registered = []
+
+    self.__process_dataloader_kwargs(kwargs)
 
     for dataset_num, folder_path in enumerate(self.folder_paths):                                     
         
@@ -599,7 +603,40 @@ class ZebraDataloader:
 
     return self.zebra_datasets[folder_path]
 
-  def register_datasets(self, number_projections = 640, load_shifts = True, save_shifts = False):
+  def __process_dataloader_kwargs(self, kwargs):
+    '''
+    Load keyword arguments for dataloader
+    Params:
+     - kwargs (dict): Dictionary containing keywords
+    '''
+
+    for key, value in kwargs.items():
+      if key == 'image_resize':
+        self.image_resize = value
+      elif key == 'total_size':
+        self.total_size = value
+      elif key == 'train_factor':
+        self.train_factor = value
+      elif key == 'val_factor':
+        self.val_factor = value
+      elif key == 'test_factor':
+        self.test_factor = value
+      elif key == 'augment_factor':
+        self.augment_factor = value
+      elif key == 'load_tensor':
+        self.load_tensor = value
+      elif key == 'save_tensor':
+        self.save_tensor = value
+      elif key == 'use_rand':
+        self.use_rand = value
+      elif key == 'k_fold_datasets':
+        self.k_fold_datasets = value 
+      elif key == 'number_projections':
+        self.number_projections = value 
+      elif key == 'batch_size':
+        self.batch_size = value 
+
+  def register_datasets(self):
     """
     Forms registered datasets from raw projection data. Corrects axis shift, resizes for tensor and saves volume.
 
@@ -610,8 +647,6 @@ class ZebraDataloader:
         - sample (string): name of the part of the boy to be sampled, defaults to head
         - experiment (string): name of the experiment
     """
-    # Paths of pickled registered datasets
-    datasets_registered = []
 
     for dataset_num, (folder_path, dataset) in enumerate(self.zebra_datasets.items()):                                     
         # Check fish parts available
@@ -626,29 +661,27 @@ class ZebraDataloader:
 
             if os.path.isfile(registered_dataset_path) == True:
                 
-                datasets_registered.append(registered_dataset_path)
+                self.datasets_registered.append(registered_dataset_path)
 
             else:
 
                 # Load corresponding registrations
-                dataset.correct_rotation_axis(sample = sample, max_shift = 200, shift_step = 1, load_shifts = load_shifts, save_shifts = save_shifts)
+                dataset.correct_rotation_axis(sample = sample, max_shift = 200, shift_step = 1, load_shifts = self.load_shifts, save_shifts = self.save_shifts)
                 
                 # Append volumes        
                 print("Dataset {}/{} loaded - {} {}".format(dataset_num+1, len(self.folder_paths), str(dataset.folder_name), sample))
                 
                 # Resize registered volume to desired
-                dataset.dataset_resize(sample, self.img_resize, number_projections)
+                dataset.dataset_resize(sample, self.img_resize, self.number_projections)
 
                 with open(registered_dataset_path, 'wb') as f:
                     
                     print(dataset.registered_volume[sample].shape)
                     pickle.dump(dataset.registered_volume[sample], f)
-                    datasets_registered.append(registered_dataset_path)
+                    self.datasets_registered.append(registered_dataset_path)
                 
                 # Save memory deleting sample volume
                 dataset.delete_registered_volume(sample)
-                
-    return datasets_registered
 
   def open_dataset(self, dataset_path):
     '''
@@ -663,137 +696,155 @@ class ZebraDataloader:
 
     return datasets_reg
 
-  def formDataloaders(self, datasets, number_projections, total_size, train_factor, val_factor, test_factor, batch_size, img_size, tensor_path, augment_factor = 1, load_tensor = True, save_tensor = False, use_rand = True, k_fold_datasets = True):
-      """
-      Form torch dataloaders for training and testing, full and undersampled
-      params:
-          - number_projections is the number of projections the sinogram is reconstructed with for undersampled FBP
-          - train size (test_size) is the number of training (test) images to be taken from the volumes. They are taken randomly using formDatasets
-          - batch_size is the number of images a batch contains in the dataloader
-          - img_size is the size of the new images to be reconstructed
-          - augment_factor determines how many times the dataset will be resampled with different seed angles
-          - k_fold_datasets sets the number of datasets to be used for k-folding
-      """
+  def get_registered_datasets(self):
 
-      fullX = []
-      fullY = []
-      filtFullX = []
+    return self.datasets_registered
 
-      testX = []
-      testY = []
-      filtTestX = []
-      
-      if load_tensor == False:
+  def build_dataloaders(self):
+    """
+    Build dataloaders from registered datasets. 
+    To-Do: 
+      - Compartimentalize and do K-Folding separately
+    """
 
-          l = len(datasets)*augment_factor
-          # Augment factor iterates over the datasets for data augmentation
-          for i in range(augment_factor):
+    full_x = []
+    full_y = []
+    filt_full_x = []
+
+    test_x = []
+    test_y = []
+    filt_test_x = []
+    
+    if self.load_tensor == False:
+
+      l = len(self.datasets_registered)*self.augment_factor
+      # Augment factor iterates over the datasets for data augmentation
+      for i in range(self.augment_factor):
+          
+        # Seed angle for data augmentation
+        rand_angle = np.random.randint(0, self.number_projections)
+
+        # Dataset train
+        # Masks chosen dataset with the number of projections required
+        for k_dataset, dataset_path in enumerate(tqdm(self.datasets_registered)):
+            
+          dataset = self.open_dataset(dataset_path).astype(float)
+
+          tY, tX, filtX = self.mask_datasets(dataset, self.number_projections, self.total_size//l, self.img_resize, rand_angle, use_rand = self.use_rand)
+
+          if k_dataset < self.k_fold_datasets:
               
-              # Seed angle for data augmentation
-              rand_angle = np.random.randint(0, number_projections)
+              full_x.append(tX)
+              full_y.append(tY)
+              filt_full_x.append(filtX)
 
-              # Dataset train
-              # Masks chosen dataset with the number of projections required
-              for k_dataset, dataset_path in enumerate(tqdm(datasets)):
-                  
-                  dataset = open_dataset(dataset_path).astype(float)
+          else:
 
-                  #print(dataset.shape, dataset_path)
-                  print(total_size)
-                  tY, tX, filtX = mask_datasets(dataset, number_projections, total_size//l, img_size, rand_angle, use_rand = use_rand)
-
-                  if k_dataset < k_fold_datasets:
-                      
-                      fullX.append(tX)
-                      fullY.append(tY)
-                      filtFullX.append(filtX)
-
-                  else:
-
-                      testX.append(tX)
-                      testY.append(tY)
-                      filtTestX.append(filtX)
-                      
-          # Stack augmented datasets
-          fullX = torch.vstack(fullX)
-          filtFullX = torch.vstack(filtFullX)
-          fullY = torch.vstack(fullY)
-          
-          # Stack test dataset separately
-          testX = torch.vstack(testX)
-          filtTestX = torch.vstack(filtTestX)
-          testY = torch.vstack(testY)
-          
-      else:
-          # In order to prevent writing numerous copies of these tensors, loading should be avoided
-
-          fullX = torch.load(tensor_path+'FullX.pt')
-          filtFullX = torch.load(tensor_path+'FiltFullX.pt')
-          fullY = torch.load(tensor_path+'FullY.pt')
+              test_x.append(tX)
+              test_y.append(tY)
+              filt_test_x.append(filtX)
+                
+      # Stack augmented datasets
+      full_x_tensor = torch.vstack(full_x)
+      filt_full_x_tensor = torch.vstack(filt_full_x)
+      full_y_tensor = torch.vstack(full_y)
       
-      if save_tensor == True:
-          # In order to prevent writing numerous copies of these tensors, loading should be avoided
-          torch.save(fullX, tensor_path+'FullX.pt')
-          torch.save(filtFullX, tensor_path+'FiltFullX.pt')
-          torch.save(fullY, tensor_path+'FullY.pt')
+      # Stack test dataset separately
+      test_x_tensor = torch.vstack(test_x)
+      filt_test_x_tensor = torch.vstack(filt_test_x)
+      test_y_tensor = torch.vstack(test_y)
 
-      if use_rand == True:
-          
-          # Randomly shuffle the images
-          idx = torch.randperm(fullX.shape[0])
-          fullX = fullX[idx].view(fullX.size())
-          filtFullX = filtFullX[idx].view(fullX.size())
-          fullY = fullY[idx].view(fullX.size())
-
-          # Stack test dataset separately and random shuffle
-          idx_test = torch.randperm(testX.shape[0])
-          testX = testX[idx_test].view(testX.size())
-          filtTestX = filtTestX[idx_test].view(filtTestX.size())
-          testY = testY[idx_test].view(testY.size())
-          
-
-      len_full = fullX.shape[0]
-
-      # Grab validation slice 
-      valX = torch.clone(fullX[:int(val_factor*len_full),...])
-      filtValX = torch.clone(filtFullX[:int(val_factor*len_full),...])
-      valY = torch.clone(fullY[:int(val_factor*len_full),...])
+      del full_x, filt_full_x, full_y, test_x, filt_test_x, test_y
       
-      # Grab train slice
-      trainX = torch.clone(fullX[int(val_factor*len_full):,...])
-      filtTrainX = torch.clone(filtFullX[int(val_factor*len_full):,...])
-      trainY = torch.clone(fullY[int(val_factor*len_full):,...])
+    else:
+      # In order to prevent writing numerous copies of these tensors, loading should be avoided
 
-      # Build dataloaders
-      trainX = torch.utils.data.DataLoader(trainX,
-                                            batch_size=batch_size,
-                                            shuffle=False, num_workers=0)
+      full_x_tensor = torch.load(self.tensor_path+'full_x.pt')
+      filt_full_x_tensor = torch.load(self.tensor_path+'filt_full_x.pt')
+      full_y_tensor = torch.load(self.tensor_path+'full_y.pt')
+    
+    if self.save_tensor == True:
+      # In order to prevent writing numerous copies of these tensors, loading should be avoided
+      torch.save(full_x_tensor, self.tensor_path+'full_x.pt')
+      torch.save(filt_full_x_tensor, self.tensor_path+'filt_full_x.pt')
+      torch.save(full_y_tensor, self.tensor_path+'full_y.pt')
 
-      filtTrainX = torch.utils.data.DataLoader(filtTrainX,
-                                                batch_size=batch_size,
-                                                shuffle=False, num_workers=0)
+    if self.use_rand == True:
+        
+      # Randomly shuffle the images
+      idx = torch.randperm(full_x.shape[0])
+      full_x = full_x[idx].view(full_x.size())
+      filt_full_x = filt_full_x[idx].view(full_x.size())
+      full_y = full_y[idx].view(full_x.size())
 
-      trainY = torch.utils.data.DataLoader(trainY, batch_size=batch_size,shuffle=False, num_workers=0)                                 
+      # Stack test dataset separately and random shuffle
+      idx_test = torch.randperm(test_x_tensor.shape[0])
+      test_x_tensor = test_x_tensor[idx_test].view(test_x_tensor.size())
+      filt_test_x_tensor = filt_test_x_tensor[idx_test].view(filt_test_x_tensor.size())
+      test_y_tensor = test_y_tensor[idx_test].view(test_y_tensor.size())
 
-      testX = torch.utils.data.DataLoader(testX, batch_size=1,shuffle=False, num_workers=0)
-      filtTestX = torch.utils.data.DataLoader(filtTestX, batch_size=1, shuffle=False, num_workers=0)
-      testY = torch.utils.data.DataLoader(testY, batch_size=1,shuffle=False, num_workers=0)
-      
-      valX = torch.utils.data.DataLoader(valX, batch_size=batch_size, shuffle=False, num_workers=0)
-      filtValX = torch.utils.data.DataLoader(filtValX,batch_size=batch_size, shuffle=False, num_workers=0)
-      valY = torch.utils.data.DataLoader(valY, batch_size=batch_size, shuffle=False, num_workers=0)
+    len_full = full_x.shape[0]
 
-      # Dictionary reshape
-      dataloaders = {'train':{'x':trainX, 'filtX':filtTrainX, 'y':trainY}, 'val':{'x':valX, 'filtX':filtValX, 'y':valY}, 'test':{'x':testX, 'filtX':filtTestX, 'y':testY}}
+    # Grab validation slice 
+    val_x_tensor = torch.clone(full_x[:int(self.val_factor*len_full),...])
+    val_filt_x_tensor = torch.clone(filt_full_x[:int(self.val_factor*len_full),...])
+    val_y_tensor = torch.clone(full_y[:int(self.val_factor*len_full),...])
+    
+    # Grab train slice
+    train_x_tensor = torch.clone(full_x[int(self.val_factor*len_full):,...])
+    train_filt_x_tensor = torch.clone(filt_full_x[int(self.val_factor*len_full):,...])
+    train_y_tensor = torch.clone(full_y[int(self.val_factor*len_full):,...])
 
-      return dataloaders
+    # Build dataloaders
+    train_x_dataloader = torch.utils.data.DataLoader(train_x_tensor,
+                                        batch_size=self.batch_size,
+                                        shuffle=False, num_workers=0)
+
+    train_filt_x_dataloader = torch.utils.data.DataLoader (train_filt_x_tensor,
+    batch_size=self.batch_size,
+    shuffle=False, num_workers=0)
+
+    train_y_dataloader = torch.utils.data.DataLoader(train_y_tensor, 
+                                        batch_size= self.batch_size,
+                                        shuffle=False, 
+                                        num_workers=0)         
+
+    test_x_dataloader = torch.utils.data.DataLoader(test_x_tensor, 
+                                        batch_size=1,shuffle=False,num_workers=0)
+
+    filt_test_x = torch.utils.data.DataLoader(filt_test_x_tensor,
+                                            batch_size=1,shuffle=False, num_workers=0)
+
+    test_y = torch.utils.data.DataLoader(test_y_tensor, 
+                                        batch_size=1,shuffle=False, num_workers=0)
+    
+    val_x_dataloader = torch.utils.data.DataLoader(val_x_tensor,
+                                      batch_size=self.batch_size,
+                                      shuffle=False, num_workers=0)
+
+    val_filt_x_dataloader = torch.utils.data.DataLoader(val_filt_x_tensor,
+                                      batch_size=self.batch_size,
+                                      shuffle=False, num_workers=0)
+ 
+    val_y_dataloader = torch.utils.data.DataLoader(val_x_dataloader, 
+                                        batch_size=self.batch_size, shuffle=False,num_workers=0)
+
+    # Dictionary reshape
+    self.dataloaders = {'train':{'x':train_x_dataloader,        
+                                 'filtX':train_filt_x_dataloader, 'y':train_y_dataloader}, 
+                        'val':{'x':val_x_dataloader,       
+                               'filtX':val_filt_x_dataloader, 
+                               'y': val_y_dataloader}, 
+                        'test':{'x':val_x_dataloader,  
+                                'filtX':val_filt_x_dataloader, 
+                                'y': val_y_dataloader}}
 
   # This should become a pytorch.Transform!
   def mask_datasets(self, full_sino, num_beams, dataset_size, img_size, angle_seed = 0, use_rand = True):
       '''
-      Mask datasets in order to undersample sinograms, obtaining undersampled and fully reconstruction datasets for training.
+      Mask datasets in order to undersample sinograms, obtaining undersampled and full_y reconstruction datasets for training.
       Params:
-          - full_sino (ndarray): Fully sampled volume of sinograms, with size (n_projections, detector_number, z-slices)
+          - full_sino (ndarray): full_y sampled volume of sinograms, with size (n_projections, detector_number, z-slices)
           - num_beams (int): Number of beams to undersample the dataset. The function builds an masking array clamping to zero the values
           that are not sampled in the sinogram.
           - dataset_size (int): number to slices to take from the original sinogram's volume 

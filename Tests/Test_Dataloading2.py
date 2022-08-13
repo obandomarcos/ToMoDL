@@ -27,19 +27,36 @@ def test_dataloader(testing_options):
     '''
     # Using CPU or GPU
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-    
     print('Device {}'.format(device))
+
     dataloader_testing_folder = '/home/obanmarcos/Balseiro/DeepOPT/Tests/Tests_Dataloader_Utilities/'
 
-    folder_paths = [f140115_1dpf]
+    folder_paths = [f140115_1dpf, f140315_3dpf, f140419_5dpf]
 
-    zebra_dataloader = dlutils.ZebraDataloader(folder_paths, img_resize = 100)
+    zebra_dict= {'folder_paths': folder_paths,
+                'tensor_path': None,
+                 'img_resize': 100,
+                  'total_size' : 30,
+                  'train_factor': 0.7,
+                  'val_factor': 0.1, 
+                  'test_factor': 0.2,
+                  'augment_factor': 1,
+                  'load_shifts': True,
+                  'save_shifts': False,
+                  'load_tensor': False,
+                  'save_tensor': False,
+                  'use_rand': True,
+                  'k_fold_datasets': 1,
+                  'number_projections': 720,
+                  'batch_size': 5}
+
+    zebra_dataloaders = dlutils.ZebraDataloader(zebra_dict)
 
     # 1 - Load datasets
     # 1a - Check ZebraDataset.load_images()
     if 'check_dataset_loading' in testing_options:
 
-        zebra_dataset_test = zebra_dataloader[folder_paths[0]]
+        zebra_dataset_test = zebra_dataloaders[folder_paths[0]]
         zebra_dataset_test.load_images()
         
         # Print main attributes after load_images
@@ -52,12 +69,34 @@ def test_dataloader(testing_options):
 
         # Print non-registered
         cv2.imwrite(dataloader_testing_folder+'Test_Image_Registered.jpg', 255.0*zebra_dataset_test._normalize_image(zebra_dataset_test.registered_volume['head'][0,...]))
-
-    if 'check_registering_dataset':
+    
+    # 2 - Check ZebraDataset registering (already done, just loading shifts)
+    if 'check_registering_dataset' in testing_options:
         
-        datasets_registered = zebra_dataloader.register_datasets(number_projections = 720, load_shifts=True, save_shifts = False)
+        zebra_dataloaders.register_datasets()
 
-        print(datasets_registered)
+        print(zebra_dataloaders.datasets_registered)
+    
+    # Checking ZebraDataloaders
+    if 'check_dataloaders_building' in testing_options:
+        
+        zebra_dataloaders.register_datasets()
+        print(zebra_dataloaders.datasets_registered)
+        zebra_dataloaders.build_dataloaders()
+        print('Printing images from dataloaders')
+
+        sets = ['train', 'val', 'test']
+        puts = ['x', 'filt_x', 'y']
+        
+        for set_name in sets:
+            for put_name in puts:
+                
+                image = zebra_dataloaders._get_next_from_dataloader(set_name, put_name)[0,0,...].cpu().detach().numpy()
+
+                print(set_name, put_name)
+                print('Image Intensity', 'Max', image.max(), 'Min: ',image.min())
+
+                cv2.imwrite(dataloader_testing_folder+'Test_Image_Dataloader_{}_{}.jpg'.format(set_name, put_name), 255.0*image)
 
 if __name__ == '__main__':
 
@@ -67,7 +106,8 @@ if __name__ == '__main__':
 
     parser.add_argument('--dataset_loading', help = 'Test dataset loading', action="store_true")
     parser.add_argument('--dataset_registration', help = 'Test dataset registration', action="store_true")
-    
+    parser.add_argument('--dataloaders_building', help = 'Test dataloaders building', action="store_true")
+
     args = parser.parse_args()
 
     if args.dataset_loading:
@@ -79,5 +119,10 @@ if __name__ == '__main__':
 
         print('Checking Dataset registration')
         testing_options.append('check_registering_dataset')
+    
+    if args.dataloaders_building:
+
+        print('Checking Dataloaders building')
+        testing_options.append('check_dataloaders_building')
     
     test_dataloader(testing_options)

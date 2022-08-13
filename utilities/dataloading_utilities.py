@@ -574,7 +574,7 @@ class ZebraDataloader:
     5 - Load Dataloader
   
   '''
-  def __init__(self, folder_paths, img_resize, experiment_name = 'Bassi', **kwargs):
+  def __init__(self, kw_dictionary, experiment_name = 'Bassi'):
     '''
     Initializes dataloader with paths of folders.
     Params: 
@@ -583,17 +583,14 @@ class ZebraDataloader:
       - experiment_name (string): string maps to experiment dataset constitution
     '''    
     
-    self.folder_paths = folder_paths
     self.zebra_datasets = {}
-    self.img_resize = img_resize
-
     self.datasets_registered = []
 
-    self.__process_dataloader_kwargs(kwargs)
-
+    self.__process_dataloader_kwdict(kw_dictionary)
+    
     for dataset_num, folder_path in enumerate(self.folder_paths):                                     
-        
-        # Loads dataset registered
+       
+      # Loads dataset registered
       self.zebra_datasets[folder_path] = ZebraDataset(folder_path, 'Datasets', experiment_name)
   
   def __getitem__(self, folder_path):
@@ -603,39 +600,30 @@ class ZebraDataloader:
 
     return self.zebra_datasets[folder_path]
 
-  def __process_dataloader_kwargs(self, kwargs):
+  def __process_dataloader_kwdict(self, kw_dictionary):
     '''
     Load keyword arguments for dataloader
     Params:
-     - kwargs (dict): Dictionary containing keywords
+     - kw_dictionary (dict): Dictionary containing keywords
     '''
 
-    for key, value in kwargs.items():
-      if key == 'image_resize':
-        self.image_resize = value
-      elif key == 'total_size':
-        self.total_size = value
-      elif key == 'train_factor':
-        self.train_factor = value
-      elif key == 'val_factor':
-        self.val_factor = value
-      elif key == 'test_factor':
-        self.test_factor = value
-      elif key == 'augment_factor':
-        self.augment_factor = value
-      elif key == 'load_tensor':
-        self.load_tensor = value
-      elif key == 'save_tensor':
-        self.save_tensor = value
-      elif key == 'use_rand':
-        self.use_rand = value
-      elif key == 'k_fold_datasets':
-        self.k_fold_datasets = value 
-      elif key == 'number_projections':
-        self.number_projections = value 
-      elif key == 'batch_size':
-        self.batch_size = value 
-
+    self.folder_paths = kw_dictionary.pop('folder_paths')
+    self.img_resize = kw_dictionary.pop('img_resize')
+    self.total_size = kw_dictionary.pop('total_size')
+    self.tensor_path = kw_dictionary.pop('tensor_path')
+    self.train_factor = kw_dictionary.pop('train_factor')
+    self.val_factor = kw_dictionary.pop('val_factor')
+    self.test_factor = kw_dictionary.pop('test_factor')
+    self.augment_factor = kw_dictionary.pop('augment_factor')
+    self.load_shifts = kw_dictionary.pop('load_shifts')
+    self.save_shifts = kw_dictionary.pop('save_shifts')
+    self.load_tensor = kw_dictionary.pop('load_tensor')
+    self.save_tensor = kw_dictionary.pop('save_tensor')
+    self.use_rand = kw_dictionary.pop('use_rand')
+    self.k_fold_datasets = kw_dictionary.pop('k_fold_datasets')
+    self.number_projections = kw_dictionary.pop('number_projections')
+    self.batch_size = kw_dictionary.pop('batch_size')
+    
   def register_datasets(self):
     """
     Forms registered datasets from raw projection data. Corrects axis shift, resizes for tensor and saves volume.
@@ -650,7 +638,8 @@ class ZebraDataloader:
 
     for dataset_num, (folder_path, dataset) in enumerate(self.zebra_datasets.items()):                                     
         # Check fish parts available
-        fish_parts = dataset.get_fish_parts()    
+        fish_parts = dataset.get_fish_parts() 
+        
         # Load images from all samples
         dataset.load_images(sample = None)
 
@@ -705,6 +694,7 @@ class ZebraDataloader:
     Build dataloaders from registered datasets. 
     To-Do: 
       - Compartimentalize and do K-Folding separately
+      - Reduce intensive memory consumption
     """
 
     full_x = []
@@ -751,7 +741,7 @@ class ZebraDataloader:
       
       # Stack test dataset separately
       test_x_tensor = torch.vstack(test_x)
-      filt_test_x_tensor = torch.vstack(filt_test_x)
+      test_filt_x_tensor = torch.vstack(filt_test_x)
       test_y_tensor = torch.vstack(test_y)
 
       del full_x, filt_full_x, full_y, test_x, filt_test_x, test_y
@@ -772,28 +762,28 @@ class ZebraDataloader:
     if self.use_rand == True:
         
       # Randomly shuffle the images
-      idx = torch.randperm(full_x.shape[0])
-      full_x = full_x[idx].view(full_x.size())
-      filt_full_x = filt_full_x[idx].view(full_x.size())
-      full_y = full_y[idx].view(full_x.size())
+      idx = torch.randperm(full_x_tensor.shape[0])
+      full_x_tensor = full_x_tensor[idx].view(full_x_tensor.size())
+      filt_full_x_tensor = filt_full_x_tensor[idx].view(filt_full_x_tensor.size())
+      full_y_tensor = full_y_tensor[idx].view(full_x_tensor.size())
 
       # Stack test dataset separately and random shuffle
       idx_test = torch.randperm(test_x_tensor.shape[0])
       test_x_tensor = test_x_tensor[idx_test].view(test_x_tensor.size())
-      filt_test_x_tensor = filt_test_x_tensor[idx_test].view(filt_test_x_tensor.size())
+      test_filt_x_tensor = test_filt_x_tensor[idx_test].view(test_filt_x_tensor.size())
       test_y_tensor = test_y_tensor[idx_test].view(test_y_tensor.size())
 
-    len_full = full_x.shape[0]
+    len_full = full_x_tensor.shape[0]
 
     # Grab validation slice 
-    val_x_tensor = torch.clone(full_x[:int(self.val_factor*len_full),...])
-    val_filt_x_tensor = torch.clone(filt_full_x[:int(self.val_factor*len_full),...])
-    val_y_tensor = torch.clone(full_y[:int(self.val_factor*len_full),...])
+    val_x_tensor = torch.clone(full_x_tensor[:int(self.val_factor*len_full),...])
+    val_filt_x_tensor = torch.clone(filt_full_x_tensor[:int(self.val_factor*len_full),...])
+    val_y_tensor = torch.clone(full_y_tensor[:int(self.val_factor*len_full),...])
     
     # Grab train slice
-    train_x_tensor = torch.clone(full_x[int(self.val_factor*len_full):,...])
-    train_filt_x_tensor = torch.clone(filt_full_x[int(self.val_factor*len_full):,...])
-    train_y_tensor = torch.clone(full_y[int(self.val_factor*len_full):,...])
+    train_x_tensor = torch.clone(full_x_tensor[int(self.val_factor*len_full):,...])
+    train_filt_x_tensor = torch.clone(filt_full_x_tensor[int(self.val_factor*len_full):,...])
+    train_y_tensor = torch.clone(full_y_tensor[int(self.val_factor*len_full):,...])
 
     # Build dataloaders
     train_x_dataloader = torch.utils.data.DataLoader(train_x_tensor,
@@ -812,10 +802,10 @@ class ZebraDataloader:
     test_x_dataloader = torch.utils.data.DataLoader(test_x_tensor, 
                                         batch_size=1,shuffle=False,num_workers=0)
 
-    filt_test_x = torch.utils.data.DataLoader(filt_test_x_tensor,
+    test_filt_x_dataloader = torch.utils.data.DataLoader(test_filt_x_tensor,
                                             batch_size=1,shuffle=False, num_workers=0)
 
-    test_y = torch.utils.data.DataLoader(test_y_tensor, 
+    test_y_dataloader = torch.utils.data.DataLoader(test_y_tensor, 
                                         batch_size=1,shuffle=False, num_workers=0)
     
     val_x_dataloader = torch.utils.data.DataLoader(val_x_tensor,
@@ -826,18 +816,28 @@ class ZebraDataloader:
                                       batch_size=self.batch_size,
                                       shuffle=False, num_workers=0)
  
-    val_y_dataloader = torch.utils.data.DataLoader(val_x_dataloader, 
+    val_y_dataloader = torch.utils.data.DataLoader(val_y_tensor, 
                                         batch_size=self.batch_size, shuffle=False,num_workers=0)
 
     # Dictionary reshape
     self.dataloaders = {'train':{'x':train_x_dataloader,        
-                                 'filtX':train_filt_x_dataloader, 'y':train_y_dataloader}, 
+                                 'filt_x':train_filt_x_dataloader, 'y':train_y_dataloader}, 
                         'val':{'x':val_x_dataloader,       
-                               'filtX':val_filt_x_dataloader, 
+                               'filt_x':val_filt_x_dataloader, 
                                'y': val_y_dataloader}, 
-                        'test':{'x':val_x_dataloader,  
-                                'filtX':val_filt_x_dataloader, 
-                                'y': val_y_dataloader}}
+                        'test':{'x':test_x_dataloader,  
+                                'filt_x':test_filt_x_dataloader, 
+                                'y': test_y_dataloader}}
+
+  def _get_next_from_dataloader(self, set_name, put_name):
+    '''
+    Gets next item in dataloader.
+    Params:
+      - set_name (string): Refers to set of data where image comes from (train, val, test)
+      - put_name (string): Specifies undersampled non-filtered backprojection (x), fully sampled filtered backprojection (y) or undersampled filtered backprojection (filt_x).
+    '''
+
+    return next(iter(self.dataloaders[set_name][put_name]))
 
   # This should become a pytorch.Transform!
   def mask_datasets(self, full_sino, num_beams, dataset_size, img_size, angle_seed = 0, use_rand = True):
@@ -891,7 +891,7 @@ class ZebraDataloader:
           sino = torch.FloatTensor(sino).to(device)
           sino = (sino - sino.min())/(sino.max()-sino.min())
           img = radon.backward(sino)*np.pi/n_angles 
-          img = (img-img.min())-(img.max()-img.min())
+          img = (img-img.min())/(img.max()-img.min())
 
           undersampled.append(img)
       print('Undersampled reconstruction raw')

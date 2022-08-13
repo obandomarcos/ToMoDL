@@ -44,6 +44,7 @@ class ZebraDataset:
     self.objective = 10
     self.dataset_folder = dataset_folder
     self.experiment_name = experiment_name
+    self.image_volume = {}
     self.registered_volume = {}
     self.shifts_path = self.folder_path 
 
@@ -100,59 +101,64 @@ class ZebraDataset:
 
     return file_list
 
-  def loaded_images(self, sample = None):
+  def load_images(self, sample = None):
     '''
     Loads images in volume
 
     Params:
       - sample (string): {None, body, head, tail}
     '''
+    samples = self.get_fish_parts()
 
-    sample2idx =  self.fish_part[sample]    
-    load_list = [f for f in self.file_list if ('tif' in str(f))]
+    # Load all samples in dataset
+    for sample in samples:
 
-    if sample is not None:
-      # If it's None, then it loads all fish parts/sample
-      fish_part = self.fish_part_code[sample]
-      load_list = [f for f in load_list if (fish_part in str(f))]
-    
+      sample2idx =  self.fish_part[sample]    
+      load_list = [f for f in self.file_list if ('tif' in str(f))]
+
+      if sample is not None:
+        # If it's None, then it loads all fish parts/sample
+        fish_part = self.fish_part_code[sample]
+        load_list = [f for f in load_list if (fish_part in str(f))]
       
-    loaded_images = []
-    loaded_angles = []
-    loaded_sample = []
-    loaded_channel = []
-    loaded_time = []
+        
+      load_images = []
+      loaded_angles = []
+      loaded_sample = []
+      loaded_channel = []
+      loaded_time = []
 
-    angle = re.compile('a\d+')
-    sample_re = re.compile('s\d+')
-    channel = re.compile('c\d+')
-    time = re.compile('t\d+')
-    
-    for f in tqdm(load_list):
+      angle = re.compile('a\d+')
+      sample_re = re.compile('s\d+')
+      channel = re.compile('c\d+')
+      time = re.compile('t\d+')
       
-      loaded_images.append(np.array(Image.open(f)))
-      loaded_angles.append(float(angle.findall(str(f))[0][1:]))
-      loaded_sample.append(float(sample_re.findall(str(f))[0][1:]))
-      loaded_channel.append(float(channel.findall(str(f))[0][1:]))
-      loaded_time.append(float(time.findall(str(f))[0][1:]))
+      for f in tqdm(load_list):
+        
+        load_images.append(np.array(Image.open(f)))
+        loaded_angles.append(float(angle.findall(str(f))[0][1:]))
+        loaded_sample.append(float(sample_re.findall(str(f))[0][1:]))
+        loaded_channel.append(float(channel.findall(str(f))[0][1:]))
+        loaded_time.append(float(time.findall(str(f))[0][1:]))
 
-    self.dataset = pd.DataFrame({'Filename':load_list, 
-                                 'Image':loaded_images,
-                                 'Angle':loaded_angles,
-                                 'Sample':loaded_sample,
-                                 'Channel':loaded_channel,
-                                 'Time':loaded_time})
+      self.dataset = pd.DataFrame({'Filename':load_list, 
+                                    'Image':load_images,
+                                    'Angle':loaded_angles,
+                                    'Sample':loaded_sample,
+                                    'Channel':loaded_channel,
+                                    'Time':loaded_time})
 
-    # Create Registered Dataset - empty till reggistering
-    self.registered_dataset = pd.DataFrame(columns = ['Image', 'Angle', 'Sample'])
+      # Create Registered Dataset - empty till reggistering
+      self.registered_dataset = pd.DataFrame(columns = ['Image', 'Angle', 'Sample'])
 
-    # Sort dataset by sample and angle
-    self.dataset = self.dataset.sort_values(['Sample','Angle'], axis = 0).reset_index(drop=True)
+      # Sort dataset by sample and angle
+      self.dataset = self.dataset.sort_values(['Sample','Angle'], axis = 0).reset_index(drop=True)
 
-    self.registered_volume[sample] = np.stack(self.dataset[self.dataset.Sample == sample2idx]['Image'].to_numpy())
-    
-    self.image_volume = np.moveaxis(np.stack(self.dataset['Image'].to_numpy()), 1, 2)
-    del self.dataset
+      self.registered_volume[sample] = np.stack(self.dataset[self.dataset.Sample == sample2idx]['Image'].to_numpy())
+      
+      self.image_volume[sample] = np.moveaxis(np.stack(self.dataset[self.dataset.Sample == sample2idx]['Image'].to_numpy()), 1, 2)
+
+      del self.dataset
   
   def correct_rotation_axis(self,  max_shift = 200, shift_step = 4, center_shift_top = 0, center_shift_bottom = 0, sample = 'head', load_shifts = False, save_shifts = True):
     '''
@@ -275,12 +281,12 @@ class ZebraDataset:
   def register_dataset(self, sample, inPlace = False):
 
     """
-    Registers full dataset, by sample. (deprecated method)
+    Registers full dataset, by sample. (DEPRECATED METHOD)
     Params:
       -sample (string): fish part sample.
     """  
     
-    # self. = self.dataset[df.dataset.Sample == '000'].sort_values('Angle', axis = 0).reset_index(drop=True)
+    # self. = self.dataset[dataset.dataset.Sample == '000'].sort_values('Angle', axis = 0).reset_index(drop=True)
     if sample is not None:
 
       sample = self.fish_part[sample]
@@ -388,7 +394,7 @@ class ZebraDataset:
     # Order by angle
     self.registered_dataset = self.registered_dataset.sort_values(['Sample','Angle'], axis = 0).reset_index(drop=True)
   
-  def applyRegistration(self):
+  def apply_registration(self):
     """
     Applies mean registration for dataset from registration params
     """
@@ -467,10 +473,10 @@ class ZebraDataset:
     self.upperLimit = self.registered_volume.shape[1]-margin
     self.lowerLimit = margin
     
-    # save dataset in HDF5
+    # save dataset in Hdataset5
     if saveDataset == True:
       
-      with h5py.File(self.dataset_folder+'/'+'OPTdatasets.hdf5', 'a') as datasets_file:
+      with h5py.File(self.dataset_folder+'/'+'OPTdatasets.hdataset5', 'a') as datasets_file:
         
         # If experiment isn't in the current folder, creates experiment
         if self.experiment_name not in datasets_file.keys():
@@ -506,9 +512,9 @@ class ZebraDataset:
     # save mean displacement for operations
     self.meanDisplacement = self.Tparams['Ty'].mean()
   
-  def saveregistered_dataset(self, name = '', mode = 'hdf5'):
+  def save_registered_dataset(self, name = '', mode = 'hdataset5'):
     '''
-    Saves registered dataset for DL usage (HDF5) or just pickle for binary storage
+    Saves registered dataset for DL usage (Hdataset5) or just pickle for binary storage
     params :
     '''
 
@@ -519,18 +525,18 @@ class ZebraDataset:
         pickle.dump({'reg_dataset' : self.registered_dataset,
                     'reg_transform' : self.Tparams}, pickleFile)
 
-    elif mode == 'hdf5':
+    elif mode == 'hdataset5':
       
-      with pd.HDFStore(self.dataset_folder+'/'+'OPTdatasets.hdf5', 'a') as datasets_file:
+      with pd.HdatasetStore(self.dataset_folder+'/'+'OPTdatasets.hdataset5', 'a') as datasets_file:
         # Take each sample and creates a new dataset
         for sample in self.registered_dataset.Sample.unique():
             
-            # Using Pandas built-in HDF5 converter save images
+            # Using Pandas built-in Hdataset5 converter save images
           datasets_file.put(key = self.experiment_name+'/'+self.folder_name+'/'+sample,
                             value = self.registered_dataset[self.registered_dataset.Sample == sample],
                             data_columns = True)
             
-  def loadregistered_dataset(self):
+  def load_registered_dataset(self):
 
     with open(str(self.folder_path)+pickleName+'.pickle', 'rb') as pickleFile:
       
@@ -545,6 +551,17 @@ class ZebraDataset:
   def delete_registered_volume(self, sample):
     
     del self.registered_volume[sample]
+  
+  @staticmethod
+  def _normalize_image(img):
+    '''
+    Normalizes images between 0 and 1.
+    Params: 
+      - img (ndarray): Image to normalize
+    '''
+    img = (img-img.max())/(img.max()-img.min())
+
+    return img
 
 # Multi-dataset to dataloader
 class ZebraDataloader:
@@ -557,13 +574,26 @@ class ZebraDataloader:
     5 - Load Dataloader
   
   '''
-  def __init__(self, folder_paths):
+  def __init__(self, folder_paths, experiment_name = 'Bassi'):
     '''
     Initializes dataloader with paths of folders
     '''    
     self.folder_paths = folder_paths
+    self.zebra_datasets = {}
 
-  def formRegDatasets(self, img_resize = 100, number_projections = 640, experiment = 'Bassi', fish_parts = None):
+    for dataset_num, folder_path in enumerate(self.folder_paths):                                     
+        
+        # Loads dataset registered
+      self.zebra_datasets[folder_path] = ZebraDataset(folder_path, 'Datasets', experiment_name)
+  
+  def __getitem__(self, folder_path):
+      
+    if folder_path not in self.zebra_datasets.keys():
+      raise KeyError
+
+    return self.zebra_datasets[folder_path]
+
+  def formRegDatasets(self, img_resize = 100, number_projections = 640, load_shifts = True, save_shifts = False):
     """
     Forms registered datasets from raw projection data.
     params:
@@ -576,15 +606,13 @@ class ZebraDataloader:
     # Paths of pickled registered datasets
     datasets_registered = []
 
-    for dataset_num, folder_path in enumerate(self.folder_paths):                                     
-        
-        # Loads dataset registered
-        df = ZebraDataset(folder_path, 'Datasets', experiment)
-        fish_parts = df.get_fish_parts()    
+    for dataset_num, (folder_path, dataset) in enumerate(self.zebra_datasets.items()):                                     
+        # Check fish parts available
+        fish_parts = dataset.get_fish_parts()    
         
         for sample in fish_parts:
+            
             # If the registered dataset exist, just add it to the list
-
             registered_dataset_path = str(folder_path)+'_'+sample+'_registered'+'.pkl'
 
             if os.path.isfile(registered_dataset_path) == True:
@@ -593,26 +621,25 @@ class ZebraDataloader:
 
             else:
                 # Load sample dataset
-                df.loaded_images(sample = sample)
+                dataset.load_images(sample = sample)
+
                 # Load corresponding registrations
+                dataset.correct_rotation_axis(sample = sample, max_shift = 200, shift_step = 1, load_shifts = load_shifts, save_shifts = save_shifts)
                 
-                df.correct_rotation_axis(sample = sample, max_shift = 200, shift_step = 1, load_shifts = True, save_shifts = False)
-                
-                print(df.registered_volume[sample].shape)
                 # Append volumes        
-                print("Dataset {}/{} loaded - {} {}".format(dataset_num+1, len(self.folder_paths), str(df.folder_name), sample))
+                print("Dataset {}/{} loaded - {} {}".format(dataset_num+1, len(self.folder_paths), str(dataset.folder_name), sample))
                 
                 # Resize registered volume to desired
-                df.dataset_resize(sample, img_resize, number_projections)
+                dataset.dataset_resize(sample, img_resize, number_projections)
 
                 with open(registered_dataset_path, 'wb') as f:
                     
-                    print(df.registered_volume[sample].shape)
-                    pickle.dump(df.registered_volume[sample], f)
+                    print(dataset.registered_volume[sample].shape)
+                    pickle.dump(dataset.registered_volume[sample], f)
                     datasets_registered.append(registered_dataset_path)
                 
                 # Save memory deleting sample volume
-                df.delete_registered_volume(sample)
+                dataset.delete_registered_volume(sample)
                 
     return datasets_registered
 
@@ -662,11 +689,11 @@ class ZebraDataloader:
               # Masks chosen dataset with the number of projections required
               for k_dataset, dataset_path in enumerate(tqdm(datasets)):
                   
-                  dataset = openDataset(dataset_path).astype(float)
+                  dataset = open_dataset(dataset_path).astype(float)
 
                   #print(dataset.shape, dataset_path)
                   print(total_size)
-                  tY, tX, filtX = maskDatasets(dataset, number_projections, total_size//l, img_size, rand_angle, use_rand = use_rand)
+                  tY, tX, filtX = mask_datasets(dataset, number_projections, total_size//l, img_size, rand_angle, use_rand = use_rand)
 
                   if k_dataset < k_fold_datasets:
                       
@@ -755,7 +782,7 @@ class ZebraDataloader:
       return dataloaders
 
   # This should become a pytorch.Transform!
-  def maskDatasets(self, full_sino, num_beams, dataset_size, img_size, angle_seed = 0, use_rand = True):
+  def mask_datasets(self, full_sino, num_beams, dataset_size, img_size, angle_seed = 0, use_rand = True):
       '''
       Mask datasets in order to undersample sinograms, obtaining undersampled and fully reconstruction datasets for training.
       Params:

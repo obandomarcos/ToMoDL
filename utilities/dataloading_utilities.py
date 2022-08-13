@@ -158,7 +158,7 @@ class ZebraDataset:
       
       self.image_volume[sample] = np.moveaxis(np.stack(self.dataset[self.dataset.Sample == sample2idx]['Image'].to_numpy()), 1, 2)
 
-      del self.dataset
+      del self.dataset, self.registered_dataset
   
   def correct_rotation_axis(self,  max_shift = 200, shift_step = 4, center_shift_top = 0, center_shift_bottom = 0, sample = 'head', load_shifts = False, save_shifts = True):
     '''
@@ -214,9 +214,9 @@ class ZebraDataset:
       self.registered_volume[sample][:,:,idx] = ndi.shift(self.registered_volume[sample][:,:,idx], (0, shift), mode = 'nearest')
 
   def dataset_resize(self, sample, img_resize, number_projections):
-    """
+    '''
     Resizes sinograms according to reconstruction image size
-    """
+    '''
     # Move axis to (N_projections, n_detector, n_slices)
     self.registered_volume[sample] = np.rollaxis(self.registered_volume[sample], 2)
     # Resize projection number % 16
@@ -500,12 +500,12 @@ class ZebraDataset:
     
       return self.registered_volume
   
-  def saveRegTransforms(self):
+  def save_reg_transforms(self):
     
     with open(str(self.folder_path)+'transform.pickle', 'wb') as h:
       pickle.dump(self.Tparams,  h)
 
-  def loadRegTransforms(self):
+  def load_reg_transforms(self):
 
     with open(str(self.folder_path)+'transform.pickle', 'rb') as h:
       self.Tparams = pickle.load(h)
@@ -574,12 +574,18 @@ class ZebraDataloader:
     5 - Load Dataloader
   
   '''
-  def __init__(self, folder_paths, experiment_name = 'Bassi'):
+  def __init__(self, folder_paths, img_resize, experiment_name = 'Bassi'):
     '''
-    Initializes dataloader with paths of folders
+    Initializes dataloader with paths of folders.
+    Params: 
+      - folder_paths (list of strings): Folders from where to load data
+      - img_resize (int): New size in tensor
+      - experiment_name (string): string maps to experiment dataset constitution
     '''    
+    
     self.folder_paths = folder_paths
     self.zebra_datasets = {}
+    self.img_resize = img_resize
 
     for dataset_num, folder_path in enumerate(self.folder_paths):                                     
         
@@ -593,10 +599,11 @@ class ZebraDataloader:
 
     return self.zebra_datasets[folder_path]
 
-  def formRegDatasets(self, img_resize = 100, number_projections = 640, load_shifts = True, save_shifts = False):
+  def register_datasets(self, number_projections = 640, load_shifts = True, save_shifts = False):
     """
-    Forms registered datasets from raw projection data.
-    params:
+    Forms registered datasets from raw projection data. Corrects axis shift, resizes for tensor and saves volume.
+
+    Params:
         - folder_paths (string): paths to the training and test folders
         - img_resize (int): image resize, detector count is calculated to fit this number and resize sinograms
         - n_proy (int): Number of projections to resize the sinogram, in order to work according to Torch Radon specifications
@@ -609,19 +616,19 @@ class ZebraDataloader:
     for dataset_num, (folder_path, dataset) in enumerate(self.zebra_datasets.items()):                                     
         # Check fish parts available
         fish_parts = dataset.get_fish_parts()    
-        
+        # Load images from all samples
+        dataset.load_images(sample = None)
+
         for sample in fish_parts:
             
             # If the registered dataset exist, just add it to the list
-            registered_dataset_path = str(folder_path)+'_'+sample+'_registered'+'.pkl'
+            registered_dataset_path = str(folder_path)+'_'+sample+'_registered'+'_size_{}'.format(self.img_resize)+'.pkl'
 
             if os.path.isfile(registered_dataset_path) == True:
                 
                 datasets_registered.append(registered_dataset_path)
 
             else:
-                # Load sample dataset
-                dataset.load_images(sample = sample)
 
                 # Load corresponding registrations
                 dataset.correct_rotation_axis(sample = sample, max_shift = 200, shift_step = 1, load_shifts = load_shifts, save_shifts = save_shifts)
@@ -630,7 +637,7 @@ class ZebraDataloader:
                 print("Dataset {}/{} loaded - {} {}".format(dataset_num+1, len(self.folder_paths), str(dataset.folder_name), sample))
                 
                 # Resize registered volume to desired
-                dataset.dataset_resize(sample, img_resize, number_projections)
+                dataset.dataset_resize(sample, self.img_resize, number_projections)
 
                 with open(registered_dataset_path, 'wb') as f:
                     

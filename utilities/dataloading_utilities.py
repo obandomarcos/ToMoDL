@@ -24,6 +24,7 @@ import h5py
 import cv2
 import scipy.ndimage as ndi
 
+# Modify for multi-gpu
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 class ZebraDataset:
@@ -609,6 +610,7 @@ class ZebraDataloader:
 
     self.folder_paths = kw_dictionary.pop('folder_paths')
     self.img_resize = kw_dictionary.pop('img_resize')
+    self.det_count = int((self.img_resize+0.5)*np.sqrt(2))
     self.total_size = kw_dictionary.pop('total_size')
     self.tensor_path = kw_dictionary.pop('tensor_path')
     self.train_factor = kw_dictionary.pop('train_factor')
@@ -621,9 +623,17 @@ class ZebraDataloader:
     self.save_tensor = kw_dictionary.pop('save_tensor')
     self.use_rand = kw_dictionary.pop('use_rand')
     self.k_fold_datasets = kw_dictionary.pop('k_fold_datasets')
-    self.number_projections = kw_dictionary.pop('number_projections')
+
+    # Define number of angles and radon transform to undersample  
+    self.number_projections_total = kw_dictionary.pop('number_projections_total')
+    self.number_projections_undersample = kw_dictionary.pop('number_projections_undersample')
+    self.acceleration_factor = self.number_projections_total//self.number_projections_undersample
+
+    self._create_radon()
+
+    self.sampling_method = kw_dictionary.pop('sampling_method')
     self.batch_size = kw_dictionary.pop('batch_size')
-    
+
   def register_datasets(self):
     """
     Forms registered datasets from raw projection data. Corrects axis shift, resizes for tensor and saves volume.
@@ -661,7 +671,7 @@ class ZebraDataloader:
                 print("Dataset {}/{} loaded - {} {}".format(dataset_num+1, len(self.folder_paths), str(dataset.folder_name), sample))
                 
                 # Resize registered volume to desired
-                dataset.dataset_resize(sample, self.img_resize, self.number_projections)
+                dataset.dataset_resize(sample, self.img_resize, self.number_projections_total)
 
                 with open(registered_dataset_path, 'wb') as f:
                     
@@ -710,9 +720,6 @@ class ZebraDataloader:
       l = len(self.datasets_registered)*self.augment_factor
       # Augment factor iterates over the datasets for data augmentation
       for i in range(self.augment_factor):
-          
-        # Seed angle for data augmentation
-        rand_angle = np.random.randint(0, self.number_projections)
 
         # Dataset train
         # Masks chosen dataset with the number of projections required
@@ -720,7 +727,7 @@ class ZebraDataloader:
             
           dataset = self.open_dataset(dataset_path).astype(float)
 
-          tY, tX, filtX = self.mask_datasets(dataset, self.number_projections, self.total_size//l, self.img_resize, rand_angle, use_rand = self.use_rand)
+          tY, tX, filtX = self.mask_datasets(dataset, self.total_size//l)
 
           if k_dataset < self.k_fold_datasets:
               
@@ -829,6 +836,98 @@ class ZebraDataloader:
                                 'filt_x':test_filt_x_dataloader, 
                                 'y': test_y_dataloader}}
 
+  def mask_datasets(self, full_sinograms, dataset_size):
+    '''
+    Mask datasets in order to undersample sinograms, obtaining undersampled and full_y reconstruction datasets for training.
+    Params:
+        - full_sinograms (ndarray): full_y sampled volume of sinograms, with size (n_projections, detector_number, z-slices)
+        - num_beams (int): Number of beams to undersample the dataset. The function builds an masking array clamping to zero the values
+        that are not sampled in the sinogram.
+        - dataset_size (int): number to slices to take from the original sinogram's volume 
+        - img_size (int): Size of reconstructed images, in pixels.
+        - rand_angle (int): Starting angle to subsample evenly spaced
+    '''    
+    
+    # List for tensor formation (this is pretty memory intensive)
+    undersampled = []
+    undersampled_filtered = []
+    desired = []
+
+    # Assert if dataset_size requested is larger than full_sinograms
+    assert(dataset_size <= full_sinograms.shape[2])
+
+    # Using boolean mask, keep values sampled and clamp to zero others
+    # Masking dataset has to be on its own
+    print('Masking with {} method'.format(self.sampling_method))
+    undersampled_sinograms = self.subsample_sinogram(full_sinograms, self.sampling_method)
+    
+    if self.use_rand == True:
+        rand = np.random.choice(range(full_sinograms.shape[2]), dataset_size, replace=False)
+    else:
+        rand = np.arange(full_sinograms.shape[2], dataset_size)
+    
+    # Grab random slices and roll axis so to sample slices
+    undersampled_sinograms = torch.FloatTensor(np.rollaxis(undersampled_sinograms[:,:,rand], 2)).to(device)
+    full_sinograms = torch.FloatTensor(np.rollaxis(full_sinograms[:,:,rand], 2)).to(device)
+    
+    # Inputs
+    for us_sinogram, full_sinogram in tqdm(zip(undersampled_sinograms, full_sinograms)):
+        
+        # Normalization of input sinogram - Undersampled
+        img = self.radon.backward(self.radon.filter_sinogram(us_sinogram))
+        img = self.normalize_image(img)
+        
+        # Undersampled filtered
+        undersampled_filtered.append(img)
+        
+        # Normalize 0-1 under sampled sinogram
+        us_sinogram = self.normalize_image(us_sinogram)
+
+        img = self.radon.backward(us_sinogram)*np.pi/self.number_projections_undersample
+        img = self.normalize_image(img)
+
+        # Undersampled raw backprojection
+        undersampled.append(img)
+        
+        # Normalization of output sinogram - Fully sampled
+        img = self.radon.backward(self.radon.filter_sinogram(full_sinogram))
+        img = self.normalize_image(img)
+
+        # Fully sampled filtered backprojection
+        desired.append(img)
+    
+    # Format dataset to feed network
+    desired = torch.unsqueeze(torch.stack(desired), 1)
+    undersampled = torch.unsqueeze(torch.stack(undersampled), 1)
+    undersampled_filtered = torch.unsqueeze(torch.stack(undersampled_filtered), 1)
+
+    return desired, undersampled, undersampled_filtered
+
+  def subsample_sinogram(self, sinogram, method = 'equispaced-linear'):
+    '''
+    Subsamples sinogram by masking images with zeros with a particular method.
+    Params: 
+      sinogram (ndarray): sinogram to mask with defined method
+      method (string): Sampling meethod to mask sinogram
+        Avalaible methods:
+          * linear-equispaced: from a random angle seed, samples equispaced the angular space.
+    '''
+
+    # Seed angle for data augmentation
+    if method == 'equispaced-linear':
+      
+      undersampled_sinogram = np.copy(sinogram)
+      rand_angle = np.random.randint(0, self.number_projections_total)
+
+      # Zeros Masking
+      zeros_idx = np.linspace(0, self.number_projections_total, self.number_projections_undersample, endpoint = False).astype(int)
+      zeros_idx = (zeros_idx+rand_angle)%self.number_projections_total
+      zeros_mask = np.full(self.number_projections_total, True, dtype = bool)
+      zeros_mask[zeros_idx] = False
+      undersampled_sinogram[zeros_mask, :, :] = 0
+    
+    return undersampled_sinogram
+
   def _get_next_from_dataloader(self, set_name, put_name):
     '''
     Gets next item in dataloader.
@@ -839,93 +938,16 @@ class ZebraDataloader:
 
     return next(iter(self.dataloaders[set_name][put_name]))
 
-  # This should become a pytorch.Transform!
-  def mask_datasets(self, full_sino, num_beams, dataset_size, img_size, angle_seed = 0, use_rand = True):
-      '''
-      Mask datasets in order to undersample sinograms, obtaining undersampled and full_y reconstruction datasets for training.
-      Params:
-          - full_sino (ndarray): full_y sampled volume of sinograms, with size (n_projections, detector_number, z-slices)
-          - num_beams (int): Number of beams to undersample the dataset. The function builds an masking array clamping to zero the values
-          that are not sampled in the sinogram.
-          - dataset_size (int): number to slices to take from the original sinogram's volume 
-          - img_size (int): Size of reconstructed images, in pixels.
-          - angle_seed (int): Starting angle to subsample evenly spaced
-      '''
-      # Copy of input sinogram dataset
-      det_count = int((img_size+0.5)*np.sqrt(2))
-      undersampled_sino = np.copy(full_sino)
+  def _create_radon(self):
+    '''
+    Creates Torch-Radon method for the desired sampling and image size of the dataloader
+    '''
+    # Grab number of angles
+    self.angles = np.linspace(0, 2*np.pi, self.number_projections_total, endpoint = False)
+    
+    self.radon = Radon(self.img_resize, self.angles, clip_to_circle = False, det_count = self.det_count)
 
-      # Using boolean mask, keep values sampled and clamp to zero others
-      print('Init mask datasets')
-      zeros_idx = np.linspace(0, full_sino.shape[0], num_beams, endpoint = False).astype(int)
-      zeros_idx = (zeros_idx+angle_seed)%full_sino.shape[0]
-      zeros_mask = np.full(full_sino.shape[0], True, dtype = bool)
-      zeros_mask[zeros_idx] = False
-      undersampled_sino[zeros_mask, :, :] = 0
+  @staticmethod
+  def normalize_image(image):
 
-      # Grab number of angles
-      n_angles = full_sino.shape[0]
-      angles = np.linspace(0, 2*np.pi, n_angles, endpoint = False)
-      
-      radon = Radon(img_size, angles, clip_to_circle = False, det_count = det_count)
-      
-      undersampled = []
-      undersampled_filtered = []
-      desired = []
-      # print('Rand {}'.format(use_rand))
-      # print(dataset_size)
-      # print('Shape sino samples{}'.format(full_sino.shape[2]))
-      # Grab random slices
-      assert(dataset_size <= full_sino.shape[2])
-      if use_rand == True:
-          rand = np.random.choice(range(full_sino.shape[2]), dataset_size, replace=False)
-      else:
-          rand = np.arange(full_sino.shape[2], dataset_size)
-      
-      # print(rand)
-      # print('Zero masked')
-      # Inputs
-      for i, sino in enumerate(np.rollaxis(undersampled_sino[:,:,rand], 2)):
-          
-          # Normalization of input sinogram
-          sino = torch.FloatTensor(sino).to(device)
-          sino = (sino - sino.min())/(sino.max()-sino.min())
-          img = radon.backward(sino)*np.pi/n_angles 
-          img = (img-img.min())/(img.max()-img.min())
-
-          undersampled.append(img)
-      print('Undersampled reconstruction raw')
-      # Grab filtered backprojection
-      
-      for sino in np.rollaxis(undersampled_sino[:,:,rand],2):
-          
-          sino = torch.FloatTensor(sino).to(device)
-          img = radon.filter_sinogram(sino)
-          #sino = (sino - sino.min())/(sino.max()-sino.min())
-          img = radon.backward(radon.filter_sinogram(sino))
-          img = (img - img.min())/(img.max()-img.min())
-          del sino
-
-          undersampled_filtered.append(img)
-      
-      del undersampled_sino
-      print('Undersampled reconstruction filtered')
-      # Target
-      for sino in np.rollaxis(full_sino[:,:,rand], 2):
-          
-          # Normalization of input sinogram
-          sino = torch.FloatTensor(sino).to(device)
-          #sino = (sino - sino.min())/(sino.max()-sino.min())
-          img = radon.backward(radon.filter_sinogram(sino))
-          img = (img - img.min())/(img.max()-img.min())
-
-          desired.append(img)
-
-      print('Undersampled reconstruction full')
-      
-      # Format dataset to feed network
-      desired = torch.unsqueeze(torch.stack(desired), 1)
-      undersampled = torch.unsqueeze(torch.stack(undersampled), 1)
-      undersampled_filtered = torch.unsqueeze(torch.stack(undersampled_filtered), 1)
-
-      return desired, undersampled, undersampled_filtered
+    return (image - image.min())/(image.max()-image.min())

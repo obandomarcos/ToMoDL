@@ -47,8 +47,10 @@ def test_dataloader(testing_options):
                   'save_tensor': False,
                   'use_rand': True,
                   'k_fold_datasets': 1,
-                  'number_projections': 720,
-                  'batch_size': 5}
+                  'number_projections_total':720,
+                  'number_projections_undersample': 72,
+                  'batch_size': 5,
+                  'sampling_method': 'equispaced-linear'}
 
     zebra_dataloaders = dlutils.ZebraDataloader(zebra_dict)
 
@@ -94,10 +96,11 @@ def test_dataloader(testing_options):
                 image = zebra_dataloaders._get_next_from_dataloader(set_name, put_name)[0,0,...].cpu().detach().numpy()
 
                 print(set_name, put_name)
-                print('Image Intensity', 'Max', image.max(), 'Min: ',image.min())
+                print('Image Intensity - set {} put {}\n'.format(set_name, put_name), 'Max', image.max(), 'Min: ',image.min())
 
                 cv2.imwrite(dataloader_testing_folder+'Test_Image_Dataloader_{}_{}.jpg'.format(set_name, put_name), 255.0*image)
 
+    
 if __name__ == '__main__':
 
     testing_options = []
@@ -122,7 +125,8 @@ if __name__ == '__main__':
     
     if args.dataloaders_building:
 
-        print('Checking Dataloaders building')
+        print('Checking Dataloaders building + masking datasets')
         testing_options.append('check_dataloaders_building')
+    
     
     test_dataloader(testing_options)

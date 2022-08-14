@@ -25,7 +25,6 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 
 
-
 def model_training_unet(model, criterion, crit_fbp, optimizer, dataloaders, device, root, num_epochs = 25, disp=False, do_checkpoint = 0, plot_title = False,title = '', compute_mse = True, monai = True):
     """
     Training routine for raw Unet

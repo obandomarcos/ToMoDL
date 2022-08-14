@@ -13,7 +13,7 @@ import matplotlib.pyplot as plt
 import pathlib
 from PIL import Image
 import re
-import torch, torchvision
+import torch
 import os 
 from tqdm import tqdm
 import SimpleITK as sitk

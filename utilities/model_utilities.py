@@ -3,28 +3,28 @@ Utility functions for model parameter saving and loading
 
 author: obanmarcos
 """
+import pandas as pd
 import numpy as np
-import torch
-import time
-import copy 
-import datetime
-import sys, os
-from torch_radon import Radon, RadonFanbeam
-import torchvision
-import utilities.dataloading_utilities as DL
-import math
 import matplotlib.pyplot as plt
-import cv2 
-import torchvision.transforms as T
-import pickle
-import os.path
-import os
+import pathlib
+from PIL import Image
+import re
+import torch
 from tqdm import tqdm
-# import albumentations
-import torch.nn.functional as nnf
+import SimpleITK as sitk
+from torch_radon import Radon, RadonFanbeam
+import scipy.ndimage as ndi
 
-os.chdir('/home/obanmarcos/Balseiro/DeepOPT/')
-from utilities.folders import *
+# Modify for multi-gpu
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+
+
+
+
+
+
+
+
 
 def model_training_unet(model, criterion, crit_fbp, optimizer, dataloaders, device, root, num_epochs = 25, disp=False, do_checkpoint = 0, plot_title = False,title = '', compute_mse = True, monai = True):
     """
@@ -374,7 +374,6 @@ def model_training(model, criterion, crit_backproj, crit_fbp, optimizer, dataloa
 
     return model , train_info
 
-
 def psnr_normalize(outputs, target):
     """
     Adjusts outputs mean to target mean and calculates PSNR
@@ -609,141 +608,6 @@ def unique_model_training(model, criterion, criterion_fbp, optimizer, dataloader
 
     return model , train_info
 
-# Deprecated
-def formDatasets(sino_dataset, num_beams, size, img_size):
-    
-    """
-    This function receives a sinogram dataset and returns two FBP reconstructed datasets,
-    ocan't multiply sequence by non-int of type 'floatne with the full span of angles and one reconstructed with num_beams
-    """ 
-    # Angles
-    n_angles = sino_dataset.shape[0]
-    angles_full = np.linspace(0, 2*np.pi, n_angles, endpoint=False)
-    angles_under = np.linspace(0, 2*np.pi, num_beams, endpoint=False)
-  
-    projs = np.linspace(0, n_angles, num_beams, endpoint=False).astype(int)
-  
-    det_count = sino_dataset.shape[1]
-    image_size = int(det_count/np.sqrt(2)-0.5)
-    # Datasets undersampled with projs
-    under_sino = sino_dataset[projs,:,:]
-  
-    rad_full = Radon(image_size, angles_full, clip_to_circle=False, det_count=det_count)
-    rad_under = Radon(image_size, angles_under, clip_to_circle=False, det_count=det_count)
-  
-    undersampled = []
-    desired = []
-    # retrieve random z-slices to train
-    rand = np.random.choice(range(under_sino.shape[2]), size, replace=False)
-  
-    # Undersampled
-    for img in np.rollaxis(under_sino[:,:,rand], 2):
-  
-      undersampled.append(rad_under.backward(rad_under.filter_sinogram(torch.FloatTensor(img).to(device))))
-  
-    # Full
-    for img in np.rollaxis(sino_dataset[:,:,rand], 2):
-  
-      desired.append(rad_full.backward(rad_full.filter_sinogram(torch.FloatTensor(img).to(device))))
-  
-    desired = torch.unsqueeze(torch.stack(desired), 1)
-    undersampled = torch.unsqueeze(torch.stack(undersampled), 1)
-    
-    # Image resize
-    transform = torch.nn.Sequential(torchvision.transforms.Resize((img_size, img_size)),
-        torchvision.transforms.Normalize([0.5], [0.5]))
-    
-    transform = torch.jit.script(transform)
-    desired = transform.forward(desired)
-    undersampled = transform.forward(undersampled)
-  
-    return desired, undersampled
-
-# For unique dataset sampling
-def formMaskDataset(sino_dataset, dataset_size, slice_idx, num_beams):
-    '''
-    Forms a dataset of images out of different subsamplings applied to a volume
-    params:
-        sino_dataset (ndarray): sinogram volume
-        dataset_size (int): number of images
-        slice_num (int): slice index to be grabbed
-        projection_num (int): 
-    ''' 
-    target_img = sino_dataset[:,:,slice_idx]
-    train_dataset = np.repeat(target_img[...,None], dataset_size, axis = 2)
-
-    for i in range(dataset_size):
-        
-        # choose random projections 
-        rand = np.random.choice(range(sino_dataset.shape[0]), sino_dataset.shape[0]-num_beams,replace=False)
-        # clamp to zero non desired lines
-        train_dataset[rand, :, i] = 0
-    
-    return train_dataset, target_img
-
-# Deprecated
-def formUniqueDataset(sino_datasets, dataset_size, num_beams, slice_idx):
-    """
-    Routine for training with a unique image. Returns a training dataset with random subsampling (num_beams used for reconstruction), a target image and the maximum number of projections taken.
-    params:
-        sino_dataset (ndarray): sinogram volume
-        dataset_size (int): number of images in training dataset
-        num_beams (int): number of beams
-        slice_idx (int): slice index 
-        img_resize (int): image resizing, squared
-    """
-    # Choose one of the datasets
-    sino_dataset = sino_datasets[np.random.choice(range(len(sino_datasets)), 1).astype(int)[0]]
-    
-    # Obtain masked datasets
-    train_dataset, target_img = formMaskDataset(sino_dataset, dataset_size, slice_idx, num_beams)
-
-    # Resize sinogram
-    n_angles = sino_dataset.shape[0]
-    angles_full = np.linspace(0, 2*np.pi, n_angles, endpoint=False)
-    
-    det_count = train_dataset.shape[1]
-    image_size = int(det_count/np.sqrt(2)+0.5)
-        
-    radon = Radon(image_size, angles_full, clip_to_circle = False, det_count = det_count)
-    
-    training_Atb = []
-
-    for img in np.rollaxis(train_dataset, 2):
-    
-        # Normalization
-        #img = cv2.normalize(img, None, alpha = 0, beta = 1, norm_type = cv2.NORM_MINMAX, dtype = cv2.CV_32F)
-        img = radon.backward(radon.filter_sinogram(torch.FloatTensor(img).to(device)))
-        mn = torch.min(img)
-        mx = torch.max(img)
-        norm = (img-mn)*(1.0/(mx-mn))
-        
-        training_Atb.append(norm)
-
-    #target_img = cv2.normalize(target_img, None, alpha = 0, beta = 1, norm_type = cv2.NORM_MINMAX, dtype = cv2.CV_32F)
-    
-    target_img = radon.backward(radon.filter_sinogram(torch.FloatTensor(target_img).to(device)))
-    mn = torch.min(target_img)
-    mx = torch.max(target_img)
-    target_img = (target_img-mn)*(1.0/(mx-mn)) 
-
-    training_Atb = torch.unsqueeze(torch.stack(training_Atb), 1)
-    
-    # Image resize
-#    transform = torch.nn.Sequential(torchvision.transforms.Normalize([0.5], [0.5]))
-    
-    #with torch.no_grad():
-    #    
-    #    train_Atb_sub = training_Atb - training_Atb.min(0, keepdim = True)[0]
-    #    train_Atb_sub /= training_Atb.max(0, keepdim = True)[0]
-    #    target_img_sub = target_img - target_img.min(0, keepdim = True)[0]
-    #    target_img_sub /= target_img.max(0, keepdim = True)[0]
-    #
-    #transform = torch.jit.script(transform)
-    #training_Atb = transform.forward(train_Atb_sub)
-    #target_img = transform.forward(torch.unsqueeze(target_img_sub, 0))
-    
-    return training_Atb, target_img, n_angles
 
 def mse(img1, img2):
 

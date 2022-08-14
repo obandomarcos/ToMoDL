@@ -19,6 +19,6 @@ f140827_3dpf_4X = main_folder+'140827_3dpf_4X'
 f140827_5dpf_4X = main_folder+'140827_5dpf_4X'
 
 results_folder = '/home/obanmarcos/Balseiro/DeepOPT/Resultados/'
-model_folder = '/home/obanmarcos/Balseiro/DeepOPT/Models/'
+model_folder = '/home/obanmarcos/Balseiro/DeepOPT/SavedModels/'
 datasets_folder = '/home/obanmarcos/Balseiro/DeepOPT/Datasets/'
 volumes_folder = '/home/obanmarcos/Balseiro/DeepOPT/Volumes/'

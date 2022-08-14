@@ -14,26 +14,31 @@ import torch.nn as nn
 import torch.nn.functional as F
 import monai
 
-dev=torch.device("cuda") 
+# Modify for multi-gpu
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 class dwLayer(nn.Module):
     """
     Creates denoiser singular layer
     """
-    def __init__(self, szW, lastLayer):
+    def __init__(self, kw_dictionary):
         """
         Dw component initializer
         Params:
-            - szW (tuple): convolutional neural network size (in_channels, out_channels, kernel_size)
-            - lastLayer (bool): if True, Relu is not applied 
+            - weights_size (tuple): convolutional neural network size (in_channels, out_channels, kernel_size)
+            - is_last_layer (bool): if True, Relu is not applied 
+            - init_method (string): Initialization method, defaults to Xavier init
         """
 
         super().__init__()
-        self.lastLayer = lastLayer
-        self.conv = nn.Conv2d(*szW, padding = (int(szW[2]/2),int(szW[2]/2)))
-        #torch.nn.init.constant_(self.conv.weight, 0.001)
-        #torch.nn.init.constant_(self.conv.bias, 0.001)
-        #self.batchNorm = nn.BatchNorm2d(szW[1])
+
+        self.process_kwdictionary(kw_dictionary)
+        self.conv = nn.Conv2d(*self.weights_size, padding = (int(self.weights_size[2]/2),int(self.weights_size[2]/2)))
+
+        self.initialize_layer(method = self.init_method)            
+        
+        if self.use_batch_norm == True:
+            self.batch_norm = nn.BatchNorm2d(self.weights_size[1])
     
     def forward(self, x):
         """
@@ -42,13 +47,36 @@ class dwLayer(nn.Module):
             - x (torch.Tensor): Image batch to be processed
         """
         output = self.conv(x)
-        #output = self.batchNorm(output)
+
+        if self.use_batch_norm:
+
+            output = self.batch_norm(output)
         
-        if self.lastLayer != True:
+        if self.is_last_layer != True:
             
             output = F.relu(output)
         
         return output
+    
+    def process_kwdictionary(self, kw_dictionary):
+        '''
+        Process keyword dictionary.
+        Params: 
+            - kw_dictionary (dict): Dictionary with keywords
+        '''
+
+        self.weights_size = kw_dictionary.pop('weights_size')
+        self.is_last_layer = kw_dictionary.pop('is_last_layer')
+        self.init_method = kw_dictionary.pop('init_method')
+        self.use_batch_norm = kw_dictionary.pop('use_batch_norm')
+
+    def initialize_layer(self, method):
+
+        if method == 'xavier':
+            return
+        elif method == 'constant':
+            torch.nn.init.constant_(self.conv.weight, 0.001)
+            torch.nn.init.constant_(self.conv.bias, 0.001)
 
 class dw(nn.Module):
 
@@ -60,7 +88,7 @@ class dw(nn.Module):
         """
         super(dw, self).__init__()
 
-        self.lastLayer = False
+        self.is_last_layer = False
         self.nw = {}
         self.kernelSize = 3
         self.features = 64
@@ -69,16 +97,16 @@ class dw(nn.Module):
         self.stride = 1
 
         # Intermediate layers (in_channels, out_channels, kernel_size_x, kernel_size_y)
-        self.szW = {key: (self.features,self.features,self.kernelSize,self.stride) for key in range(2,nLayer)}   
-        self.szW[1] = (self.inChannels, self.features, self.kernelSize, self.stride)
-        self.szW[nLayer] = (self.features, self.outChannels, self.kernelSize, self.stride)
+        self.weights_size = {key: (self.features,self.features,self.kernelSize,self.stride) for key in range(2,nLayer)}   
+        self.weights_size[1] = (self.inChannels, self.features, self.kernelSize, self.stride)
+        self.weights_size[nLayer] = (self.features, self.outChannels, self.kernelSize, self.stride)
 
         for i in np.arange(1,nLayer+1):
             
             if i == nLayer:
-                self.lastLayer = True
+                self.is_last_layer = True
 
-            self.nw['c'+str(i)] = dwLayer(self.szW[i], self.lastLayer)
+            self.nw['c'+str(i)] = dwLayer(self.weights_size[i], self.is_last_layer)
             self.nw['c'+str(i)].cuda(dev)
 
         self.nw = nn.ModuleDict(self.nw)
@@ -118,15 +146,9 @@ class Aclass:
         Image is already in device as a Tensor
         """
         
-        #sinogram = self.radon.forward(img)
-        #iradon = self.radon.backprojection(self.radon.filter_sinogram(sinogram))
 
-        #img = (abs(img)-abs(img).min())/(abs(img).max()-abs(img).min())         #normalize
         sinogram = self.radon.forward(img)/self.img_size    
         iradon = self.radon.backprojection(sinogram)*np.pi/self.num_angles
-        #iradon = (iradon-iradon.min())/(iradon.max()-iradon.min())
-        #print('img', img.max(), img.min())
-        #print('iradon', iradon.max(), iradon.min())
         del sinogram
         output = iradon/self.lam+img
         

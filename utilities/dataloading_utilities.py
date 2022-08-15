@@ -156,8 +156,6 @@ class ZebraDataset:
       self.dataset = self.dataset.sort_values(['Sample','Angle'], axis = 0).reset_index(drop=True)
 
       self.registered_volume[sample] = np.stack(self.dataset[self.dataset.Sample == sample2idx]['Image'].to_numpy())
-      
-      self.image_volume[sample] = np.moveaxis(np.stack(self.dataset[self.dataset.Sample == sample2idx]['Image'].to_numpy()), 1, 2)
 
       del self.dataset, self.registered_dataset
   
@@ -415,7 +413,6 @@ class ZebraDataset:
       else:
         self.maxAngle = 720
 
-      print(self.maxAngle)
       angles = np.arange(0, self.maxAngle//2, 1).astype(float)
   
       for angle in tqdm(angles):
@@ -770,9 +767,9 @@ class ZebraDataloader:
         
       # Randomly shuffle the images
       idx = torch.randperm(full_x_tensor.shape[0])
-      full_x_tensor = full_x_tensor[idx].view(full_x_tensor.size())
-      filt_full_x_tensor = filt_full_x_tensor[idx].view(filt_full_x_tensor.size())
-      full_y_tensor = full_y_tensor[idx].view(full_x_tensor.size())
+      full_x_tensor = full_x_tensor[idx].view(full_x_tensor.size()).to(device)
+      filt_full_x_tensor = filt_full_x_tensor[idx].view(filt_full_x_tensor.size()).to(device)
+      full_y_tensor = full_y_tensor[idx].view(full_x_tensor.size()).to(device)
 
       # Stack test dataset separately and random shuffle
       idx_test = torch.randperm(test_x_tensor.shape[0])
@@ -793,48 +790,21 @@ class ZebraDataloader:
     train_y_tensor = torch.clone(full_y_tensor[int(self.val_factor*len_full):,...])
 
     # Build dataloaders
-    train_x_dataloader = torch.utils.data.DataLoader(train_x_tensor,
+    train_dataloader = torch.utils.data.DataLoader((train_x_tensor, train_filt_x_tensor ,train_y_tensor),
                                         batch_size=self.batch_size,
                                         shuffle=False, num_workers=0)
 
-    train_filt_x_dataloader = torch.utils.data.DataLoader (train_filt_x_tensor,
-    batch_size=self.batch_size,
-    shuffle=False, num_workers=0)
-
-    train_y_dataloader = torch.utils.data.DataLoader(train_y_tensor, 
-                                        batch_size= self.batch_size,
-                                        shuffle=False, 
-                                        num_workers=0)         
-
-    test_x_dataloader = torch.utils.data.DataLoader(test_x_tensor, 
+    test_dataloader = torch.utils.data.DataLoader((test_x_tensor, test_filt_x_tensor, test_y_tensor), 
                                         batch_size=1,shuffle=False,num_workers=0)
 
-    test_filt_x_dataloader = torch.utils.data.DataLoader(test_filt_x_tensor,
-                                            batch_size=1,shuffle=False, num_workers=0)
-
-    test_y_dataloader = torch.utils.data.DataLoader(test_y_tensor, 
-                                        batch_size=1,shuffle=False, num_workers=0)
-    
-    val_x_dataloader = torch.utils.data.DataLoader(val_x_tensor,
+    val_dataloader = torch.utils.data.DataLoader((val_x_tensor, val_filt_x_tensor, val_y_tensor),
                                       batch_size=self.batch_size,
                                       shuffle=False, num_workers=0)
-
-    val_filt_x_dataloader = torch.utils.data.DataLoader(val_filt_x_tensor,
-                                      batch_size=self.batch_size,
-                                      shuffle=False, num_workers=0)
- 
-    val_y_dataloader = torch.utils.data.DataLoader(val_y_tensor, 
-                                        batch_size=self.batch_size, shuffle=False,num_workers=0)
 
     # Dictionary reshape
-    self.dataloaders = {'train':{'x':train_x_dataloader,        
-                                 'filt_x':train_filt_x_dataloader, 'y':train_y_dataloader}, 
-                        'val':{'x':val_x_dataloader,       
-                               'filt_x':val_filt_x_dataloader, 
-                               'y': val_y_dataloader}, 
-                        'test':{'x':test_x_dataloader,  
-                                'filt_x':test_filt_x_dataloader, 
-                                'y': test_y_dataloader}}
+    self.dataloaders = {'train':train_dataloader,        
+                        'val': val_dataloader,
+                        'test':test_dataloader}
 
   def mask_datasets(self, full_sinograms, dataset_size):
     '''

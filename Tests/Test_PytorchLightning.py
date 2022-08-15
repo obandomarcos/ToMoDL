@@ -102,8 +102,8 @@ def test_pytorch_training(testing_options):
         modl_reconstruction = MoDLReconstructor(model_system_dict)
 
         # train model
-        trainer = pl.Trainer()
-        trainer.fit(model=modl_reconstruction, train_dataloader=zebra_dataloaders.dataloaders['train'])
+        trainer = pl.Trainer(accelerator = 'gpu', devices = 1)
+        trainer.fit(model=modl_reconstruction, train_dataloaders=zebra_dataloaders.dataloaders['train'])
     
 if __name__ == '__main__':
 

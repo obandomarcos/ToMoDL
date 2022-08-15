@@ -795,7 +795,7 @@ class ZebraDataloader:
                                         shuffle=False, num_workers=0)
 
     test_dataloader = torch.utils.data.DataLoader((test_x_tensor, test_filt_x_tensor, test_y_tensor), 
-                                        batch_size=1,shuffle=False,num_workers=0)
+                                        batch_size=self.batch_size,shuffle=False,num_workers=0)
 
     val_dataloader = torch.utils.data.DataLoader((val_x_tensor, val_filt_x_tensor, val_y_tensor),
                                       batch_size=self.batch_size,
@@ -898,15 +898,14 @@ class ZebraDataloader:
     
     return undersampled_sinogram
 
-  def _get_next_from_dataloader(self, set_name, put_name):
+  def _get_next_from_dataloader(self, set_name):
     '''
     Gets next item in dataloader.
     Params:
       - set_name (string): Refers to set of data where image comes from (train, val, test)
-      - put_name (string): Specifies undersampled non-filtered backprojection (x), fully sampled filtered backprojection (y) or undersampled filtered backprojection (filt_x).
     '''
 
-    return next(iter(self.dataloaders[set_name][put_name]))
+    return next(iter(self.dataloaders[set_name]))
 
   def _create_radon(self):
     '''

@@ -17,6 +17,8 @@ from utilities.folders import *
 from utilities import model_utilities as modutils # Esto lo tengo que eliminar una vez que termine el models system
 from models.models_system import MoDLReconstructor
 import torch
+from pytorch_lightning.loggers import WandbLogger
+
 import cv2
 
 def test_pytorch_training(testing_options):
@@ -80,6 +82,8 @@ def test_pytorch_training(testing_options):
 
     # Training parameters
     loss_dict = {'loss_name': torch.nn.MSELoss(reduction = 'sum')}
+
+    # Optimizer parameters
     optimizer_dict = {'optimizer_name': 'Adam',
                       'lr': 1e-3}
     
@@ -88,22 +92,38 @@ def test_pytorch_training(testing_options):
                         'kw_dictionary_modl': modl_dict,
                         'loss_dict': loss_dict,}
     
+    # Logger parameters
+    wandb_logger = WandbLogger(project="deepopt", entity = 'omarcos', log_model="all")
+
     # Load dataloaders
     zebra_dataloaders = dlutils.ZebraDataloader(zebra_dict)
+    zebra_dataloaders.register_datasets()
+    zebra_dataloaders.build_dataloaders()
+
+    # Trainer parameters
+    trainer_dict = {'max_epochs': 1,
+                    'accelerator' : 'gpu', 
+                    'devices' : 1}
 
     # 1 - Check training with Pytorch Lightning
     if 'check_pytorch_lightning_training' in testing_options:
-
-        # Load and build dataloaders
-        zebra_dataloaders.register_datasets()
-        zebra_dataloaders.build_dataloaders()
-
+        
         # model
         modl_reconstruction = MoDLReconstructor(model_system_dict)
 
-        # train model
-        trainer = pl.Trainer(accelerator = 'gpu', devices = 1)
-        trainer.fit(model=modl_reconstruction, train_dataloaders=zebra_dataloaders.dataloaders['train'])
+        # PL train model
+        trainer = pl.Trainer(**trainer_dict)
+        
+        # W&B logger
+        wandb_logger.watch(modl_reconstruction)
+
+        # Train model
+        trainer.fit(model=modl_reconstruction, 
+                    train_dataloaders=zebra_dataloaders.dataloaders['train'], 
+                    val_dataloaders = zebra_dataloaders.dataloaders['val'])
+
+        # test model
+        trainer.test(model = modl_reconstruction, dataloaders= zebra_dataloaders.dataloaders['test'])
     
 if __name__ == '__main__':
 

@@ -17,8 +17,11 @@ from utilities.folders import *
 from utilities import model_utilities as modutils # Esto lo tengo que eliminar una vez que termine el models system
 from models.models_system import MoDLReconstructor
 import torch
+
+from pytorch_lightning.callbacks import ModelCheckpoint
 from pytorch_lightning.loggers import WandbLogger
 
+import wandb 
 import cv2
 
 def test_pytorch_training(testing_options):
@@ -31,6 +34,8 @@ def test_pytorch_training(testing_options):
     # Using CPU or GPU
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     print('Device {}'.format(device))
+
+    wandb.init(project = 'deepopt')
 
     dataloader_testing_folder = '/home/obanmarcos/Balseiro/DeepOPT/Tests/Tests_Pytorch_Utilities/'
 
@@ -91,19 +96,30 @@ def test_pytorch_training(testing_options):
     model_system_dict = {'optimizer_dict': optimizer_dict,
                         'kw_dictionary_modl': modl_dict,
                         'loss_dict': loss_dict,}
-    
-    # Logger parameters
-    wandb_logger = WandbLogger(project="deepopt", entity = 'omarcos', log_model="all")
 
     # Load dataloaders
     zebra_dataloaders = dlutils.ZebraDataloader(zebra_dict)
     zebra_dataloaders.register_datasets()
     zebra_dataloaders.build_dataloaders()
 
+    # Logger parameters
+    wandb_logger = WandbLogger(project='deepopt',
+                                   entity = 'omarcos', 
+                                   log_model= True) 
+
+    # Callbacks
+    train_checkpoint_callback = ModelCheckpoint(monitor='train/loss', mode='max')
+    val_checkpoint_callback = ModelCheckpoint(monitor='val/loss', mode='max')
+
     # Trainer parameters
-    trainer_dict = {'max_epochs': 1,
+    trainer_dict = {'max_epochs': 10,
+                    'log_every_n_steps':1,
                     'accelerator' : 'gpu', 
-                    'devices' : 1}
+                    'devices' : 1,
+                    'default_root_dir': model_folder,
+                    'logger':wandb_logger,
+                    'callbacks' : [train_checkpoint_callback,
+                                    val_checkpoint_callback]}
 
     # 1 - Check training with Pytorch Lightning
     if 'check_pytorch_lightning_training' in testing_options:

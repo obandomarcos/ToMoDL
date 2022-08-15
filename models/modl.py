@@ -32,7 +32,6 @@ class dwLayer(nn.Module):
 
         super().__init__()
 
-        print('Pre-dwLayer', kw_dictionary)
         self.process_kwdictionary(kw_dictionary)
         self.conv = nn.Conv2d(*self.weights_size, padding = (int(self.weights_size[2]/2),int(self.weights_size[2]/2)))
 
@@ -66,7 +65,6 @@ class dwLayer(nn.Module):
             - kw_dictionary (dict): Dictionary with keywords
         '''
 
-        print('Pre-process kwdict: ', kw_dictionary)
         self.weights_size = kw_dictionary['weights_size']
         self.is_last_layer = kw_dictionary['is_last_layer']
         self.init_method = kw_dictionary['init_method']
@@ -96,7 +94,6 @@ class dw(nn.Module):
 
         self.process_kwdictionary(kw_dictionary=kw_dictionary)
         
-        print('Pre-loop', self.dw_layer_dict)
         for i in np.arange(1, self.number_layers+1):
             
             self.dw_layer_dict['weights_size'] = self.weights_size[i]
@@ -104,7 +101,6 @@ class dw(nn.Module):
             if i == self.number_layers:
                 self.dw_layer_dict['is_last_layer']= True
 
-            print('in-loop :', self.dw_layer_dict)
             self.nw['c'+str(i)] = dwLayer(self.dw_layer_dict)
             self.nw['c'+str(i)].cuda(device)
 

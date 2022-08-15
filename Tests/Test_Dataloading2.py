@@ -91,9 +91,12 @@ def test_dataloader(testing_options):
         puts = ['x', 'filt_x', 'y']
         
         for set_name in sets:
-            for put_name in puts:
+            
+            tuple_image = zebra_dataloaders._get_next_from_dataloader(set_name)
+            
+            for put_idx, put_name in enumerate(puts):
                 
-                image = zebra_dataloaders._get_next_from_dataloader(set_name, put_name)[0,0,...].cpu().detach().numpy()
+                image = tuple_image[put_idx][0,0,...].cpu().detach().numpy()
 
                 print(set_name, put_name)
                 print('Image Intensity - set {} put {}\n'.format(set_name, put_name), 'Max', image.max(), 'Min: ',image.min())

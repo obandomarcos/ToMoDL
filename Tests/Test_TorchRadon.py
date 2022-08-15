@@ -11,23 +11,24 @@ import phantominator as ph
 import matplotlib.pyplot as plt
 
 device = torch.device('cuda')
-results_folder = '/home/marcos/DeepOPT/Resultados/'
+results_folder = '/home/obanmarcos/Balseiro/DeepOPT/Resultados/'
 
-n_angles = 160
+n_angles = 100
 image_size = 256
 angles = np.linspace(0, np.pi, n_angles, endpoint=False)
 det_count = int(np.sqrt(2)*image_size+0.5)
 
 rad = Radon(image_size, angles, clip_to_circle=False, det_count=det_count)
 
-phant = np.copy(np.flipud(ph.shepp_logan(image_size)))
+phant = np.copy(np.flipud(ph.shepp_logan(image_size))).astype(float)
+
 phant_gpu = torch.FloatTensor(phant).to(device)
 sino_gpu = rad.forward(phant_gpu)/image_size
 backproj = rad.backward(sino_gpu)*np.pi/n_angles
 filtered_back = rad.backward(rad.filter_sinogram(sino_gpu))
 
 print('x :: Max :', phant_gpu.cpu().max(), 'Min', phant_gpu.cpu().min())
-print('Ax :: Max :', sino_gpu.cpu().max(), 'Min', phant_gpu.cpu().min())
+print('Ax :: Max :', sino_gpu.cpu().max(), 'Min', sino_gpu.cpu().min())
 print('ATAx :: Max', backproj.cpu().max(), 'Min', backproj.cpu().min())
 
 fig, ax = plt.subplots(1,3)

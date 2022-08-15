@@ -52,7 +52,7 @@ def k_folding_test(projection, augment_factor, total_size, train_factor, val_fac
         datasets = modutils.k_fold_list(datasets, k_fold_datasets)
         tensor_path = None
 
-        dataloaders = modutils.formDataloaders(datasets, projection, total_size, train_factor, val_factor, test_factor, batch_size, img_size, tensor_path, augment_factor, load_tensor = False, save_tensor = False, k_fold_datasets = k_fold_datasets)
+        dataloaders = dlutils.formDataloaders(datasets, projection, total_size, train_factor, val_factor, test_factor, batch_size, img_size, tensor_path, augment_factor, load_tensor = False, save_tensor = False, k_fold_datasets = k_fold_datasets)
         
         # Images from testing should be from the penultimate dataset of the list (considering k_fold_datasets == 2)
         test_image = (255.0*next(iter(dataloaders['test']['y'])).cpu().detach().numpy()[0, 0,...]).astype(int)
@@ -67,6 +67,6 @@ if __name__ == '__main__':
     folder_paths = [f140115_1dpf, f140315_3dpf, f140419_5dpf, f140714_5dpf, f140117_3dpf, f140114_5dpf]
     k_iters = 6
     
-    datasets = modutils.formRegDatasets(folder_paths, fish_parts = None)
+    datasets = dlutils.formRegDatasets(folder_paths, fish_parts = None)
 
     k_folding_test(projection, augment_factor, total_size, train_factor, val_factor, test_factor, batch_size, img_size, datasets, k_iters, k_fold_datasets = 2)

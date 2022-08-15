@@ -22,100 +22,145 @@ import torchvision
 import model_torch as modl
 import pickle
 from tqdm import tqdm
+from pytorch_msssim import SSIM
+from skimage.metrics import structural_similarity as ssim
+from pathlib import Path
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 folder_paths = [f140115_1dpf, f140315_3dpf, f140419_5dpf, f140714_5dpf, f140117_3dpf, f140114_5dpf] # Folders to be used
 
-proj_num = 720//np.arange(2,26,4)
+factors = np.arange(2,20,2)
+proj_num = 720//factors
 train_factor = 0.7
 val_factor = 0.2
 test_factor = 0.1 
 total_size= 5000                  
-batch_size= 5 
+batch_size = 5 
 img_size = 100
 augment_factor = 1
 train_infos = {}        
-nLayer = 8
+
+nLayer = 7
 lam = 0.05
 max_angle = 720
 K = 8
-epochs = 50
-lr = 5e-4
+epochs = 40
+lr = 1e-4
 
 shrink = 0.5
 test_loss_dict = {} 
 
-train_name_modl = 'Optimization_Projections_MODL_Test62'
-train_name_unet = 'Optimization_Projections_UNet_Test62'
+train_name_modl = 'Optimization_Projections_PSNR_MODL_Test62'
+train_name_SSIM = 'Optimization_Projections_SSIM_MODL_Test62'
+
+test_models = False
 
 for projection in proj_num:
-
+   
     tensor_path = datasets_folder+'Proj_{}_augmentFactor_{}_totalSize_{}_'.format(projection, augment_factor, total_size)
-
-    datasets = modutils.formRegDatasets(folder_paths, img_resize =img_size)
-    dataloaders = modutils.formDataloaders(datasets, proj_num, total_size, train_factor, val_factor, test_factor, batch_size, img_size, tensor_path, augment_factor, load_tensor = True, save_tensor = False)    
-
-    # Training MODL
-    model_MODL = modl.OPTmodl(nLayer, K, max_angle, projection, img_size, None, lam, results_folder, shared = True, unet_options = False)
-
-    loss_fn = torch.nn.MSELoss(reduction = 'sum')
-    loss_fbp_fn = torch.nn.MSELoss(reduction = 'sum')
-    loss_backproj_fn = torch.nn.MSELoss(reduction = 'sum')
-        
-    optimizer = torch.optim.Adam(model_MODL.parameters(), lr = lr)
-        
-    model_MODL, train_info = modutils.model_training(model_MODL, loss_fn, loss_backproj_fn, loss_fbp_fn, optimizer, dataloaders, device, results_folder+train_name_modl, num_epochs = epochs, disp = True, do_checkpoint = 0, title = train_name_modl, plot_title = True, compute_mse = False, monai = False)
-
-    train_infos[projection] = train_info
+    datasets = []
+    dataloaders = modutils.formDataloaders(datasets, projection, total_size, train_factor, val_factor, test_factor, batch_size, img_size, tensor_path, augment_factor, load_tensor = True, save_tensor = False)    
     
-    with open(results_folder+train_name_modl+'LossProjections_Proj{}_nlay{}_epochs{}_K{}_lam{}_trnSize{}.pkl'.format(projection, nLayer, epochs, K, lam, train_factor), 'wb') as f:
-    
-        pickle.dump(train_infos, f)
-        print('Diccionario salvado para proyección {}'.format(projection))
-    
-    modutils.save_net(model_folder+train_name_modl+'K_{}_lam_{}_nlay_{}_proj_{}'.format(K, lam, nLayer, projection), model_MODL)
-
-    # Training UNet
-    model_Unet = modl.UNet(1,1, residual = True, up_conv = True, batch_norm = True, batch_norm_inconv = True).to(device)
-    
-    loss_fn = torch.nn.L1Loss(reduction = 'mean')
-    loss_fbp_fn = torch.nn.L1Loss(reduction = 'mean')
-    loss_backproj_fn = torch.nn.L1Loss(reduction = 'mean')
+    model_MODL_path = Path(model_folder+train_name_modl+'K_{}_lam_{}_nlay_{}_proj_{}.pth'.format(K, lam, nLayer, projection))
+     
     loss_mse = torch.nn.MSELoss(reduction = 'sum')
     
-    optimizer_Unet = torch.optim.Adam(model_Unet.parameters(), lr = lr)
-    
-    model_Unet, train_info_Unet = modutils.model_training_unet(model_Unet, loss_fn, loss_fbp_fn, optimizer_Unet, dataloaders,  device, results_folder+train_name_unet, num_epochs = epochs, disp = True, monai = False)
+    if not model_MODL_path.is_file():
+        print('Training for MODL model with {} projections'.format(projection))
 
-    with open(results_folder+train_name_unet+'Train_UNet_lr{}_shrink{}.pkl'.format(lr, shrink), 'wb') as f:
-    
-        pickle.dump(train_info_Unet, f)
-        print('Diccionario salvado para proyección {}'.format(projection))
+        # Training MODL
+        model_MODL = modl.OPTmodl(nLayer, K, max_angle, projection, img_size, None, lam, results_folder, shared = True, unet_options = False)
 
-    modutils.save_net(model_folder+train_name_unet+'Model_Unet_lr{}_shrink{}'.format(lr, shrink), model_Unet)
+        loss_fn = torch.nn.MSELoss(reduction = 'sum')
+        loss_fbp_fn = torch.nn.MSELoss(reduction = 'sum')
+        loss_backproj_fn = torch.nn.MSELoss(reduction = 'sum') 
 
-    test_loss_modl = []
-    test_loss_fbp = []           
-    test_loss_unet = []
-
-    for inp, target, filt in tqdm(zip(dataloaders['test']['x'], dataloaders['test']['y'], dataloaders['test']['filtX'])): 
+        optimizer_MODL = torch.optim.Adam(model_MODL.parameters(), lr = lr)
         
-        pred_unet = model_Unet(inp)
-        pred_modl = model_MODL(inp)
+        model_MODL, train_info = modutils.model_training(model_MODL, loss_fn, loss_backproj_fn, loss_fbp_fn, optimizer_MODL, dataloaders, device, results_folder+train_name_modl, num_epochs = epochs, disp = True, do_checkpoint = 0, title = train_name_modl, plot_title = True, compute_mse = False, monai = False)
 
-        loss_modl = loss_mse(pred_modl['dc'+str(K)], target)
-        loss_fbp = loss_mse(filt, target)
-        loss_unet = loss_mse(pred_unet, target)
+        train_infos[projection] = train_info
+    
+        with open(results_folder+train_name_modl+'LossProjections_Proj{}_nlay{}_epochs{}_K{}_lam{}_trnSize{}.pkl'.format(projection, nLayer, epochs, K, lam, train_factor), 'wb') as f:
+    
+            pickle.dump(train_infos, f)
+            print('Diccionario salvado para proyección {}'.format(projection))
+    
+        modutils.save_net(model_folder+train_name_modl+'K_{}_lam_{}_nlay_{}_proj_{}'.format(K, lam, nLayer, projection), model_MODL)
+
+    else:
+        
+        model_MODL = modl.OPTmodl(nLayer, K, max_angle, projection, img_size, None, lam, results_folder, shared = True, unet_options = False)
+        modutils.load_net(model_folder+train_name_modl+'K_{}_lam_{}_nlay_{}_proj_{}'.format(K, lam, nLayer, projection), model_MODL, device)
+    
+    del model_MODL
+
+    model_SSIM_path = Path(model_folder+train_name_SSIM+'K_{}_lam_{}_nlay_{}_proj_{}.pth'.format(K, lam, nLayer, projection))
+    
+    if not model_SSIM_path.is_file():                                            
+         
+        print('Training for MODL model with {} projections'.format(projection))
+        loss_fn = SSIM(data_range = 1, size_average= True, channel = 1)
+        loss_fbp_fn = SSIM(data_range = 1, size_average= True, channel = 1)
+        loss_backproj_fn = SSIM(data_range = 1, size_average= True, channel = 1)
+
+        # Training with SSIM as loss function 
+        model_SSIM = modl.OPTmodl(nLayer, K, max_angle, projection, img_size, None, lam,  results_folder)
+        optimizer_SSIM = torch.optim.Adam(model_SSIM.parameters(), lr = lr) 
+        model_SSIM, train_info = modutils.model_training(model_SSIM, loss_fn, loss_backproj_fn, loss_fbp_fn, optimizer_SSIM, dataloaders, device, results_folder+train_name_SSIM, num_epochs = epochs, disp = True, do_checkpoint = 0, title = train_name_SSIM, plot_title = True, compute_ssim = True, compute_mse = True)
+
+        with open(results_folder+train_name_SSIM+'LossSSIM_nlay{}_epochs{}_K{}_lam{}_trnSize{}.pkl'.format(nLayer, epochs, K, lam, train_factor), 'wb') as f:
+
+            pickle.dump(train_info, f)
+            print('Diccionario salvado para proyección {}'.format(projection))
+
+        modutils.save_net(model_folder+train_name_SSIM+'K_{}_lam_{}_nlay_{}_proj_{}'.format(K, lam, nLayer, projection), model_SSIM)
+    
+    else:
+        
+        model_SSIM = modl.OPTmodl(nLayer, K, max_angle, projection, img_size, None, lam,  results_folder)
+        modutils.load_net(model_folder+train_name_SSIM+'K_{}_lam_{}_nlay_{}_proj_{}'.format(K, lam, nLayer, projection), model_SSIM, device)
+    
+    del model_SSIM
+    
+    if test_models == True:
+        mse_loss_modl = []
+        mse_loss_fbp = []
+        mse_loss_modlssim = []
+
+        ssim_loss_modl = []
+        ssim_loss_fbp = []
+        ssim_loss_modlssim = []
+
+        for inp, target, filt in tqdm(zip(dataloaders['test']['x'], dataloaders['test']['y'], dataloaders['test']['filtX'])): 
+        
+            pred_modl = model_MODL(inp)
+            pred_ssim = model_SSIM(inp)
+
+            loss_modl_MSE = loss_mse(pred_modl['dc'+str(K)], target)
+            loss_modlSSIM_MSE = loss_mse(pred_ssim['dc'+str(K)], target)
+            loss_fbp_MSE = loss_mse(filt, target)
                                                                  
-        test_loss_modl.append(modutils.psnr(img_size, loss_modl.item(), 1))
-        test_loss_fbp.append(modutils.psnr(img_size, loss_fbp.item(), 1))
-        test_loss_unet.append(modutils.psnr(img_size, loss_unet.item(), 1))
-
-    modutils.plot_outputs(target, pred_modl, results_folder+train_name_modl+'Test_images_proj{}_K{}.pdf'.format(projection, K))
-
-    test_loss_dict[projection] = {'loss_modl': test_loss_modl, 'loss_fbp': test_loss_fbp, 'loss_unet':test_loss_unet}
-
-    with open(results_folder+train_name_modl+'Projections_Proj{}_nLay{}_K{}_lam{}_trnSize{}.pkl'.format(projection, nLayer, K, lam, train_factor), 'wb') as f:
+            mse_loss_modl.append(modutils.psnr(img_size, loss_modl_MSE.item(), 1))
+            mse_loss_fbp.append(modutils.psnr(img_size, loss_fbp_MSE.item(), 1))
+            mse_loss_modlssim.append(modutils.psnr(img_size, loss_modlSSIM_MSE.item(), 1))
         
-        pickle.dump(test_loss_dict, f)
-        print('Diccionario salvado para proyección {}'.format(projection))
+            loss_modl_SSIM = ssim(pred_modl['dc'+str(K)].detach().cpu().numpy()[0,0,...], target.detach().cpu().numpy()[0,0,...])
+            loss_modlSSIM_SSIM = ssim(pred_ssim['dc'+str(K)].detach().cpu().numpy()[0,0,...], target.detach().cpu().numpy()[0,0,...])
+            loss_fbp_SSIM = ssim(filt.detach().cpu().numpy()[0,0,...], target.detach().cpu().numpy()[0,0,...])                               
+
+            ssim_loss_modl.append(loss_modl_SSIM)
+            ssim_loss_fbp.append(loss_modlSSIM_MSE)
+            ssim_loss_modlssim.append(loss_fbp_SSIM)
+
+        modutils.plot_outputs(target, pred_modl, results_folder+train_name_modl+'Test_images_proj{}_K{}.pdf'.format(projection, K))
+
+        test_loss_dict[projection] = {'mse_modl': mse_loss_modl, 'mse_modlssim':mse_loss_modlssim, 'mse_fbp': mse_loss_fbp, 'ssim_modl':ssim_loss_modl, 'ssim_modlssim':ssim_loss_modlssim, 'ssim_fbp':ssim_loss_fbp}
+
+        with open(results_folder+train_name_modl+'Projections_Proj{}_nLay{}_K{}_lam{}_trnSize{}.pkl'.format(projection, nLayer, K, lam, train_factor), 'wb') as f:
+        
+            pickle.dump(test_loss_dict, f)
+            print('Diccionario salvado para proyección {}'.format(projection))
+    
+
+

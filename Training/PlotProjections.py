@@ -44,58 +44,34 @@ max_angle = 720
 lr = 0.001
 proj_num = 45
 
-train_name = 'Optimization_Projections_MoDL_Test60_'
-train_name_Unet = 'Optimization_Projections_UnetResidual_Test61_'
+train_name_modl = 'Optimization_Projections_PSNR_MODL_Test62'
 
-with open(results_folder+train_name+'Unique_Proj{}_nLay{}_epochs{}_K{}_lam{}_trnSize{}.pkl'.format(proj_num, nLayer, epochs, K, lam, train_factor), 'rb') as f:
+with open(results_folder+train_name_modl+'Projections_SSIM_PSNR.pkl', 'rb') as f:
         
     test_loss_dict = pickle.load(f)
-    print('Diccionario salvado para proyección {}'.format(proj_num))
 
-epochs = 50
-proj_num = 36
+fig, ax= plt.subplots(1,2, figsize = (12,6))
+col = ['red', 'blue', 'green']
 
-with open(results_folder+train_name+'Unique_Proj{}_nLay{}_epochs{}_K{}_lam{}_trnSize{}.pkl'.format(proj_num, nLayer, epochs, K, lam, train_factor), 'rb') as f:
+for proj, losses in test_loss_dict.items():
+    
+    for i, (loss_key, val_loss) in enumerate(losses.items()):
         
-    test_loss_dict_extra = pickle.load(f)
-    print('Diccionario salvado para proyección {}'.format(proj_num))
-
-
-fig, ax_proj = plt.subplots(1,1, figsize = (8,6))
-
-for i, (key_proj, projection_dict) in enumerate(test_loss_dict.items()):
-     
-    if i == 1:
-     
-        label_fbp = 'FBP'
-        label_modl = 'MoDL'
-        label_unet = 'U-Net'
+        val_loss = np.array(val_loss)
+        if 'mse' in loss_key:
+            
+            ax[0].scatter(max_angle//int(proj), val_loss.mean(), c = col[i], label = loss_key)
         
-    elif i==0:
-        continue
-   
-    else:
-        
-        label_fbp = label_modl = label_unet = '_nolegend_'
-
-    ax_proj.scatter(720//int(key_proj), np.array(projection_dict['loss_net_modl']).mean(), label = label_modl, color = 'blue')
-    ax_proj.scatter(720//int(key_proj), np.array(projection_dict['loss_fbp']).mean(), label = label_fbp, color = 'red')
-    ax_proj.scatter(720//int(key_proj), np.array(projection_dict['loss_net_unet']).mean(), label = label_unet, color = 'green')
+        else:
+            ax[1].scatter(max_angle//int(proj), val_loss.mean(), c = col[i//2], label = loss_key)
 
 
-for i, (key_proj, projection_dict) in enumerate(test_loss_dict_extra.items()):
+ax[0].set_xlabel('Acceleration factor')
+ax[1].set_xlabel('Acceleration factor')
 
-    if key_proj < 45:
+ax[0].set_ylabel('PSNR in testing images')
+ax[1].set_ylabel('SSIM in testing images')
+ax[0].legend()
+ax[0].grid(True)
 
-        label_fbp = label_modl = label_unet = '_nolegend_'
-                                                                                                                             
-        ax_proj.scatter(720//int(key_proj), np.array(projection_dict['loss_net_modl']).mean(), label = label_modl, color = 'blue')
-        ax_proj.scatter(720//int(key_proj), np.array(projection_dict['loss_fbp']).mean(), label = label_fbp, color = 'red')
-        ax_proj.scatter(720//int(key_proj), np.array(projection_dict['loss_net_unet']).mean(), label = label_unet, color = 'green')
-
-ax_proj.set_xlabel('Acceleration factor')
-ax_proj.set_ylabel('PSNR in testing images')
-ax_proj.legend()
-ax_proj.grid(True)
-
-fig.savefig(results_folder+'Projections_Comparison.pdf', bbox_inches = 'tight')
+fig.savefig(results_folder+'Projections_Comparison_SSIM_PSNR.pdf', bbox_inches = 'tight')

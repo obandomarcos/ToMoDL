@@ -8,7 +8,7 @@ Testing for data loading
 import os
 import os,time, sys
 prefix_local = '/home/obanmarcos/Balseiro/Maestría/Proyecto/Implementación/'
-os.chdir(prefix_local+'DeepOPT/')
+os.chdir('/home/marcos/DeepOPT/')
 sys.path.append('Utilities/')
 sys.path.append('OPTmodl/')
 
@@ -17,10 +17,10 @@ import random
 import matplotlib.pyplot as plt
 import pandas as pd
 
-%load_ext autoreload
-%autoreload 2
-%aimport DataLoading
-DL = DataLoading 
+#%load_ext autoreload
+#%autoreload 2
+import DataLoading as DL
+#DL = DataLoading 
 
 import torch
 from torch_radon import Radon, RadonFanbeam
@@ -47,7 +47,7 @@ shifts = df.correctRotationAxis(sample = 'lower tail', max_shift = 200, shift_st
 #%%
 df._grabImageIndexes()
 #%%
-plt.plot(df.shifts)
+#plt.plot(df.shifts)
 #%% Grab non-empty image
 df.imageVolume = (df.imageVolume-df.imageVolume.min())/(df.imageVolume.max()-df.imageVolume.min())
 #%% para buscar el threshold, busco las lineas con varianza no nula
@@ -79,7 +79,7 @@ plt.imshow(image_prueba)
 img_min = df.imageVolume.min(axis = 0)
 img_test = (((img_min-img_min.min())/(img_min.max()-img_min.min()))*255.0).astype(np.uint8)
 img_test = ndi.gaussian_filter(img_test,(11,11))
-threshold = 50
+threshold = 0.5
 
 fig, ax = plt.subplots(1,2, figsize = (16,8))
 ax[0].imshow(img_min)
@@ -92,7 +92,7 @@ ax[1].set_axis_off()
 # ax[2].axhline(threshold)
 # ax[2].set_aspect('auto')
 
-print(np.where(img_test.std(axis = 0)>threshold)[0][0],np.where(img_test.std(axis = 0)>threshold)[0][-1] )
+#print(np.where(img_test.std(axis = 0)>threshold)[0][0],np.where(img_test.std(axis = 0)>threshold)[0][-1] )
 fig.savefig(results_folder+'EdgeIdentification.png')
 
 #%%
@@ -193,21 +193,13 @@ fig.savefig(results_folder+'Test49_TopBottomRotationAxis.pdf', bbox_inches = 'ti
 #%%
 max_shift_bottom = shifts[np.argmax(top_image_std)]
 
-
 #%%
 
-def 
-
-
-
-
-#%%
-
-for image in images:
+for i, image in enumerate(images):
 
     fig, ax = plt.subplots(1,2, figsize = (8, 8))
 
-    ax[0].imshow(image[1])
+    ax[0].imshow(image[1], cmap = 'gray')
     ax[0].axis('off')
     # ax[0].text(0, 400, shift)
     
@@ -217,13 +209,14 @@ for image in images:
     ax[1].set_ylabel('Intensity variance')
     asp = np.diff(ax[1].get_xlim())[0] / np.diff(ax[1].get_ylim())[0]
     ax[1].set_aspect(asp)
-    ax[1].set_title('Dataset {}, {}'.format('f140114_5dpf',sample))
+    
+    #ax[1].set_title('Dataset {}, {}'.format('f140114_5dpf',sample))
 
-    fig.savefig(results_folder+'CorrectAxisTest/'+str(image[0])+'.png', bbox_inches = 'tight')
+    fig.savefig(results_folder+'CorrectAxisTest/'+str(image[0])+'.pdf', bbox_inches = 'tight')
 
 
 #%%
-filenames = [results_folder+'CorrectAxisTest/'+str(image[0])+'.png' for image in images]
+filenames = [results_folder+'CorrectAxisTest/'+str(image[0])+'.pdf' for image in images]
 
 images_list = []
 for filename in filenames:

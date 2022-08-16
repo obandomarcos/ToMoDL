@@ -56,11 +56,19 @@ class MoDLReconstructor(pl.LightningModule):
         unfiltered_us_rec, filtered_us_rec, filtered_fs_rec = batch
         
         modl_rec = self.model(unfiltered_us_rec)
-        loss = self.loss_dict['loss_name'](modl_rec['dc'+str(self.model.K)], filtered_fs_rec)
+        psnr_loss = self.loss_dict['psnr_loss'](modl_rec['dc'+str(self.model.K)], filtered_fs_rec)
+        ssim_loss = self.loss_dict['ssim_loss'](modl_rec['dc'+str(self.model.K)], filtered_fs_rec)
 
-        self.log("train/loss", loss)
+        self.log("train/psnr", self.psnr(psnr_loss))
+        self.log("train/ssim", ssim_loss)
+
+        if self.loss_dict['loss_name'] == 'psnr':
+            
+            return psnr_loss
         
-        return loss
+        elif self.loss_dict['loss_name'] == 'ssim':
+            
+            return ssim_loss
     
     def validation_step(self, batch, batch_idx):
 
@@ -74,9 +82,19 @@ class MoDLReconstructor(pl.LightningModule):
         unfiltered_us_rec, filtered_us_rec, filtered_fs_rec = batch
         
         modl_rec = self.model(unfiltered_us_rec)
-        test_loss = self.loss_dict['loss_name'](modl_rec['dc'+str(self.model.K)], filtered_fs_rec)
+        psnr_loss = self.loss_dict['psnr_loss'](modl_rec['dc'+str(self.model.K)], filtered_fs_rec)
+        ssim_loss = self.loss_dict['ssim_loss'](modl_rec['dc'+str(self.model.K)], filtered_fs_rec)
+        
+        self.log("val/psnr", self.psnr(psnr_loss))
+        self.log("val/ssim", ssim_loss)
 
-        self.log("val/loss", test_loss)
+        if self.loss_dict['loss_name'] == 'psnr':
+            
+            return psnr_loss
+        
+        elif self.loss_dict['loss_name'] == 'ssim':
+            
+            return ssim_loss
 
     def test_step(self, batch, batch_idx):
 
@@ -90,9 +108,19 @@ class MoDLReconstructor(pl.LightningModule):
         unfiltered_us_rec, filtered_us_rec, filtered_fs_rec = batch
         
         modl_rec = self.model(unfiltered_us_rec)
-        test_loss = self.loss_dict['loss_name'](modl_rec['dc'+str(self.model.K)], filtered_fs_rec)
+        psnr_loss = self.loss_dict['psnr_loss'](modl_rec['dc'+str(self.model.K)], filtered_fs_rec)
+        ssim_loss = self.loss_dict['ssim_loss'](modl_rec['dc'+str(self.model.K)], filtered_fs_rec)
+        
+        self.log("test/psnr", self.psnr(psnr_loss).item())
+        self.log("test/ssim", ssim_loss.item())
 
-        self.log("test/loss", test_loss)
+        if self.loss_dict['loss_name'] == 'psnr':
+            
+            return psnr_loss
+        
+        elif self.loss_dict['loss_name'] == 'ssim':
+            
+            return ssim_loss
     
     def configure_optimizers(self):
         '''
@@ -116,6 +144,14 @@ class MoDLReconstructor(pl.LightningModule):
         self.hparams['loss_dict'] = self.loss_dict
         self.hparams['kw_dictionary_modl'] = self.kw_dictionary_modl
         self.hparams['optimizer_dict'] = self.optimizer_dict
+    
+    @staticmethod
+    def psnr(mse):
+        '''
+        Calculates PSNR respect to MSE mean value
+        '''
+
+        return 10*np.log10(1.0/mse.cpu().detach().numpy())
 
 
 

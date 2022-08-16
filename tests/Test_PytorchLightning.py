@@ -111,8 +111,10 @@ def test_pytorch_training(testing_options):
                                    log_model= True) 
 
     # Callbacks
-    train_checkpoint_callback = ModelCheckpoint(monitor='train/loss', mode='max')
-    val_checkpoint_callback = ModelCheckpoint(monitor='val/loss', mode='max')
+    train_psnr_checkpoint_callback = ModelCheckpoint(monitor='train/psnr', mode='max')
+    train_ssim_checkpoint_callback = ModelCheckpoint(monitor='train/ssim', mode='max')
+    val_psnr_checkpoint_callback = ModelCheckpoint(monitor='val/psnr', mode='max')
+    val_ssim_checkpoint_callback = ModelCheckpoint(monitor='val/ssim', mode='max')
 
     # Trainer parameters
     trainer_dict = {'max_epochs': 10,
@@ -121,8 +123,10 @@ def test_pytorch_training(testing_options):
                     'devices' : 1,
                     'default_root_dir': model_folder,
                     'logger':wandb_logger,
-                    'callbacks' : [train_checkpoint_callback,
-                                    val_checkpoint_callback]}
+                    'callbacks' : [train_psnr_checkpoint_callback,
+                                   train_ssim_checkpoint_callback,
+                                   val_psnr_checkpoint_callback,
+                                   val_ssim_checkpoint_callback]}
 
     # 1 - Check training with Pytorch Lightning
     if 'check_pytorch_lightning_training' in testing_options:

@@ -20,9 +20,11 @@ import SimpleITK as sitk
 from torch_radon import Radon, RadonFanbeam
 from skimage.transform import radon, iradon
 import pickle
+from pathlib import Path
 import h5py
 import cv2
 import scipy.ndimage as ndi
+from torch.utils.data import Dataset
 
 # Modify for multi-gpu
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -33,21 +35,47 @@ class ZebraDataset:
   Params:
     - folder_path (string): full path folder 
   '''
-  def __init__(self, folder_path, dataset_folder, experiment_name):
+  def __init__(self, kw_dictionary):
     '''
     Initialises Zebrafish dataset according to Bassi format.
     Folder
     '''
 
-    self.folder_path = pathlib.Path(folder_path)
-    self.folder_name = pathlib.PurePath(self.folder_path).name
+    self.process_kwdictionary(kw_dictionary)    
+  
+  def process_kwdictionary(self, kw_dictionary): 
+    '''
+    Load keyword arguments for dataloader
+    Params:
+     - kw_dictionary (dict): Dictionary containing keywords
+    '''
 
+    self.folder_path = pathlib.Path(kw_dictionary.pop('folder_path'))
+    self.folder_name = pathlib.PurePath(self.folder_path).name
+    
     self.objective = 10
-    self.dataset_folder = dataset_folder
-    self.experiment_name = experiment_name
+    self.dataset_folder = kw_dictionary.pop('dataset_folder')
+    self.experiment_name =kw_dictionary.pop('experiment_name')
+
     self.image_volume = {}
     self.registered_volume = {}
-    self.shifts_path = self.folder_path 
+    self.shifts_path = self.folder_path
+
+    self.img_resize = kw_dictionary.pop('img_resize')
+    self.det_count = int((self.img_resize+0.5)*np.sqrt(2))
+    
+    self.load_shifts = kw_dictionary.pop('load_shifts')
+    self.save_shifts = kw_dictionary.pop('save_shifts')
+
+    # Define number of angles and radon transform to undersample  
+    self.number_projections_total = kw_dictionary.pop('number_projections_total')
+    self.number_projections_undersampled = kw_dictionary.pop('number_projections_undersampled')
+    self.acceleration_factor = self.number_projections_total//self.number_projections_undersampled
+
+    self._create_radon()
+
+    self.sampling_method = kw_dictionary.pop('sampling_method')
+    
 
     if '4X' in self.folder_name:
 
@@ -82,7 +110,9 @@ class ZebraDataset:
           
           self.fish_parts_available.append(fish_part_key)
           break
-      
+
+    return 
+
   def _search_all_files(self, x):
     '''
     Searches all files corresponding to images of the dataset
@@ -159,14 +189,14 @@ class ZebraDataset:
 
       del self.dataset, self.registered_dataset
   
-  def correct_rotation_axis(self,  max_shift = 200, shift_step = 4, center_shift_top = 0, center_shift_bottom = 0, sample = 'head', load_shifts = False, save_shifts = True):
+  def correct_rotation_axis(self,  max_shift = 200, shift_step = 4, center_shift_top = 0, center_shift_bottom = 0, sample = 'head'):
     '''
     Corrects rotation axis by finding optimal registration via maximising reconstructed image's intensity variance.
 
     Based on 'Walls, J. R., Sled, J. G., Sharpe, J., & Henkelman, R. M. (2005). Correction of artefacts in optical projection tomography. Physics in Medicine & Biology, 50(19), 4645.'
     '''
     
-    if load_shifts == True:
+    if self.load_shifts == True:
       
       with open(str(self.shifts_path)+"_{}".format(sample)+".pickle", 'rb') as f:
         
@@ -190,16 +220,16 @@ class ZebraDataset:
       b = top_shift_max-m*top_index
       self.shifts[sample] = (m*np.arange(0, self.registered_volume[sample].shape[2]-1)+b).astype(int)
 
-    if save_shifts == True:
+    if self.save_shifts == True:
       
       with open(str(self.shifts_path)+"_{}".format(sample)+".pickle", 'wb') as f:
 
         pickle.dump(self.shifts, f)
 
     # Create Registered volume[sample] with the shifts
-    self._registerVolume(sample)
+    self.register_volume(sample)
 
-  def _registerVolume(self, sample):
+  def register_volume(self, sample):
     """
     Register volume with interpolated shifts.
     Params:
@@ -208,23 +238,108 @@ class ZebraDataset:
     assert(self.shifts is not None)
 
     # Shift according to shifts
-    for idx, shift in enumerate(self.shifts[sample]):
+    for idx, shift in enumerate(tqdm(self.shifts[sample], 'Registering in progress')):
       
       self.registered_volume[sample][:,:,idx] = ndi.shift(self.registered_volume[sample][:,:,idx], (0, shift), mode = 'nearest')
 
-  def dataset_resize(self, sample, img_resize, number_projections):
+  def dataset_resize(self, sample):
     '''
     Resizes sinograms according to reconstruction image size
     '''
+    
+    print('Resizing in progress...')
     # Move axis to (N_projections, n_detector, n_slices)
     self.registered_volume[sample] = np.rollaxis(self.registered_volume[sample], 2)
     # Resize projection number % 16
-
-    det_count = int((img_resize+0.5)*np.sqrt(2))
   
-    self.registered_volume[sample] = np.array([cv2.resize(img, (det_count, number_projections)) for img in self.registered_volume[sample]])
+    self.registered_volume[sample] = np.array([cv2.resize(img, (self.det_count, self.number_projections_total)) for img in self.registered_volume[sample]])
+    print('Finished')
     
     self.registered_volume[sample] = np.moveaxis(self.registered_volume[sample], 0,-1)
+
+  def write_dataset_reconstruction(self, sample):
+    '''
+    Mask datasets in order to undersample sinograms, obtaining undersampled and full_y reconstruction datasets for training. Then saves images in folder 
+    Params:
+        - full_sinogram (ndarray): full_y sampled sinogram, with size (n_projections, detector_number, z-slices)
+        - num_beams (int): Number of beams to undersample the dataset. The function builds an masking array clamping to zero the values
+        that are not sampled in the sinogram.
+        - dataset_size (int): number to slices to take from the original sinogram's volume 
+        - img_size (int): Size of reconstructed images, in pixels.
+        - rand_angle (int): Starting angle to subsample evenly spaced
+    '''    
+    # Create dataset folder and subfolders for acceleration folders
+    reconstructed_dataset_folder = self.dataset_folder+'/'+self.folder_name+'_'+sample+'_'+str(self.acceleration_factor)+'/'
+    
+    Path(reconstructed_dataset_folder).mkdir(parents=True, exist_ok=True)
+
+    us_unfiltered_dataset_folder = reconstructed_dataset_folder+'us_{}_unfiltered/'.format(self.acceleration_factor)
+    fs_filtered_dataset_folder = reconstructed_dataset_folder+'fs_filtered/'
+    us_filtered_dataset_folder = reconstructed_dataset_folder+'us_{}_filtered/'.format(self.acceleration_factor)
+
+    Path(us_unfiltered_dataset_folder).mkdir(parents=True, exist_ok=True)
+    Path(fs_filtered_dataset_folder).mkdir(parents=True, exist_ok=True)
+    Path(us_filtered_dataset_folder).mkdir(parents=True, exist_ok=True)
+
+    write_us_unfiltered = os.path.isdir(us_unfiltered_dataset_folder)
+    write_fs_filtered = os.path.isdir(fs_filtered_dataset_folder)
+    write_us_filtered = os.path.isdir(us_filtered_dataset_folder)
+    
+    # Grab full sinogram
+    full_sinogram = self.registered_volume[sample].astype(float)
+
+    # Using boolean mask, keep values sampled and clamp to zero others
+    # Masking dataset has to be on its own
+    print('Masking with {} method'.format(self.sampling_method))
+    undersampled_sinograms = self.subsample_sinogram(full_sinogram, self.sampling_method)
+    
+    # Grab random slices and roll axis so to sample slices
+    undersampled_sinograms = torch.FloatTensor(np.rollaxis(undersampled_sinograms, 2)).to(device)
+    full_sinogram = torch.FloatTensor(np.rollaxis(full_sinogram, 2)).to(device)
+    
+    # Inputs
+    for sinogram_slice, (us_sinogram, full_sinogram) in tqdm(enumerate(zip(undersampled_sinograms, full_sinogram))):
+        
+        sinogram_slice = str(sinogram_slice)
+        if write_us_filtered == True:
+          print('Slice {sinogram_slice} escrita\n')
+          # Undersampled filtered reconstructed image path
+          us_filtered_img_path = us_filtered_dataset_folder+sinogram_slice+'.jpg'
+          
+          # Normalization of input sinogram - Undersampled
+          us_filtered_img = self.radon.backward(self.radon.filter_sinogram(us_sinogram))
+          us_filtered_img = self.normalize_image(us_filtered_img)
+          
+          # Write undersampled filtered
+          thumbs =cv2.imwrite(us_filtered_img_path, 255.0*us_filtered_img.cpu().detach().numpy())
+          print(thumbs)
+        
+        if write_us_unfiltered == True: 
+          print('Slice {sinogram_slice} escrita\n') 
+          # Undersampled unfiltered reconstructed image path
+          us_unfiltered_img_path = us_unfiltered_dataset_folder+sinogram_slice+'.jpg'
+
+          # Normalize 0-1 under sampled sinogram
+          us_sinogram = self.normalize_image(us_sinogram)
+
+          us_unfiltered_img = self.radon.backward(us_sinogram)*np.pi/self.number_projections_undersampled
+          us_unfiltered_img = self.normalize_image(us_unfiltered_img)
+
+          # Write undersampled filtered
+          thumbs = cv2.imwrite(us_unfiltered_img_path,255.0*us_filtered_img.cpu().detach().numpy())
+          print(thumbs)
+        
+        if write_fs_filtered == True:
+          
+          print('Slice {sinogram_slice} escrita\n')
+          # Fully sampled filtered reconstructed image path
+          fs_filtered_img_path = fs_filtered_dataset_folder+sinogram_slice+'.jpg'
+          # Normalization of output sinogram - Fully sampled
+          fs_filtered_img = self.radon.backward(self.radon.filter_sinogram(full_sinogram))
+          fs_filtered_img = self.normalize_image(fs_filtered_img)
+          # Write fully sampled filtered
+          thumbs = cv2.imwrite(fs_filtered_img_path, 255.0*fs_filtered_img.cpu().detach().numpy())
+          print(thumbs)
 
   def _grab_image_indexes(self, threshold = 50):
     """
@@ -277,120 +392,60 @@ class ZebraDataset:
 
     return self.fish_parts_available
   
-  def get_registered_volume(self, sample ,saveDataset = True, margin = 10, useSegmented = False):
-    '''
-    Returns registered and stacked numpy volume, ordered by angle
-    Calculates lower and upper non-zero limits for sinograms, with a safety
-    margin given by margin.
-    '''
-    assert(self.registered_dataset is not None)
-
-    # Filter by sample
-    self.registered_volume = np.stack(self.registered_dataset[self.registered_dataset.Sample == sample]['Image'].to_numpy())
-    self.registeredAngles = np.stack(self.registered_dataset[self.registered_dataset.Sample == sample]['Angle'].to_numpy())
-    
-    # Calculates non-zero boundary limit for segmenting the volume
-    self.upperLimit = self.registered_volume.shape[1]-margin
-    self.lowerLimit = margin
-    
-    # save dataset in Hdataset5
-    if saveDataset == True:
-      
-      with h5py.File(self.dataset_folder+'/'+'OPTdatasets.hdataset5', 'a') as datasets_file:
-        
-        # If experiment isn't in the current folder, creates experiment
-        if self.experiment_name not in datasets_file.keys():
-
-          datasets_file.create_group(self.experiment_name)
-        
-        # Creates experiment specifics 
-        if self.folder_name not in datasets_file[self.experiment_name]:
-
-          datasets_file[self.experiment_name].create_group(self.folder_name)
-        
-        datasets_file[self.experiment_name][self.folder_name].create_dataset(sample, data = self.registered_volume)
-        datasets_file[self.experiment_name][self.folder_name].create_dataset(sample+'_angles', data = self.registeredAngles)
-    
-    # Normalize volume
-    if useSegmented == True:
-  
-      return self.registered_volume[:, self.lowerLimit:self.upperLimit, :]
-    
-    else:
-    
-      return self.registered_volume
-  
-  def save_reg_transforms(self):
-    
-    with open(str(self.folder_path)+'transform.pickle', 'wb') as h:
-      pickle.dump(self.Tparams,  h)
-
-  def load_reg_transforms(self):
-
-    with open(str(self.folder_path)+'transform.pickle', 'rb') as h:
-      self.Tparams = pickle.load(h)
-    # save mean displacement for operations
-    self.meanDisplacement = self.Tparams['Ty'].mean()
-  
-  def save_registered_dataset(self, name = '', mode = 'hdataset5'):
-    '''
-    Saves registered dataset for DL usage (Hdataset5) or just pickle for binary storage
-    params :
-    '''
-
-    if mode == 'pickle':
-
-      with open(str(self.folder_path)+name+'.pickle', 'wb') as pickleFile:
-      
-        pickle.dump({'reg_dataset' : self.registered_dataset,
-                    'reg_transform' : self.Tparams}, pickleFile)
-
-    elif mode == 'hdataset5':
-      
-      with pd.HdatasetStore(self.dataset_folder+'/'+'OPTdatasets.hdataset5', 'a') as datasets_file:
-        # Take each sample and creates a new dataset
-        for sample in self.registered_dataset.Sample.unique():
-            
-            # Using Pandas built-in Hdataset5 converter save images
-          datasets_file.put(key = self.experiment_name+'/'+self.folder_name+'/'+sample,
-                            value = self.registered_dataset[self.registered_dataset.Sample == sample],
-                            data_columns = True)
-            
-  def load_registered_dataset(self):
-
-    with open(str(self.folder_path)+pickleName+'.pickle', 'rb') as pickleFile:
-      
-      reg = pickle.load(pickleFile)
-      self.registered_dataset = reg['reg_dataset']
-      self.Tparams = reg['reg_transform']
-
-  def delete_section(self, sample):
-
-    self.registered_dataset = self.registered_dataset.drop(self.registered_dataset[self.registered_dataset.Sample == sample].index)
-
   def delete_registered_volume(self, sample):
     
     del self.registered_volume[sample]
   
+  def subsample_sinogram(self, sinogram, method = 'equispaced-linear'):
+    '''
+    Subsamples sinogram by masking images with zeros with a particular method.
+    Params: 
+      sinogram (ndarray): sinogram to mask with defined method
+      method (string): Sampling meethod to mask sinogram
+        Avalaible methods:
+          * linear-equispaced: from a random angle seed, samples equispaced the angular space.
+    '''
+
+    # Seed angle for data augmentation
+    if method == 'equispaced-linear':
+      
+      undersampled_sinogram = np.copy(sinogram)
+      rand_angle = np.random.randint(0, self.number_projections_total)
+
+      # Zeros Masking
+      zeros_idx = np.linspace(0, self.number_projections_total, self.number_projections_undersampled, endpoint = False).astype(int)
+      zeros_idx = (zeros_idx+rand_angle)%self.number_projections_total
+      zeros_mask = np.full(self.number_projections_total, True, dtype = bool)
+      zeros_mask[zeros_idx] = False
+      undersampled_sinogram[zeros_mask, :, :] = 0
+    
+    return undersampled_sinogram
+  
   @staticmethod
-  def _normalize_image(img):
+  def normalize_image(img):
     '''
     Normalizes images between 0 and 1.
     Params: 
       - img (ndarray): Image to normalize
     '''
-    img = (img-img.max())/(img.max()-img.min())
+    img = (img-img.min())/(img.max()-img.min())
 
     return img
+  
+  def _create_radon(self):
+    '''
+    Creates Torch-Radon method for the desired sampling and image size of the dataloader
+    '''
+    # Grab number of angles
+    self.angles = np.linspace(0, 2*np.pi, self.number_projections_total, endpoint = False)
+    
+    self.radon = Radon(self.img_resize, self.angles, clip_to_circle = False, det_count = self.det_count)
 
 # Multi-dataset to dataloader
 class ZebraDataloader:
   '''
   List of tasks:
-    1 - Load ZebraDatasets
-    2 - Reshape
-    3 - Register and correct artifacts
-    4 - Create torch.Dataset
+    1 - Load ZebraDatasets (all reconstructed)
     5 - Load Dataloader
   
   '''
@@ -406,12 +461,12 @@ class ZebraDataloader:
     self.zebra_datasets = {}
     self.datasets_registered = []
 
-    self.__process_dataloader_kwdict(kw_dictionary)
+    self.process_kwdictionary(kw_dictionary)
     
     for dataset_num, folder_path in enumerate(self.folder_paths):                                     
        
       # Loads dataset registered
-      self.zebra_datasets[folder_path] = ZebraDataset(folder_path, 'Datasets', experiment_name)
+      self.zebra_datasets[folder_path] = ZebraDataset(self.kw_dictionary_dataset)
   
   def __getitem__(self, folder_path):
       
@@ -420,7 +475,7 @@ class ZebraDataloader:
 
     return self.zebra_datasets[folder_path]
 
-  def __process_dataloader_kwdict(self, kw_dictionary):
+  def process_kwdictionary(self, kw_dictionary):
     '''
     Load keyword arguments for dataloader
     Params:
@@ -428,29 +483,17 @@ class ZebraDataloader:
     '''
 
     self.folder_paths = kw_dictionary.pop('folder_paths')
-    self.img_resize = kw_dictionary.pop('img_resize')
-    self.det_count = int((self.img_resize+0.5)*np.sqrt(2))
+
     self.total_size = kw_dictionary.pop('total_size')
-    self.tensor_path = kw_dictionary.pop('tensor_path')
+
     self.train_factor = kw_dictionary.pop('train_factor')
     self.val_factor = kw_dictionary.pop('val_factor')
     self.test_factor = kw_dictionary.pop('test_factor')
     self.augment_factor = kw_dictionary.pop('augment_factor')
-    self.load_shifts = kw_dictionary.pop('load_shifts')
-    self.save_shifts = kw_dictionary.pop('save_shifts')
-    self.load_tensor = kw_dictionary.pop('load_tensor')
-    self.save_tensor = kw_dictionary.pop('save_tensor')
+    
     self.use_rand = kw_dictionary.pop('use_rand')
     self.k_fold_datasets = kw_dictionary.pop('k_fold_datasets')
 
-    # Define number of angles and radon transform to undersample  
-    self.number_projections_total = kw_dictionary.pop('number_projections_total')
-    self.number_projections_undersampled = kw_dictionary.pop('number_projections_undersampled')
-    self.acceleration_factor = self.number_projections_total//self.number_projections_undersampled
-
-    self._create_radon()
-
-    self.sampling_method = kw_dictionary.pop('sampling_method')
     self.batch_size = kw_dictionary.pop('batch_size')
 
   def register_datasets(self):
@@ -484,18 +527,20 @@ class ZebraDataloader:
             else:
 
                 # Load corresponding registrations
-                dataset.correct_rotation_axis(sample = sample, max_shift = 200, shift_step = 1, load_shifts = self.load_shifts, save_shifts = self.save_shifts)
+                dataset.correct_rotation_axis(sample = sample, max_shift = 200, shift_step = 1)
                 
                 # Append volumes        
                 print("Dataset {}/{} loaded - {} {}".format(dataset_num+1, len(self.folder_paths), str(dataset.folder_name), sample))
                 
                 # Resize registered volume to desired
-                dataset.dataset_resize(sample, self.img_resize, self.number_projections_total)
+                dataset.dataset_resize(sample)
+
+                dataset.dataset_reconstruction()
 
                 with open(registered_dataset_path, 'wb') as f:
                     
-                    print(dataset.registered_volume[sample].shape)
-                    pickle.dump(dataset.registered_volume[sample], f)
+                  for image in dataset.registered_volume[sample]: 
+                    
                     self.datasets_registered.append(registered_dataset_path)
                 
                 # Save memory deleting sample volume
@@ -507,7 +552,6 @@ class ZebraDataloader:
     Params: 
       - dataset_path (string)
     '''
-              
     with open(str(dataset_path), 'rb') as f:
                     
         datasets_reg = pickle.load(f)
@@ -623,103 +667,15 @@ class ZebraDataloader:
                                       batch_size=self.batch_size,
                                       shuffle=False, 
                                       num_workers=0)
-    
+
+    # Form Datasets with folders
+
+
+
     # Dictionary reshape
     self.dataloaders = {'train':train_dataloader,        
                         'val': val_dataloader,
                         'test':test_dataloader}
-
-  def mask_datasets(self, full_sinograms, dataset_size):
-    '''
-    Mask datasets in order to undersample sinograms, obtaining undersampled and full_y reconstruction datasets for training.
-    Params:
-        - full_sinograms (ndarray): full_y sampled volume of sinograms, with size (n_projections, detector_number, z-slices)
-        - num_beams (int): Number of beams to undersample the dataset. The function builds an masking array clamping to zero the values
-        that are not sampled in the sinogram.
-        - dataset_size (int): number to slices to take from the original sinogram's volume 
-        - img_size (int): Size of reconstructed images, in pixels.
-        - rand_angle (int): Starting angle to subsample evenly spaced
-    '''    
-    
-    # List for tensor formation (this is pretty memory intensive)
-    undersampled = []
-    undersampled_filtered = []
-    desired = []
-
-    # Assert if dataset_size requested is larger than full_sinograms
-    assert(dataset_size <= full_sinograms.shape[2])
-
-    # Using boolean mask, keep values sampled and clamp to zero others
-    # Masking dataset has to be on its own
-    print('Masking with {} method'.format(self.sampling_method))
-    undersampled_sinograms = self.subsample_sinogram(full_sinograms, self.sampling_method)
-    
-    if self.use_rand == True:
-        rand = np.random.choice(range(full_sinograms.shape[2]), dataset_size, replace=False)
-    else:
-        rand = np.arange(full_sinograms.shape[2], dataset_size)
-    
-    # Grab random slices and roll axis so to sample slices
-    undersampled_sinograms = torch.FloatTensor(np.rollaxis(undersampled_sinograms[:,:,rand], 2)).to(device)
-    full_sinograms = torch.FloatTensor(np.rollaxis(full_sinograms[:,:,rand], 2)).to(device)
-    
-    # Inputs
-    for us_sinogram, full_sinogram in tqdm(zip(undersampled_sinograms, full_sinograms)):
-        
-        # Normalization of input sinogram - Undersampled
-        img = self.radon.backward(self.radon.filter_sinogram(us_sinogram))
-        img = self.normalize_image(img)
-        
-        # Undersampled filtered
-        undersampled_filtered.append(img)
-        
-        # Normalize 0-1 under sampled sinogram
-        us_sinogram = self.normalize_image(us_sinogram)
-
-        img = self.radon.backward(us_sinogram)*np.pi/self.number_projections_undersample
-        img = self.normalize_image(img)
-
-        # Undersampled raw backprojection
-        undersampled.append(img)
-        
-        # Normalization of output sinogram - Fully sampled
-        img = self.radon.backward(self.radon.filter_sinogram(full_sinogram))
-        img = self.normalize_image(img)
-
-        # Fully sampled filtered backprojection
-        desired.append(img)
-    
-    # Format dataset to feed network
-    desired = torch.unsqueeze(torch.stack(desired), 1)
-    undersampled = torch.unsqueeze(torch.stack(undersampled), 1)
-    undersampled_filtered = torch.unsqueeze(torch.stack(undersampled_filtered), 1)
-
-    return desired, undersampled, undersampled_filtered
-
-  def subsample_sinogram(self, sinogram, method = 'equispaced-linear'):
-    '''
-    Subsamples sinogram by masking images with zeros with a particular method.
-    Params: 
-      sinogram (ndarray): sinogram to mask with defined method
-      method (string): Sampling meethod to mask sinogram
-        Avalaible methods:
-          * linear-equispaced: from a random angle seed, samples equispaced the angular space.
-    '''
-
-    # Seed angle for data augmentation
-    if method == 'equispaced-linear':
-      
-      undersampled_sinogram = np.copy(sinogram)
-      rand_angle = np.random.randint(0, self.number_projections_total)
-
-      # Zeros Masking
-      zeros_idx = np.linspace(0, self.number_projections_total, self.number_projections_undersample, endpoint = False).astype(int)
-      zeros_idx = (zeros_idx+rand_angle)%self.number_projections_total
-      zeros_mask = np.full(self.number_projections_total, True, dtype = bool)
-      zeros_mask[zeros_idx] = False
-      undersampled_sinogram[zeros_mask, :, :] = 0
-    
-    return undersampled_sinogram
 
   def _get_next_from_dataloader(self, set_name):
     '''
@@ -730,16 +686,27 @@ class ZebraDataloader:
 
     return next(iter(self.dataloaders[set_name]))
 
-  def _create_radon(self):
-    '''
-    Creates Torch-Radon method for the desired sampling and image size of the dataloader
-    '''
-    # Grab number of angles
-    self.angles = np.linspace(0, 2*np.pi, self.number_projections_total, endpoint = False)
-    
-    self.radon = Radon(self.img_resize, self.angles, clip_to_circle = False, det_count = self.det_count)
-
   @staticmethod
   def normalize_image(image):
 
     return (image - image.min())/(image.max()-image.min())
+
+# class ReconstructionsDataset(DataSet):
+
+#     def __init__(self, root = 'train', image_loader=None, transform=None):
+      
+#       self.root = root
+#       self.image_files = [os.listdir(os.path.join(self.root, 'folder_{}'.format(i)) for i in range(1, 9)]
+#       self.loader = image_loader
+#       self.transform = transform
+
+
+#     def __len__(self):
+#       # Here, we need to return the number of samples in this dataset.
+#       return sum([len(folder) for folder in self.image_files])
+
+#     def __getitem__(self, index):
+#       images = [self.loader(os.path.join(root, 'folder_{}'.format(i), self.image_files[i][index])) for i in range(1, 9)]
+#       if self.transform is not None:
+#           images = [self.transform(img) for img in images]
+#       return images

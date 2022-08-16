@@ -33,6 +33,19 @@ def test_dataloader(testing_options):
 
     folder_paths = [f140115_1dpf, f140315_3dpf, f140419_5dpf]
 
+    folder_path = f140115_1dpf
+
+    zebra_dataset_dict = {'folder_path':folder_path,
+                'dataset_folder':datasets_folder,
+                 'experiment_name':'Bassi',
+                 'img_resize' :100,
+                 'load_shifts':True,
+                 'save_shifts':False,
+                  'number_projections_total':720,
+                  'number_projections_undersampled': 72,
+                  'batch_size': 5,
+                  'sampling_method': 'equispaced-linear'}
+
     zebra_dict= {'folder_paths': folder_paths,
                 'tensor_path': None,
                  'img_resize': 100,
@@ -52,26 +65,24 @@ def test_dataloader(testing_options):
                   'batch_size': 5,
                   'sampling_method': 'equispaced-linear'}
 
-    zebra_dataloaders = dlutils.ZebraDataloader(zebra_dict)
-
     # 1 - Load datasets
-    # 1a - Check ZebraDataset.load_images()
-    if 'check_dataset_loading' in testing_options:
-
-        zebra_dataset_test = zebra_dataloaders[folder_paths[0]]
-        zebra_dataset_test.load_images()
+    # 1a - Check ZebraDataset writing of x10 acceleration factor
+    if 'check_dataset_writing' in testing_options:
         
-        # Print main attributes after load_images
-        print(zebra_dataset_test.registered_dataset)
-        print(zebra_dataset_test.registered_volume['head'].max())
-        print(zebra_dataset_test.image_volume['head'].max())
+        sample = 'head'
+        
+        for folder in folder_paths:
+            
+            zebra_dataset_dict['folder_path'] = folder
+            zebra_dataset_test = dlutils.ZebraDataset(zebra_dataset_dict)
 
-        # Print registered
-        cv2.imwrite(dataloader_testing_folder+'Test_Image.jpg', 255.0*zebra_dataset_test._normalize_image(zebra_dataset_test.image_volume['head'][0,...]))
+            for sample in zebra_dataset_test.fish_parts_available:
+                zebra_dataset_test.load_images(sample)
+                zebra_dataset_test.correct_rotation_axis(sample = sample, max_shift = 200, shift_step = 1)
+                zebra_dataset_test.dataset_resize(sample)
+                
+                zebra_dataset_test.write_dataset_reconstruction(sample)
 
-        # Print non-registered
-        cv2.imwrite(dataloader_testing_folder+'Test_Image_Registered.jpg', 255.0*zebra_dataset_test._normalize_image(zebra_dataset_test.registered_volume['head'][0,...]))
-    
     # 2 - Check ZebraDataset registering (already done, just loading shifts)
     if 'check_registering_dataset' in testing_options:
         
@@ -110,16 +121,16 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser(description='Test utilities.dataloading_utilities module')
 
-    parser.add_argument('--dataset_loading', help = 'Test dataset loading', action="store_true")
+    parser.add_argument('--dataset_writing', help = 'Test dataset loading', action="store_true")
     parser.add_argument('--dataset_registration', help = 'Test dataset registration', action="store_true")
     parser.add_argument('--dataloaders_building', help = 'Test dataloaders building', action="store_true")
 
     args = parser.parse_args()
 
-    if args.dataset_loading:
+    if args.dataset_writing:
 
-        print('Checking Dataset loading')
-        testing_options.append('check_dataset_loading')
+        print('Checking Dataset writing')
+        testing_options.append('check_dataset_writing')
     
     if args.dataset_registration:
 

@@ -276,180 +276,6 @@ class ZebraDataset:
   def get_fish_parts(self):
 
     return self.fish_parts_available
-
-  def register_dataset(self, sample, inPlace = False):
-
-    """
-    Registers full dataset, by sample. (DEPRECATED METHOD)
-    Params:
-      -sample (string): fish part sample.
-    """  
-    
-    # self. = self.dataset[dataset.dataset.Sample == '000'].sort_values('Angle', axis = 0).reset_index(drop=True)
-    if sample is not None:
-
-      sample = self.fish_part[sample]
-      dataset = self.dataset[self.dataset.Sample == sample].filter(['Angle','Image'])
-    
-    else:
-      
-      dataset = self.dataset.filter(['Angle', 'Image'])
-
-    # Assert angle step {360, 720} -> (1, 0.5)
-    if dataset['Angle'].max() in [359, 360]:
-      self.maxAngle = 360
-    else:
-      self.maxAngle = 720
-    # {0-179, 0-359}
-    #pruebita paso max angle
-    angles = np.arange(0, self.maxAngle//2, 1).astype(float)
-    # Parámetros de transformación
-    self.Tparams = pd.DataFrame(columns = ['theta', 'Tx', 'Ty', 'Sample', 'Angle'])
-
-    # Filtrado Laplaciano mas grayscale
-    rglaplacianfilter = sitk.LaplacianRecursiveGaussianImageFilter()
-    rglaplacianfilter.SetSigma(6)
-    rglaplacianfilter.SetNormalizeAcrossScale(True)
-
-    grayscale_dilate_filter = sitk.GrayscaleDilateImageFilter()
-    IsoData = sitk.IsoDataThresholdImageFilter()
-    
-    # Registration algorithm
-    R = sitk.ImageRegistrationMethod()
-    
-    # Similarity metric, optimizer and interpolator
-    R.SetMetricAsCorrelation()
-    R.SetOptimizerAsGradientDescentLineSearch(learningRate=0.1,
-                                              numberOfIterations=10)
-    R.SetInterpolator(sitk.sitkLinear)
-    
-    for angle in tqdm(angles):
-      
-      fixed =  dataset[dataset.Angle == angle].iloc[0]['Image'].astype(float)
-      moving = np.flipud(dataset[dataset.Angle == angle+self.maxAngle//2].iloc[0]['Image'].astype(float))
-      # pair of images sitk
-      fixed_s = sitk.Cast(sitk.GetImageFromArray(fixed), sitk.sitkFloat32)
-      moving_s = sitk.Cast(sitk.GetImageFromArray(moving), sitk.sitkFloat32)
-
-      # f stands for filtered image
-      fixed_s_f  = rglaplacianfilter.Execute(fixed_s)
-      fixed_s_f = grayscale_dilate_filter.Execute(fixed_s)
-      fixed_s_f = sitk.BinaryFillhole(IsoData.Execute(fixed_s))
-
-      moving_s_f  = rglaplacianfilter.Execute(moving_s)
-      moving_s_f = grayscale_dilate_filter.Execute(moving_s)
-      moving_s_f = sitk.BinaryFillhole(IsoData.Execute(moving_s))
-
-      # Initial Transform - Aligns center of mass (same modality - no processing/filtering)
-      initialT = sitk.CenteredTransformInitializer(fixed_s, 
-                                        moving_s, 
-                                        sitk.Euler2DTransform(), 
-                                        sitk.CenteredTransformInitializerFilter.MOMENTS)
-  
-      R.SetInitialTransform(initialT)
-      
-      fixed_s_f = sitk.Cast(fixed_s_f, sitk.sitkFloat32)
-      moving_s_f = sitk.Cast(moving_s_f, sitk.sitkFloat32)
-
-      outTx = R.Execute(fixed_s_f, moving_s_f) # Rotation + traslation
-      params = outTx.GetParameters()
-      self.Tparams = self.Tparams.append({'theta':params[0],
-                                          'Tx':params[1],
-                                          'Ty':params[2],
-                                          'Sample':sample,
-                                          'Angle':angle}, ignore_index=True)      
-
-      # Check rotation
-
-      # If inPlace, registration is applied to all the dataset, translating images
-      # to half the value of vertical translation
-      if inPlace == True:
-        
-        F2C_T = sitk.TranslationTransform(2)
-        M2C_T = sitk.TranslationTransform(2)
-
-        F2C_T.SetParameters((0, -params[2]/2))  # Fixed image to center
-        M2C_T.SetParameters((0, params[2]/2))  # Moving image to center
-
-        fixed_s_T = sitk.Resample(fixed_s, 
-                                  F2C_T, 
-                                  sitk.sitkLinear, 
-                                  0.0,
-                                  fixed_s.GetPixelID())
-
-        moving_s_T = sitk.Resample(moving_s, 
-                                  M2C_T, 
-                                  sitk.sitkLinear, 
-                                  0.0,
-                                  moving_s.GetPixelID())
-        # Append to registered dataset
-        self.registered_dataset = self.registered_dataset.append({'Image' : sitk.GetArrayFromImage(fixed_s_T),
-                                      'Angle': angle,
-                                      'Sample': sample}, ignore_index=True)
-        self.registered_dataset = self.registered_dataset.append({'Image' : np.flipud(sitk.GetArrayFromImage(moving_s_T)),
-                                      'Angle': angle+self.maxAngle,
-                                      'Sample': sample}, ignore_index=True)
-    
-    # Order by angle
-    self.registered_dataset = self.registered_dataset.sort_values(['Sample','Angle'], axis = 0).reset_index(drop=True)
-  
-  def apply_registration(self):
-    """
-    Applies mean registration for dataset from registration params
-    """
-
-    assert(self.Tparams is not None)
-    
-    self.registered_dataset = pd.DataFrame(columns = ['Image', 'Angle', 'Sample'])
-
-    for sample in self.dataset.Sample.unique():
-      
-      print(sample)
-      dataset = self.dataset[self.dataset.Sample == sample].filter(['Angle','Image'])
-
-      # Assert angle step {360, 720} -> (1, 0.5)
-      if dataset['Angle'].max() in [359, 360]:
-        self.maxAngle = 360
-      else:
-        self.maxAngle = 720
-
-      angles = np.arange(0, self.maxAngle//2, 1).astype(float)
-  
-      for angle in tqdm(angles):
-
-        fixed =  dataset[dataset.Angle == angle].iloc[0]['Image'].astype(float)
-        moving = dataset[dataset.Angle == angle+self.maxAngle//2].iloc[0]['Image'].astype(float)
-
-        fixed_s = sitk.Cast(sitk.GetImageFromArray(fixed), sitk.sitkFloat32)
-        moving_s = sitk.Cast(sitk.GetImageFromArray(moving), sitk.sitkFloat32)
-        
-        # setting moving transform
-        transform = sitk.TranslationTransform(2)
-        transform.SetParameters((0, -self.meanDisplacement/2))  # Fixed image to center
-        
-        fixed_s_T = sitk.Resample(fixed_s, 
-                                      transform, 
-                                      sitk.sitkLinear, 
-                                      0.0,
-                                      fixed_s.GetPixelID())
-
-        moving_s_T = sitk.Resample(moving_s, 
-                                      transform, 
-                                      sitk.sitkLinear, 
-                                      0.0,
-                                      moving_s.GetPixelID())
-        # Append to registered dataset
-        self.registered_dataset = self.registered_dataset.append({'Image' : sitk.GetArrayFromImage(fixed_s_T),
-                                          'Angle': angle,
-                                          'Sample': sample}, ignore_index=True)
-        self.registered_dataset = self.registered_dataset.append({'Image' : sitk.GetArrayFromImage(moving_s_T),
-                                          'Angle': angle+self.maxAngle//2,
-                                          'Sample': sample}, ignore_index=True)
-      
-        self.dataset = self.dataset.drop(self.dataset[self.dataset.Sample == sample].index)
-    
-    self.registered_dataset = self.registered_dataset.sort_values(['Sample','Angle'], axis = 0).reset_index(drop=True)
-    del self.dataset
   
   def get_registered_volume(self, sample ,saveDataset = True, margin = 10, useSegmented = False):
     '''
@@ -458,10 +284,6 @@ class ZebraDataset:
     margin given by margin.
     '''
     assert(self.registered_dataset is not None)
-
-    # if self.registered_volume is not None:
-
-      # return self.registered_volume
 
     # Filter by sample
     self.registered_volume = np.stack(self.registered_dataset[self.registered_dataset.Sample == sample]['Image'].to_numpy())
@@ -623,8 +445,8 @@ class ZebraDataloader:
 
     # Define number of angles and radon transform to undersample  
     self.number_projections_total = kw_dictionary.pop('number_projections_total')
-    self.number_projections_undersample = kw_dictionary.pop('number_projections_undersample')
-    self.acceleration_factor = self.number_projections_total//self.number_projections_undersample
+    self.number_projections_undersampled = kw_dictionary.pop('number_projections_undersampled')
+    self.acceleration_factor = self.number_projections_total//self.number_projections_undersampled
 
     self._create_radon()
 
@@ -656,7 +478,7 @@ class ZebraDataloader:
             registered_dataset_path = str(folder_path)+'_'+sample+'_registered'+'_size_{}'.format(self.img_resize)+'.pkl'
 
             if os.path.isfile(registered_dataset_path) == True:
-                
+                print('Dataset ya registrado')
                 self.datasets_registered.append(registered_dataset_path)
 
             else:
@@ -726,14 +548,14 @@ class ZebraDataloader:
 
           tY, tX, filtX = self.mask_datasets(dataset, self.total_size//l)
 
-          if k_dataset < self.k_fold_datasets:
-              
+          if k_dataset < len(self.datasets_registered)- self.k_fold_datasets:
+              print('Processing training/validation volumes\n')
               full_x.append(tX)
               full_y.append(tY)
               filt_full_x.append(filtX)
 
           else:
-
+              print('Processing testing volumes\n')
               test_x.append(tX)
               test_y.append(tY)
               filt_test_x.append(filtX)
@@ -799,8 +621,9 @@ class ZebraDataloader:
 
     val_dataloader = torch.utils.data.DataLoader((val_x_tensor, val_filt_x_tensor, val_y_tensor),
                                       batch_size=self.batch_size,
-                                      shuffle=False, num_workers=0)
-
+                                      shuffle=False, 
+                                      num_workers=0)
+    
     # Dictionary reshape
     self.dataloaders = {'train':train_dataloader,        
                         'val': val_dataloader,

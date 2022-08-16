@@ -23,6 +23,7 @@ from pytorch_lightning.loggers import WandbLogger
 
 import wandb 
 import cv2
+from pytorch_msssim import SSIM
 
 def test_pytorch_training(testing_options):
     '''
@@ -86,16 +87,18 @@ def test_pytorch_training(testing_options):
                  'out_channels': 1}
 
     # Training parameters
-    loss_dict = {'loss_name': torch.nn.MSELoss(reduction = 'sum')}
+    loss_dict = {'loss_name': 'psnr',
+                 'psnr_loss': torch.nn.MSELoss(reduction = 'mean'),
+                 'ssim_loss': SSIM(data_range = 1, size_average= True, channel = 1) }
 
     # Optimizer parameters
     optimizer_dict = {'optimizer_name': 'Adam',
-                      'lr': 1e-3}
+                      'lr': 1e-4}
     
     # System parameters
     model_system_dict = {'optimizer_dict': optimizer_dict,
                         'kw_dictionary_modl': modl_dict,
-                        'loss_dict': loss_dict,}
+                        'loss_dict': loss_dict}
 
     # Load dataloaders
     zebra_dataloaders = dlutils.ZebraDataloader(zebra_dict)

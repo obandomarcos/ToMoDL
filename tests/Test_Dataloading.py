@@ -15,6 +15,7 @@ import pandas as pd
 from utilities import dataloading_utilities as dlutils
 from utilities.folders import *
 from utilities import model_utilities as modutils
+from torch.utils.data import DataLoader
 import torch
 import cv2
 
@@ -31,7 +32,9 @@ def test_dataloader(testing_options):
 
     dataloader_testing_folder = '/home/obanmarcos/Balseiro/DeepOPT/Tests/Tests_Dataloader_Utilities/'
 
-    folder_paths = [f140115_1dpf, f140315_3dpf, f140419_5dpf]
+    folder_paths = [f140115_1dpf, f140315_3dpf, f140419_5dpf, f140714_5dpf, f140117_3dpf, f140114_5dpf]
+    
+    folder_paths_names = ['f140115_1dpf', 'f140315_3dpf', 'f140419_5dpf', 'f140714_5dpf', 'f140117_3dpf', 'f140114_5dpf']
 
     folder_path = f140115_1dpf
 
@@ -69,52 +72,42 @@ def test_dataloader(testing_options):
     # 1a - Check ZebraDataset writing of x10 acceleration factor
     if 'check_dataset_writing' in testing_options:
         
-        sample = 'head'
-        
         for folder in folder_paths:
             
             zebra_dataset_dict['folder_path'] = folder
-            zebra_dataset_test = dlutils.ZebraDataset(zebra_dataset_dict)
+            zebra_dataset_test = dlutils.DatasetProcessor(zebra_dataset_dict)
 
-            for sample in zebra_dataset_test.fish_parts_available:
-                zebra_dataset_test.load_images(sample)
-                zebra_dataset_test.correct_rotation_axis(sample = sample, max_shift = 200, shift_step = 1)
-                zebra_dataset_test.dataset_resize(sample)
-                
-                zebra_dataset_test.write_dataset_reconstruction(sample)
+            del zebra_dataset_test
 
-    # 2 - Check ZebraDataset registering (already done, just loading shifts)
-    if 'check_registering_dataset' in testing_options:
-        
-        zebra_dataloaders.register_datasets()
-
-        print(zebra_dataloaders.datasets_registered)
-    
     # Checking ZebraDataloaders
     if 'check_dataloaders_building' in testing_options:
         
-        zebra_dataloaders.register_datasets()
-        print(zebra_dataloaders.datasets_registered)
-        zebra_dataloaders.build_dataloaders()
-        print('Printing images from dataloaders')
+        acceleration_factor = 10
 
-        sets = ['train', 'val', 'test']
-        puts = ['x', 'filt_x', 'y']
-        
-        for set_name in sets:
+        folders_datasets = [datasets_folder+'/x{}/'.format(acceleration_factor)+x for x in os.listdir(datasets_folder+'x{}'.format(acceleration_factor))]
+
+        for enum, folder in enumerate(folders_datasets):
+
+            dataset_dict = {'root_folder' : folder, 'acceleration_factor' : acceleration_factor,
+            'transform':None}
             
-            tuple_image = zebra_dataloaders._get_next_from_dataloader(set_name)
+            dataset = dlutils.ReconstructionDataset(**dataset_dict) 
             
-            for put_idx, put_name in enumerate(puts):
-                
-                image = tuple_image[put_idx][0,0,...].cpu().detach().numpy()
+            dataloader = DataLoader(dataset, shuffle = True)
 
-                print(set_name, put_name)
-                print('Image Intensity - set {} put {}\n'.format(set_name, put_name), 'Max', image.max(), 'Min: ',image.min())
+            (us_uf_img, us_fil_img, fs_fil_img) = next(iter(dataloader))
+            
+            us_uf_img = us_uf_img[0,...].cpu().detach().numpy()
+            us_fil_img = us_fil_img[0,...].cpu().detach().numpy()
+            fs_fil_img = fs_fil_img[0,...].cpu().detach().numpy()
 
-                cv2.imwrite(dataloader_testing_folder+'Test_Image_Dataloader_{}_{}.jpg'.format(set_name, put_name), 255.0*image)
+            thumbs = cv2.imwrite(dataloader_testing_folder+'Test_Image_Dataloader_us_fil_imgs_uf_{}.jpg'.format(enum), 255.0*us_fil_img)
+            
+            thumbs = cv2.imwrite(dataloader_testing_folder+'Test_Image_Dataloader_us_uf_imgs_uf_{}.jpg'.format(enum), 255.0*us_uf_img)
 
-    
+            thumbs = cv2.imwrite(dataloader_testing_folder+'Test_Image_Dataloader_fs_fil_imgs_uf_{}.jpg'.format(enum), 255.0*fs_fil_img)       
+            print(thumbs)
+
 if __name__ == '__main__':
 
     testing_options = []

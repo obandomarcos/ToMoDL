@@ -25,11 +25,12 @@ import h5py
 import cv2
 import scipy.ndimage as ndi
 from torch.utils.data import Dataset
+from torchvision.datasets import ImageFolder
 
 # Modify for multi-gpu
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-class ZebraDataset:
+class DatasetProcessor:
   '''
   Zebra dataset 
   Params:
@@ -41,7 +42,16 @@ class ZebraDataset:
     Folder
     '''
 
-    self.process_kwdictionary(kw_dictionary)    
+    self.process_kwdictionary(kw_dictionary)
+
+    for sample in self.fish_parts_available:
+      
+      self.load_images(sample)
+      self.correct_rotation_axis(sample = sample, max_shift = 200, shift_step = 1)
+      self.dataset_resize(sample)
+      self.write_dataset_reconstruction(sample)
+
+      del self.registered_volume[sample]
   
   def process_kwdictionary(self, kw_dictionary): 
     '''
@@ -50,31 +60,31 @@ class ZebraDataset:
      - kw_dictionary (dict): Dictionary containing keywords
     '''
 
-    self.folder_path = pathlib.Path(kw_dictionary.pop('folder_path'))
+    self.folder_path = pathlib.Path(kw_dictionary['folder_path'])
     self.folder_name = pathlib.PurePath(self.folder_path).name
     
     self.objective = 10
-    self.dataset_folder = kw_dictionary.pop('dataset_folder')
-    self.experiment_name =kw_dictionary.pop('experiment_name')
+    self.dataset_folder = kw_dictionary['dataset_folder']
+    self.experiment_name =kw_dictionary['experiment_name']
 
     self.image_volume = {}
     self.registered_volume = {}
     self.shifts_path = self.folder_path
 
-    self.img_resize = kw_dictionary.pop('img_resize')
+    self.img_resize = kw_dictionary['img_resize']
     self.det_count = int((self.img_resize+0.5)*np.sqrt(2))
     
-    self.load_shifts = kw_dictionary.pop('load_shifts')
-    self.save_shifts = kw_dictionary.pop('save_shifts')
+    self.load_shifts = kw_dictionary['load_shifts']
+    self.save_shifts = kw_dictionary['save_shifts']
 
     # Define number of angles and radon transform to undersample  
-    self.number_projections_total = kw_dictionary.pop('number_projections_total')
-    self.number_projections_undersampled = kw_dictionary.pop('number_projections_undersampled')
+    self.number_projections_total = kw_dictionary['number_projections_total']
+    self.number_projections_undersampled = kw_dictionary['number_projections_undersampled']
     self.acceleration_factor = self.number_projections_total//self.number_projections_undersampled
 
     self._create_radon()
 
-    self.sampling_method = kw_dictionary.pop('sampling_method')
+    self.sampling_method = kw_dictionary['sampling_method']
     
 
     if '4X' in self.folder_name:
@@ -269,7 +279,7 @@ class ZebraDataset:
         - rand_angle (int): Starting angle to subsample evenly spaced
     '''    
     # Create dataset folder and subfolders for acceleration folders
-    reconstructed_dataset_folder = self.dataset_folder+'/'+self.folder_name+'_'+sample+'_'+str(self.acceleration_factor)+'/'
+    reconstructed_dataset_folder = self.dataset_folder+'/x'+str(self.acceleration_factor)+'/'+self.folder_name+'_'+sample+'_'+str(self.acceleration_factor)+'/'
     
     Path(reconstructed_dataset_folder).mkdir(parents=True, exist_ok=True)
 
@@ -301,6 +311,7 @@ class ZebraDataset:
     for sinogram_slice, (us_sinogram, full_sinogram) in tqdm(enumerate(zip(undersampled_sinograms, full_sinogram))):
         
         sinogram_slice = str(sinogram_slice)
+        
         if write_us_filtered == True:
           print('Slice {sinogram_slice} escrita\n')
           # Undersampled filtered reconstructed image path
@@ -326,7 +337,7 @@ class ZebraDataset:
           us_unfiltered_img = self.normalize_image(us_unfiltered_img)
 
           # Write undersampled filtered
-          thumbs = cv2.imwrite(us_unfiltered_img_path,255.0*us_filtered_img.cpu().detach().numpy())
+          thumbs = cv2.imwrite(us_unfiltered_img_path,255.0*us_unfiltered_img.cpu().detach().numpy())
           print(thumbs)
         
         if write_fs_filtered == True:
@@ -482,19 +493,19 @@ class ZebraDataloader:
      - kw_dictionary (dict): Dictionary containing keywords
     '''
 
-    self.folder_paths = kw_dictionary.pop('folder_paths')
+    self.folder_paths = kw_dictionary['folder_paths']
 
-    self.total_size = kw_dictionary.pop('total_size')
+    self.total_size = kw_dictionary['total_size']
 
-    self.train_factor = kw_dictionary.pop('train_factor')
-    self.val_factor = kw_dictionary.pop('val_factor')
-    self.test_factor = kw_dictionary.pop('test_factor')
-    self.augment_factor = kw_dictionary.pop('augment_factor')
+    self.train_factor = kw_dictionary['train_factor']
+    self.val_factor = kw_dictionary['val_factor']
+    self.test_factor = kw_dictionary['test_factor']
+    self.augment_factor = kw_dictionary['augment_factor']
     
-    self.use_rand = kw_dictionary.pop('use_rand')
-    self.k_fold_datasets = kw_dictionary.pop('k_fold_datasets')
+    self.use_rand = kw_dictionary['use_rand']
+    self.k_fold_datasets = kw_dictionary['k_fold_datasets']
 
-    self.batch_size = kw_dictionary.pop('batch_size')
+    self.batch_size = kw_dictionary['batch_size']
 
   def register_datasets(self):
     """
@@ -691,22 +702,36 @@ class ZebraDataloader:
 
     return (image - image.min())/(image.max()-image.min())
 
-# class ReconstructionsDataset(DataSet):
+class ReconstructionDataset(Dataset):
+  
+  def __init__(self, root_folder, transform, acceleration_factor):
+    '''
+    Params:
+      - root_folder (string): root folder contains code for dataset + sample
+      - acceleration_factor (int): acceleration factor 
+    '''
+    self.root_folder = root_folder+'/'
+    self.acceleration_factor = str(acceleration_factor)
+    self.transform = transform
 
-#     def __init__(self, root = 'train', image_loader=None, transform=None):
+    self.fs_filt_folder = 'fs_filtered/'
+    self.us_filt_folder = 'us_{}_filtered/'.format(self.acceleration_factor)
+    self.us_unfilt_folder = 'us_{}_unfiltered/'.format(self.acceleration_factor)
+
+    self.files = self.root_folder+self.us_unfilt_folder
+
+  def __len__(self):
+      return len(os.listdir(self.files))
+
+  def __getitem__(self, index):
       
-#       self.root = root
-#       self.image_files = [os.listdir(os.path.join(self.root, 'folder_{}'.format(i)) for i in range(1, 9)]
-#       self.loader = image_loader
-#       self.transform = transform
+    unfiltered_us_rec = self.normalize_image(cv2.imread(self.root_folder+self.us_unfilt_folder+str(index)+'.jpg', cv2.IMREAD_GRAYSCALE))
+    filtered_us_rec = self.normalize_image(cv2.imread(self.root_folder+self.us_filt_folder+str(index)+'.jpg', cv2.IMREAD_GRAYSCALE))
+    filtered_fs_rec = self.normalize_image(cv2.imread(self.root_folder+self.fs_filt_folder+str(index)+'.jpg', cv2.IMREAD_GRAYSCALE))
 
+    return (unfiltered_us_rec, filtered_us_rec, filtered_fs_rec)
 
-#     def __len__(self):
-#       # Here, we need to return the number of samples in this dataset.
-#       return sum([len(folder) for folder in self.image_files])
+  @staticmethod
+  def normalize_image(image):
 
-#     def __getitem__(self, index):
-#       images = [self.loader(os.path.join(root, 'folder_{}'.format(i), self.image_files[i][index])) for i in range(1, 9)]
-#       if self.transform is not None:
-#           images = [self.transform(img) for img in images]
-#       return images
+    return (image - image.min())/(image.max()-image.min())

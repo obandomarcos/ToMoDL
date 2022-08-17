@@ -15,7 +15,7 @@ import pandas as pd
 from utilities import dataloading_utilities as dlutils
 from utilities.folders import *
 from utilities import model_utilities as modutils
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, ConcatDataset
 import torch
 import cv2
 
@@ -80,7 +80,7 @@ def test_dataloader(testing_options):
             del zebra_dataset_test
 
     # Checking ZebraDataloaders
-    if 'check_dataloaders_building' in testing_options:
+    if 'check_dataloader_building' in testing_options:
         
         acceleration_factor = 10
 
@@ -106,7 +106,39 @@ def test_dataloader(testing_options):
             thumbs = cv2.imwrite(dataloader_testing_folder+'Test_Image_Dataloader_us_uf_imgs_uf_{}.jpg'.format(enum), 255.0*us_uf_img)
 
             thumbs = cv2.imwrite(dataloader_testing_folder+'Test_Image_Dataloader_fs_fil_imgs_uf_{}.jpg'.format(enum), 255.0*fs_fil_img)       
-            print(thumbs)
+            
+    
+    if 'check_multiple_dataset_dataloader_building' in testing_options:
+
+
+        acceleration_factor = 10
+
+        folders_datasets = [datasets_folder+'/x{}/'.format(acceleration_factor)+x for x in os.listdir(datasets_folder+'x{}'.format(acceleration_factor))]
+
+        datasets = []
+
+        for enum, folder in enumerate(folders_datasets):
+
+            dataset_dict = {'root_folder' : folder, 'acceleration_factor' : acceleration_factor,
+            'transform':None}
+            
+            datasets.append(dlutils.ReconstructionDataset(**dataset_dict))
+        
+        dataloader_test = DataLoader(ConcatDataset(datasets), shuffle = True)
+
+        (us_uf_img, us_fil_img, fs_fil_img) = next(iter(dataloader_test))
+            
+        us_uf_img = us_uf_img[0,...].cpu().detach().numpy()
+        us_fil_img = us_fil_img[0,...].cpu().detach().numpy()
+        fs_fil_img = fs_fil_img[0,...].cpu().detach().numpy()
+
+        thumbs = cv2.imwrite(dataloader_testing_folder+'Test_Image__Multidataset_Dataloader_us_fil_imgs_uf.jpg', 255.0*us_fil_img)
+        
+        thumbs = cv2.imwrite(dataloader_testing_folder+'Test_Image__Multidataset_Dataloader_us_uf_imgs_uf.jpg', 255.0*us_uf_img)
+
+        thumbs = cv2.imwrite(dataloader_testing_folder+'Test_Image__Multidataset_Dataloader_fs_fil_imgs_uf.jpg', 255.0*fs_fil_img)  
+
+        print(thumbs)
 
 if __name__ == '__main__':
 
@@ -117,7 +149,8 @@ if __name__ == '__main__':
     parser.add_argument('--dataset_writing', help = 'Test dataset loading', action="store_true")
     parser.add_argument('--dataset_registration', help = 'Test dataset registration', action="store_true")
     parser.add_argument('--dataloaders_building', help = 'Test dataloaders building', action="store_true")
-
+    parser.add_argument('--multidataset_dataloader_building', help = 'Test multidataset dataloader building', action="store_true")
+    
     args = parser.parse_args()
 
     if args.dataset_writing:
@@ -134,6 +167,10 @@ if __name__ == '__main__':
 
         print('Checking Dataloaders building + masking datasets')
         testing_options.append('check_dataloaders_building')
+    
+    if args.multidataset_dataloader_building:
+
+        testing_options.append('check_multiple_dataset_dataloader_building')
     
     
     test_dataloader(testing_options)

@@ -96,6 +96,8 @@ class dw(nn.Module):
         
         for i in np.arange(1, self.number_layers+1):
             
+            print('Building resnet')
+            print(i, self.weights_size[i])
             self.dw_layer_dict['weights_size'] = self.weights_size[i]
 
             if i == self.number_layers:

@@ -22,7 +22,7 @@ import pandas as pd
 from utilities import dataloading_utilities as dlutils
 from utilities.folders import *
 
-import models 
+from models import models_system as modsys
 
 from torch.utils.data import DataLoader, ConcatDataset, random_split
 
@@ -35,7 +35,7 @@ import cv2
 
 class Trainer():
 
-    def __init__(self, trainer_kwdict, dataloader_kwdict, model_kwdict):
+    def __init__(self, trainer_kwdict, dataloader_kwdict, model_system_kwdict):
         '''
         Trainer for MoDL.
         Params:
@@ -44,7 +44,7 @@ class Trainer():
         '''
         self.process_trainer_kwdictionary(trainer_kwdict)
         self.process_dataloader_kwdictionary(dataloader_kwdict)
-        self.process_model_system_kwdictionary(model_kwdict)
+        self.process_model_system_kwdictionary(model_system_kwdict)
     
     def process_trainer_kwdictionary(self, kwdict):
         '''
@@ -61,10 +61,11 @@ class Trainer():
             self.k_fold_number_datasets = kwdict['k_fold_number_datasets']
         
         self.use_logger = kwdict['use_logger']
-        self.trainer_dict = kwdict['trainer_dict']
+        self.lightning_trainer_dict = kwdict['lightning_trainer_dict']
 
         if self.use_logger == True:
 
+            self.track_default_checkpoints = True
             self.reinitialize_logger(kwdict)
         
         self.create_trainer()
@@ -75,30 +76,30 @@ class Trainer():
         
         '''
         if self.use_logger == True:
-            self.logger_options_dict = kwdict['logger_dict_options']              
+            self.logger_dict = kwdict['logger_dict']              
             
             # Logger parameters
-            self.wandb_logger = WandbLogger(**self.logger_options_dict) 
+            self.wandb_logger = WandbLogger(**self.logger_dict) 
 
             # Callbacks (default)
-            if self.trainer_dict['track_default_checkpoints']:
+            if self.track_default_checkpoints == True:
 
                 train_psnr_checkpoint_callback = ModelCheckpoint(monitor='train/psnr', mode='max')
                 train_ssim_checkpoint_callback = ModelCheckpoint(monitor='train/ssim', mode='max')
                 val_psnr_checkpoint_callback = ModelCheckpoint(monitor='val/psnr', mode='max')
                 val_ssim_checkpoint_callback = ModelCheckpoint(monitor='val/ssim', mode='max')
 
-                self.trainer_dict['callbacks'] = [train_psnr_checkpoint_callback,
-                                                  train_ssim_checkpoint_callback,
-                                                  val_psnr_checkpoint_callback,
-                                                  val_ssim_checkpoint_callback]
-            
+                self.lightning_trainer_dict['callbacks'] = [train_psnr_checkpoint_callback,
+                                                            train_ssim_checkpoint_callback,
+                                                            val_psnr_checkpoint_callback,
+                                                            val_ssim_checkpoint_callback]
+         
     def create_trainer(self):
         '''
         Create trainer based on current trainer_dict
         '''
 
-        self.trainer = pl.Trainer(**self.trainer_dict)
+        self.trainer = pl.Trainer(**self.lightning_trainer_dict)
 
         return self.trainer
 
@@ -109,7 +110,6 @@ class Trainer():
             kwdict (dict): Dictionary for dataloader creation
         '''
 
-        self.folder_path = kwdict['folder_path']
         self.datasets_folder = kwdict['datasets_folder']
         self.experiment_name = kwdict['experiment_name']
         self.img_resize = kwdict['img_resize'] 
@@ -124,10 +124,11 @@ class Trainer():
         self.test_factor = kwdict['test_factor']
 
         self.batch_size = kwdict['batch_size']
-        self.acceleration_factor = kwdict['acceleration_factor']
+        self.acceleration_factor = self.number_projections_total//self.number_projections_undersampled
         self.sampling_method= kwdict['sampling_method']
         self.shuffle_data = kwdict['shuffle_data']
         
+        # To-Do: Option for non-available acceleration factors (RUN ProcessDatasets)
         self.folders_datasets = [self.datasets_folder+'/x{}/'.format(self.acceleration_factor)+x for x in os.listdir(self.datasets_folder+'x{}'.format(self.acceleration_factor))]
 
         # Number of datasets defines splitting number between train/val and test datasets
@@ -145,7 +146,7 @@ class Trainer():
             kwdict (dict): Dictionary for model creation
         '''
 
-        self.modl_system_dict = kwdict
+        self.model_system_dict = kwdict
     
     def generate_K_folding_dataloader(self):
         '''
@@ -162,17 +163,24 @@ class Trainer():
         # Train and validation dataloader  
         train_val_datasets = []
         
-        for folder in enumerate(train_val_datasets_folders):
+        for enum, folder in enumerate(train_val_datasets_folders):
             
             dataset_dict = {'root_folder' : folder, 
-                                'acceleration_factor' : self.acceleration_factor,
-                                'transform' : None}
+                            'acceleration_factor' : self.acceleration_factor,
+                            'transform' : None}
 
             train_val_datasets.append(dlutils.ReconstructionDataset(**dataset_dict))
         
         train_val_datasets = ConcatDataset(train_val_datasets)
         
-        train_dataset, val_dataset = random_split(train_val_datasets, [self.train_factor, self.val_factor])
+        train_val_lengths = [int(len(train_val_datasets)*self.train_factor), int(len(train_val_datasets)*self.val_factor)]
+        
+        # Possible non-zero sum
+        if sum(train_val_lengths) != len(train_val_datasets):
+
+            train_val_lengths[0] += (len(train_val_datasets)- sum(train_val_lengths))
+
+        train_dataset, val_dataset = random_split(train_val_datasets, train_val_lengths)
 
         train_dataloader = DataLoader(train_dataset, 
                                 batch_size = self.batch_size,
@@ -184,7 +192,7 @@ class Trainer():
         
         test_datasets = []
         
-        for folder in enumerate(test_datasets_folders):
+        for enum, folder in enumerate(test_datasets_folders):
             
             dataset_dict = {'root_folder' : folder, 
                                 'acceleration_factor' : self.acceleration_factor,
@@ -224,9 +232,9 @@ class Trainer():
         trainer = self.create_trainer()
         
         # Create model reconstructor
-        modl_reconstruction = models.MoDLReconstructor(self.model_system_dict)
+        modl_reconstruction = modsys.MoDLReconstructor(self.model_system_dict)
 
-        modl_reconstruction.log('k_fold')
+        modl_reconstruction.log('k_fold', self.current_fold)
         # W&B logger
         self.wandb_logger.watch(modl_reconstruction)
 

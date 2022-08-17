@@ -33,21 +33,19 @@ def test_dataloader(testing_options):
     dataloader_testing_folder = '/home/obanmarcos/Balseiro/DeepOPT/Tests/Tests_Dataloader_Utilities/'
 
     folder_paths = [f140115_1dpf, f140315_3dpf, f140419_5dpf, f140714_5dpf, f140117_3dpf, f140114_5dpf]
-    
-    folder_paths_names = ['f140115_1dpf', 'f140315_3dpf', 'f140419_5dpf', 'f140714_5dpf', 'f140117_3dpf', 'f140114_5dpf']
 
     folder_path = f140115_1dpf
 
     zebra_dataset_dict = {'folder_path':folder_path,
-                'dataset_folder':datasets_folder,
-                 'experiment_name':'Bassi',
-                 'img_resize' :100,
-                 'load_shifts':True,
-                 'save_shifts':False,
-                  'number_projections_total':720,
-                  'number_projections_undersampled': 72,
-                  'batch_size': 5,
-                  'sampling_method': 'equispaced-linear'}
+                          'dataset_folder':datasets_folder,
+                          'experiment_name':'Bassi',
+                          'img_resize' :100,
+                          'load_shifts':True,
+                          'save_shifts':False,
+                          'number_projections_total':720,
+                          'number_projections_undersampled': 72,
+                          'batch_size': 5,
+                          'sampling_method': 'equispaced-linear'}
 
     zebra_dict= {'folder_paths': folder_paths,
                 'tensor_path': None,

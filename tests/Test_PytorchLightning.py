@@ -40,13 +40,13 @@ def test_pytorch_training(testing_options):
 
     dataloader_testing_folder = '/home/obanmarcos/Balseiro/DeepOPT/Tests/Tests_Pytorch_Utilities/'
 
-    folder_paths = [f140115_1dpf, f140315_3dpf, f140419_5dpf]
+    folder_paths = [f140115_1dpf, f140315_3dpf, f140419_5dpf, f140714_5dpf, f140117_3dpf, f140114_5dpf]
 
     # Dataloader parameters
     zebra_dict= {'folder_paths': folder_paths,
                 'tensor_path': None,
                  'img_resize': 100,
-                  'total_size' : 30,
+                  'total_size' : 5000,
                   'train_factor': 0.7,
                   'val_factor': 0.1, 
                   'test_factor': 0.2,
@@ -56,9 +56,9 @@ def test_pytorch_training(testing_options):
                   'load_tensor': False,
                   'save_tensor': False,
                   'use_rand': True,
-                  'k_fold_datasets': 1,
+                  'k_fold_datasets': 2,
                   'number_projections_total':720,
-                  'number_projections_undersample': 72,
+                  'number_projections_undersampled': 72,
                   'batch_size': 5,
                   'sampling_method': 'equispaced-linear'}
     
@@ -69,13 +69,13 @@ def test_pytorch_training(testing_options):
                            'in_channels':1,
                            'out_channels':1,
                            'stride':1, 
-                           'use_batch_norm': True,
-                           'init_method': 'xavier'}
+                           'use_batch_norm': False,
+                           'init_method': 'unsxavier'}
 
     # Model parameters
     modl_dict = {'use_torch_radon': True,
-                 'number_layers': 3,
-                 'K_iterations' : 3,
+                 'number_layers': 8,
+                 'K_iterations' : 8,
                  'number_projections_total' : 720,
                  'number_projections_undersampled' : 72, 
                  'image_size': 100,

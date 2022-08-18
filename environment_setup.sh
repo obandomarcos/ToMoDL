@@ -18,5 +18,6 @@ fi
 wget -qO- https://raw.githubusercontent.com/matteo-ronchetti/torch-radon/v2/auto_install.py | python -
 
 conda activate deepopt
+
 echo >> 'Environment created succesfully'
 

@@ -10,6 +10,7 @@ if find_in_conda_env ".*deepopt.*" ; then
    conda env update --file deepopt.yml --prune
 else 
     conda env create -f deepopt.yml
+fi
 
 cd torch-radon
 git checkout v2

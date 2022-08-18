@@ -20,7 +20,6 @@ import wandb
 # Modify for multi-gpu
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-
 class MoDLReconstructor(pl.LightningModule):
     '''
     Pytorch Lightning for MoDL boilerplate
@@ -56,6 +55,13 @@ class MoDLReconstructor(pl.LightningModule):
         unfiltered_us_rec, filtered_us_rec, filtered_fs_rec = batch
         
         modl_rec = self.model(unfiltered_us_rec)
+
+        psnr_fbp_loss = self.loss_dict['psnr_loss'](filtered_us_rec, filtered_fs_rec)
+        ssim_fbp_loss = self.loss_dict['ssim_loss'](filtered_us_rec, filtered_fs_rec)
+
+        self.log("train/psnr_fbp", self.psnr(psnr_fbp_loss))
+        self.log("train/ssim_fbp", ssim_fbp_loss)
+
         psnr_loss = self.loss_dict['psnr_loss'](modl_rec['dc'+str(self.model.K)], filtered_fs_rec)
         ssim_loss = self.loss_dict['ssim_loss'](modl_rec['dc'+str(self.model.K)], filtered_fs_rec)
 
@@ -82,6 +88,13 @@ class MoDLReconstructor(pl.LightningModule):
         unfiltered_us_rec, filtered_us_rec, filtered_fs_rec = batch
         
         modl_rec = self.model(unfiltered_us_rec)
+
+        psnr_fbp_loss = self.loss_dict['psnr_loss'](filtered_us_rec, filtered_fs_rec)
+        ssim_fbp_loss = self.loss_dict['ssim_loss'](filtered_us_rec, filtered_fs_rec)
+
+        self.log("val/psnr_fbp", self.psnr(psnr_fbp_loss))
+        self.log("val/ssim_fbp", ssim_fbp_loss)
+
         psnr_loss = self.loss_dict['psnr_loss'](modl_rec['dc'+str(self.model.K)], filtered_fs_rec)
         ssim_loss = self.loss_dict['ssim_loss'](modl_rec['dc'+str(self.model.K)], filtered_fs_rec)
         
@@ -107,7 +120,14 @@ class MoDLReconstructor(pl.LightningModule):
 
         unfiltered_us_rec, filtered_us_rec, filtered_fs_rec = batch
         
+        psnr_fbp_loss = self.loss_dict['psnr_loss'](filtered_us_rec, filtered_fs_rec)
+        ssim_fbp_loss = self.loss_dict['ssim_loss'](filtered_us_rec, filtered_fs_rec)
+
+        self.log("test/psnr_fbp", self.psnr(psnr_fbp_loss))
+        self.log("test/ssim_fbp", ssim_fbp_loss)
+
         modl_rec = self.model(unfiltered_us_rec)
+
         psnr_loss = self.loss_dict['psnr_loss'](modl_rec['dc'+str(self.model.K)], filtered_fs_rec)
         ssim_loss = self.loss_dict['ssim_loss'](modl_rec['dc'+str(self.model.K)], filtered_fs_rec)
         

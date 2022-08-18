@@ -60,7 +60,7 @@ class Trainer():
             
             # Number of datasets for testing
             self.k_fold_number_datasets = kwdict['k_fold_number_datasets']
-        
+            self.current_fold = 0 
         self.use_logger = kwdict['use_logger']
         self.lightning_trainer_dict = kwdict['lightning_trainer_dict']
 
@@ -69,7 +69,7 @@ class Trainer():
             self.track_default_checkpoints = True
             self.logger_dict = kwdict['logger_dict']
 
-            self.logger_dict['run_name'] = names.get_last_name()
+            self.logger_dict['name'] = names.get_last_name()
 
             self.reinitialize_logger()
         
@@ -85,20 +85,31 @@ class Trainer():
             
             if self.use_k_folding == True:
 
-                self.logger_dict['run_name'] += '_fold_'+str(self.current_fold)
+                self.logger_dict['name'] += '_fold_'+str(self.current_fold)
 
             # Logger parameters
             self.wandb_logger = WandbLogger(**self.logger_dict) 
 
             # Callbacks (default)
             if self.track_default_checkpoints == True:
+                
+                train_psnr_fbp_checkpoint_callback = ModelCheckpoint(monitor='train/psnr_fbp', mode='max')
+                train_ssim_fbp_checkpoint_callback = ModelCheckpoint(monitor='train/ssim_fbp', mode='max')
+
+                val_psnr_fbp_checkpoint_callback = ModelCheckpoint(monitor='val/psnr_fbp', mode='max')
+                val_ssim_fbp_checkpoint_callback = ModelCheckpoint(monitor='val/ssim_fbp', mode='max')
 
                 train_psnr_checkpoint_callback = ModelCheckpoint(monitor='train/psnr', mode='max')
                 train_ssim_checkpoint_callback = ModelCheckpoint(monitor='train/ssim', mode='max')
+
                 val_psnr_checkpoint_callback = ModelCheckpoint(monitor='val/psnr', mode='max')
                 val_ssim_checkpoint_callback = ModelCheckpoint(monitor='val/ssim', mode='max')
 
-                self.lightning_trainer_dict['callbacks'] = [train_psnr_checkpoint_callback,
+                self.lightning_trainer_dict['callbacks'] = [train_psnr_fbp_checkpoint_callback,
+                                                            train_ssim_fbp_checkpoint_callback,
+                                                            val_psnr_fbp_checkpoint_callback,
+                                                            val_ssim_fbp_checkpoint_callback,
+                                                            train_psnr_checkpoint_callback,
                                                             train_ssim_checkpoint_callback,
                                                             val_psnr_checkpoint_callback,
                                                             val_ssim_checkpoint_callback]
@@ -149,7 +160,6 @@ class Trainer():
             
             self.datasets_number = len(self.folders_datasets)
 
-            self.current_fold = 0
             self.k_fold_max = self.datasets_number//self.k_fold_number_datasets
             
     def process_model_system_kwdictionary(self, kwdict):
@@ -197,11 +207,13 @@ class Trainer():
 
         train_dataloader = DataLoader(train_dataset, 
                                 batch_size = self.batch_size,
-                                shuffle = self.shuffle_data)
+                                shuffle = self.shuffle_data,
+                                num_workers = 0)
 
         val_dataloader = DataLoader(val_dataset, 
                                 batch_size = self.batch_size,
-                                shuffle = False)
+                                shuffle = False,
+                                num_workers = 0)
         
         test_datasets = []
         
@@ -217,7 +229,8 @@ class Trainer():
 
         test_dataloader = DataLoader(test_dataset, 
                                 batch_size = self.batch_size,
-                                shuffle = False)
+                                shuffle = False,
+                                num_workers = 0)
 
         return train_dataloader, val_dataloader, test_dataloader
     
@@ -271,6 +284,7 @@ class Trainer():
         assert(self.use_k_folding == True)
 
         for k_fold in range(self.k_fold_max):
+
             print('{} fold started...'.format(self.current_fold))
             self.train_model()
             print('{} fold finished succesfully!'.format(self.current_fold))

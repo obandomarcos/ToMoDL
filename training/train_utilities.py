@@ -66,17 +66,18 @@ class Trainer():
         if self.use_logger == True:
 
             self.track_default_checkpoints = True
-            self.reinitialize_logger(kwdict)
+            self.logger_dict = kwdict['logger_dict']
+
+            self.reinitialize_logger()
         
         self.create_trainer()
             
-    def reinitialize_logger(self, kwdict):
+    def reinitialize_logger(self):
         '''
         Reinitializes logger, meant for reloading K-folding
         
         '''
-        if self.use_logger == True:
-            self.logger_dict = kwdict['logger_dict']              
+        if self.use_logger == True:              
             
             # Logger parameters
             self.wandb_logger = WandbLogger(**self.logger_dict) 
@@ -127,6 +128,8 @@ class Trainer():
         self.acceleration_factor = self.number_projections_total//self.number_projections_undersampled
         self.sampling_method= kwdict['sampling_method']
         self.shuffle_data = kwdict['shuffle_data']
+
+        self.data_transform = kwdict['data_transform']
         
         # To-Do: Option for non-available acceleration factors (RUN ProcessDatasets)
         self.folders_datasets = [self.datasets_folder+'/x{}/'.format(self.acceleration_factor)+x for x in os.listdir(self.datasets_folder+'x{}'.format(self.acceleration_factor))]
@@ -167,7 +170,7 @@ class Trainer():
             
             dataset_dict = {'root_folder' : folder, 
                             'acceleration_factor' : self.acceleration_factor,
-                            'transform' : None}
+                            'transform' : self.data_transform}
 
             train_val_datasets.append(dlutils.ReconstructionDataset(**dataset_dict))
         
@@ -196,7 +199,7 @@ class Trainer():
             
             dataset_dict = {'root_folder' : folder, 
                                 'acceleration_factor' : self.acceleration_factor,
-                                'transform' : None}
+                                'transform' : self.data_transform}
 
             test_datasets.append(dlutils.ReconstructionDataset(**dataset_dict))
         
@@ -225,6 +228,8 @@ class Trainer():
         '''
         Train model based on Pytorch Lightning
         '''
+
+        self.reinitialize_logger()
         # Create dataloaders
         train_dataloader, val_dataloader, test_dataloader = self.generate_K_folding_dataloader()
 

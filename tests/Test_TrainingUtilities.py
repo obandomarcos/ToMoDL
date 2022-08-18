@@ -25,6 +25,7 @@ from pytorch_lightning.loggers import WandbLogger
 
 import wandb 
 import cv2
+from torchvision import transforms as T
 from pytorch_msssim import SSIM
 
 # Options for folding menu
@@ -82,6 +83,8 @@ def test_trainer(testing_options):
 
         lightning_trainer_dict = {'max_epochs': 10,
                                   'log_every_n_steps':1,
+                                  'check_val_every_n_epoch': 1,
+                                  'gradient_clip_val' : 1.0,
                                   'accelerator' : 'gpu', 
                                   'devices' : 1,
                                   'default_root_dir': model_folder}
@@ -96,6 +99,8 @@ def test_trainer(testing_options):
     # Dataloader dictionary
     if use_default_dataloader_dict == True:
         
+        data_transform = T.Compose([T.ToTensor()])
+                                    
         dataloader_dict = {'datasets_folder': datasets_folder,
                            'experiment_name': 'Bassi',
                            'img_resize': 100,
@@ -108,13 +113,20 @@ def test_trainer(testing_options):
                            'test_factor' : 0.2, 
                            'batch_size' : 5, 
                            'sampling_method' : 'equispaced-linear',
-                           'shuffle_data' : True}
+                           'shuffle_data' : True,
+                           'data_transform' : data_transform}
     
+    # Create Custom trainer
     trainer = trutils.Trainer(trainer_dict, dataloader_dict, model_system_dict)
 
     if 'train_model' in testing_options:
 
         trainer.train_model()
+
+    if 'train_k_folding' in testing_options:
+
+        trainer.k_folding()
+
 
 if __name__ == '__main__':
 
@@ -122,7 +134,8 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser(description='Test training.training_utilities module')
 
-    parser.add_argument('--train_model', help = 'Test multidataset dataloader building', action="store_true")
+    parser.add_argument('--train_model', help = 'Test custom Trainer building and call', action="store_true")
+    parser.add_argument('--train_k_folding', help = 'Test K-Folfing with custom trainer', action="store_true")
     
     args = parser.parse_args()
 
@@ -131,5 +144,10 @@ if __name__ == '__main__':
         print('Checking model trainer...')
         testing_options.append('train_model')
     
-        test_trainer(testing_options)
+    if args.train_k_folding:
+        
+        print('Checking model trainer with K-Folding...')
+        testing_options.append('train_k_folding')
+    
+    test_trainer(testing_options)
 

@@ -127,7 +127,6 @@ def test_trainer(testing_options):
 
         trainer.k_folding()
 
-
 if __name__ == '__main__':
 
     testing_options = []

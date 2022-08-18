@@ -12,6 +12,7 @@ author: obanmarcos
 import os
 import os, sys
 from re import S
+import names
 
 sys.path.append('/home/obanmarcos/Balseiro/DeepOPT/')
 
@@ -68,7 +69,10 @@ class Trainer():
             self.track_default_checkpoints = True
             self.logger_dict = kwdict['logger_dict']
 
+            self.logger_dict['run_name'] = names.get_last_name()
+
             self.reinitialize_logger()
+        
         
         self.create_trainer()
             
@@ -79,6 +83,10 @@ class Trainer():
         '''
         if self.use_logger == True:              
             
+            if self.use_k_folding == True:
+
+                self.logger_dict['run_name'] += '_fold_'+str(self.current_fold)
+
             # Logger parameters
             self.wandb_logger = WandbLogger(**self.logger_dict) 
 
@@ -94,6 +102,8 @@ class Trainer():
                                                             train_ssim_checkpoint_callback,
                                                             val_psnr_checkpoint_callback,
                                                             val_ssim_checkpoint_callback]
+            
+            self.lightning_trainer_dict['logger'] = self.wandb_logger
          
     def create_trainer(self):
         '''
@@ -191,7 +201,7 @@ class Trainer():
 
         val_dataloader = DataLoader(val_dataset, 
                                 batch_size = self.batch_size,
-                                shuffle = self.shuffle_data)
+                                shuffle = False)
         
         test_datasets = []
         
@@ -207,7 +217,7 @@ class Trainer():
 
         test_dataloader = DataLoader(test_dataset, 
                                 batch_size = self.batch_size,
-                                shuffle = self.shuffle_data)
+                                shuffle = False)
 
         return train_dataloader, val_dataloader, test_dataloader
     

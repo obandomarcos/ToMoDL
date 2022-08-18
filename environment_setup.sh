@@ -1,7 +1,15 @@
 #!/bin/bash
 # You Only Run Once!
 
-conda env create -f deepopt.yml
+find_in_conda_env(){
+    conda env list | grep "${@}" >/dev/null 2>/dev/null
+}
+
+if find_in_conda_env ".*deepopt.*" ; then
+   conda activate deepopt
+   conda env update --file deepopt.yml --prune
+else 
+    conda env create -f deepopt.yml
 
 cd torch-radon
 git checkout v2

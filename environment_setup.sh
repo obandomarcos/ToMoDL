@@ -5,7 +5,10 @@ find_in_conda_env(){
     conda env list | grep "${@}" >/dev/null 2>/dev/null
 }
 
+conda init
+
 if find_in_conda_env ".*deepopt.*" ; then
+
    conda activate deepopt
    conda env update --file deepopt.yml --prune
 else 

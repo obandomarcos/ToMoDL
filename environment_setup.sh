@@ -5,7 +5,7 @@ find_in_conda_env(){
     conda env list | grep "${@}" >/dev/null 2>/dev/null
 }
 
-conda init
+conda init bash
 
 if find_in_conda_env ".*deepopt.*" ; then
 

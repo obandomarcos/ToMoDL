@@ -21,7 +21,6 @@ import wandb
 # Modify for multi-gpu
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-
 class MoDLReconstructor(pl.LightningModule):
     '''
     Pytorch Lightning for MoDL boilerplate
@@ -57,12 +56,22 @@ class MoDLReconstructor(pl.LightningModule):
         unfiltered_us_rec, filtered_us_rec, filtered_fs_rec = batch
 
         modl_rec = self.model(unfiltered_us_rec)
-        
+
+        if (self.track_train == True) and ((self.current_epoch == 0) or (self.current_epoch == self.max_epochs-1)) and (batch_idx == 0):
+
+            self.log_plot(filtered_fs_rec, modl_rec, 'train')
+                
+        psnr_fbp_loss = self.loss_dict['psnr_loss'](filtered_us_rec, filtered_fs_rec)
+        ssim_fbp_loss = self.loss_dict['ssim_loss'](filtered_us_rec, filtered_fs_rec)
+
+        self.log("train/psnr_fbp", self.psnr(psnr_fbp_loss), on_step=False, on_epoch=True)
+        self.log("train/ssim_fbp", ssim_fbp_loss, on_step=False, on_epoch=True)
+
         psnr_loss = self.loss_dict['psnr_loss'](modl_rec['dc'+str(self.model.K)], filtered_fs_rec)
         ssim_loss = self.loss_dict['ssim_loss'](modl_rec['dc'+str(self.model.K)], filtered_fs_rec)
 
-        self.log("train/psnr", self.psnr(psnr_loss))
-        self.log("train/ssim", ssim_loss)
+        self.log("train/psnr", self.psnr(psnr_loss),on_step=False, on_epoch=True)
+        self.log("train/ssim", ssim_loss, on_step=False, on_epoch=True)
 
         if self.loss_dict['loss_name'] == 'psnr':
             
@@ -85,11 +94,21 @@ class MoDLReconstructor(pl.LightningModule):
         
         modl_rec = self.model(unfiltered_us_rec)
 
+        if (self.track_val == True) and ((self.current_epoch == 0) or (self.current_epoch == self.max_epochs-1)) and (batch_idx == 0):
+
+            self.log_plot(filtered_fs_rec, modl_rec, 'validation')
+
+        psnr_fbp_loss = self.loss_dict['psnr_loss'](filtered_us_rec, filtered_fs_rec)
+        ssim_fbp_loss = self.loss_dict['ssim_loss'](filtered_us_rec, filtered_fs_rec)
+
+        self.log("val/psnr_fbp", self.psnr(psnr_fbp_loss), on_step=False, on_epoch=True)
+        self.log("val/ssim_fbp", ssim_fbp_loss, on_step=False, on_epoch=True)
+
         psnr_loss = self.loss_dict['psnr_loss'](modl_rec['dc'+str(self.model.K)], filtered_fs_rec)
         ssim_loss = self.loss_dict['ssim_loss'](modl_rec['dc'+str(self.model.K)], filtered_fs_rec)
         
-        self.log("val/psnr", self.psnr(psnr_loss))
-        self.log("val/ssim", ssim_loss)
+        self.log("val/psnr", self.psnr(psnr_loss), on_step=False, on_epoch=True)
+        self.log("val/ssim", ssim_loss, on_step=False, on_epoch=True)
 
         if self.loss_dict['loss_name'] == 'psnr':
             
@@ -110,7 +129,17 @@ class MoDLReconstructor(pl.LightningModule):
 
         unfiltered_us_rec, filtered_us_rec, filtered_fs_rec = batch
         
+        psnr_fbp_loss = self.loss_dict['psnr_loss'](filtered_us_rec, filtered_fs_rec)
+        ssim_fbp_loss = self.loss_dict['ssim_loss'](filtered_us_rec, filtered_fs_rec)
+
+        self.log("test/psnr_fbp", self.psnr(psnr_fbp_loss))
+        self.log("test/ssim_fbp", ssim_fbp_loss)
+
         modl_rec = self.model(unfiltered_us_rec)
+
+        if (self.track_test == True) and (batch_idx == 0):
+
+            self.log_plot(filtered_fs_rec, modl_rec, 'test')
 
         psnr_loss = self.loss_dict['psnr_loss'](modl_rec['dc'+str(self.model.K)], filtered_fs_rec)
         ssim_loss = self.loss_dict['ssim_loss'](modl_rec['dc'+str(self.model.K)], filtered_fs_rec)
@@ -182,9 +211,14 @@ class MoDLReconstructor(pl.LightningModule):
             - kw_dictionary (dict): Dictionary with keywords
         '''
         
-        self.optimizer_dict = kw_dict.pop('optimizer_dict')
-        self.kw_dictionary_modl = kw_dict.pop('kw_dictionary_modl')
-        self.loss_dict = kw_dict.pop('loss_dict')
+        self.optimizer_dict = kw_dict['optimizer_dict']
+        self.kw_dictionary_modl = kw_dict['kw_dictionary_modl']
+        self.loss_dict = kw_dict['loss_dict']
+        self.max_epochs = kw_dict['max_epochs']
+
+        self.track_train = kw_dict['track_train']
+        self.track_val = kw_dict['track_val']
+        self.track_test = kw_dict['track_test']
 
         self.hparams['loss_dict'] = self.loss_dict
         self.hparams['kw_dictionary_modl'] = self.kw_dictionary_modl
@@ -197,6 +231,31 @@ class MoDLReconstructor(pl.LightningModule):
         '''
 
         return 10*np.log10(1.0/mse.cpu().detach().numpy())
+
+    def log_plot(self, target, prediction, phase):
+        '''
+        Plots target and prediction (unrolled) and logs it. 
+        '''
+        
+        fig, ax = plt.subplots(1, len(prediction.keys())+1, figsize = (16,6))
+        
+        im = ax[0].imshow(target.detach().cpu().numpy()[0,0,:,:], cmap = 'gray')
+        ax[0].set_title('Target')
+        ax[0].axis('off') 
+        
+        plt.suptitle('Epoch {} in {} phase'.format(self.current_epoch, phase))
+
+        for a, (key, image) in zip(ax[1:], prediction.items()):
+
+            im = a.imshow(image.detach().cpu().numpy()[0,0,:,:], cmap = 'gray')
+            a.set_title(key)
+            a.axis('off')
+        
+        cax = fig.add_axes([a.get_position().x1+0.01,a.get_position().y0,0.02,a.get_position().height])
+        plt.colorbar(im, cax = cax)
+
+        wandb.log({'train_plot_{}'.format(self.current_epoch): fig})
+
 
 
 

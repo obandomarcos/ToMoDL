@@ -207,7 +207,6 @@ dependencies:
     - tensorboard-data-server==0.6.1
     - tensorboard-plugin-wit==1.8.1
     - torch==1.8.0
-    - torch-radon==2.0.0
     - torchmetrics==0.9.3
     - traitlets==5.3.0
     - ujson==5.4.0

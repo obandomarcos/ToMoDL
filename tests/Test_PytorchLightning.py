@@ -128,6 +128,10 @@ def test_pytorch_training(testing_options):
                                    val_psnr_checkpoint_callback,
                                    val_ssim_checkpoint_callback]}
 
+    logger_options_dict = {'project':'deepopt',
+                                'entity': 'omarcos', 
+                                'log_model': True}
+
     # 1 - Check training with Pytorch Lightning
     if 'check_pytorch_lightning_training' in testing_options:
         

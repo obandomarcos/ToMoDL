@@ -702,7 +702,7 @@ class ZebraDataloader:
 
 class ReconstructionDataset(Dataset):
   
-  def __init__(self, root_folder, transform, acceleration_factor):
+  def __init__(self, root_folder, acceleration_factor, transform = None):
     '''
     Params:
       - root_folder (string): root folder contains code for dataset + sample
@@ -723,11 +723,17 @@ class ReconstructionDataset(Dataset):
 
   def __getitem__(self, index):
     '''
-    To-Do : Use transform!!
+    Retrieves undersampled unfiltered reconstruction (unfiltered_us_rec), undersampled filtered reconstruction (filtered_us_rec) and fully sampled filtered reconstruction (filtered_fs_rec), used as Input, FBP benchmark and Output respectively. 
     '''
-    unfiltered_us_rec = torch.unsqueeze(torch.FloatTensor(self.normalize_image(cv2.imread(self.root_folder+self.us_unfilt_folder+str(index)+'.jpg', cv2.IMREAD_GRAYSCALE))), 0)
-    filtered_us_rec = torch.unsqueeze(torch.FloatTensor(self.normalize_image(cv2.imread(self.root_folder+self.us_filt_folder+str(index)+'.jpg', cv2.IMREAD_GRAYSCALE))), 0)
-    filtered_fs_rec = torch.unsqueeze(torch.FloatTensor(self.normalize_image(cv2.imread(self.root_folder+self.fs_filt_folder+str(index)+'.jpg', cv2.IMREAD_GRAYSCALE))), 0)
+    unfiltered_us_rec = self.normalize_image(cv2.imread(self.root_folder+self.us_unfilt_folder+str(index)+'.jpg', cv2.IMREAD_GRAYSCALE))
+    filtered_us_rec = self.normalize_image(cv2.imread(self.root_folder+self.us_filt_folder+str(index)+'.jpg', cv2.IMREAD_GRAYSCALE))
+    filtered_fs_rec = self.normalize_image(cv2.imread(self.root_folder+self.fs_filt_folder+str(index)+'.jpg', cv2.IMREAD_GRAYSCALE))
+
+    if self.transform != None:
+
+      unfiltered_us_rec = self.transform(unfiltered_us_rec).type('torch.FloatTensor')
+      filtered_us_rec = self.transform(filtered_us_rec).type('torch.FloatTensor')
+      filtered_fs_rec = self.transform(filtered_fs_rec).type('torch.FloatTensor')
 
     return (unfiltered_us_rec, filtered_us_rec, filtered_fs_rec)
 

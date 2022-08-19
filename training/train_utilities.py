@@ -181,8 +181,8 @@ class TrainerSystem():
             self.rotate_list(self.folders_datasets, self.k_fold_number_datasets)
 
         # Load each dataset in Dataset class (torch.utils.data.Dataset)
-        train_val_datasets_folders = self.folders_datasets[:self.k_fold_max-self.k_fold_number_datasets].copy()
-        test_datasets_folders = self.folders_datasets[self.k_fold_max-self.k_fold_number_datasets:].copy()
+        train_val_datasets_folders = self.folders_datasets[:self.datasets_number-self.k_fold_number_datasets].copy()
+        test_datasets_folders = self.folders_datasets[self.datasets_number-self.k_fold_number_datasets:].copy()
 
         print('Train/Val folders in use...')
         print(train_val_datasets_folders)

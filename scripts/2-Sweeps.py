@@ -5,7 +5,8 @@ author: obanmarcos
 import os
 import os, sys
 
-sys.path.append('/home/obanmarcos/Balseiro/DeepOPT/')
+# Where am I asks where you are
+sys.path.append(where_am_i())
 
 import pytorch_lightning as pl
 import argparse

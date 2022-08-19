@@ -1,15 +1,14 @@
 import sys
+import socket
 
 marcos_computer_path = '/home/marcos/Balseiro/DeepOPT' 
 german_computer_path = '/home/marcos/DeepOPT'
 
 def where_am_i():
 
-    computer = input('Where am I:')
-
-    if computer == 'marcos':
+    if socket.gethostname() in ['copote', 'copito']:
         return marcos_computer_path
-    elif computer == 'german':
+    elif socket.gethostname() == 'cabfst42':
         return german_computer_path
     else:
         print('Computer not found')

@@ -315,7 +315,6 @@ class DatasetProcessor:
         sinogram_slice = str(sinogram_slice)
         
         if write_us_filtered == True:
-          print('Slice {sinogram_slice} escrita\n')
           # Undersampled filtered reconstructed image path
           us_filtered_img_path = us_filtered_dataset_folder+sinogram_slice+'.jpg'
           

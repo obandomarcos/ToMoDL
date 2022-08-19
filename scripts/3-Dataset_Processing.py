@@ -7,6 +7,7 @@ from config import *
 from concurrent.futures import process
 import os, sys
 
+# Where am I asks where you are
 sys.path.append(where_am_i())
 
 import argparse

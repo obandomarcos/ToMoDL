@@ -14,7 +14,7 @@ import os, sys
 from re import S
 import names
 
-sys.path.append('/home/obanmarcos/Balseiro/DeepOPT/')
+sys.path.append('~/DeepOPT/')
 
 import argparse
 import numpy as np
@@ -30,9 +30,7 @@ from torch.utils.data import DataLoader, ConcatDataset, random_split
 import pytorch_lightning as pl
 from pytorch_lightning.loggers import WandbLogger
 from pytorch_lightning.callbacks import ModelCheckpoint
-
-import torch
-import cv2
+import wandb
 
 class TrainerSystem():
 
@@ -70,9 +68,7 @@ class TrainerSystem():
             self.track_default_checkpoints = True
             self.logger_dict = kwdict['logger_dict']
 
-            self.logger_dict['name'] = names.get_last_name()
-
-            self.reinitialize_logger()
+            self.run_base_name = names.get_last_name()
         
         self.create_trainer()
             
@@ -85,7 +81,8 @@ class TrainerSystem():
             
             if self.use_k_folding == True:
 
-                self.logger_dict['name'] += '_fold_'+str(self.current_fold)
+                self.logger_dict['group'] = self.run_base_name
+                self.logger_dict['name'] = 'K-Fold {}/{}'.format(self.current_fold, self.k_fold_max-1) 
 
             # Logger parameters
             self.wandb_logger = WandbLogger(**self.logger_dict) 
@@ -152,9 +149,15 @@ class TrainerSystem():
 
         self.data_transform = kwdict['data_transform']
         
+        self.number_volumes = kwdict['number_volumes']
+        
         # To-Do: Option for non-available acceleration factors (RUN ProcessDatasets)
         self.folders_datasets = [self.datasets_folder+'x{}/'.format(self.acceleration_factor)+x for x in os.listdir(self.datasets_folder+'x{}'.format(self.acceleration_factor))]
 
+        if self.number_volumes != 0:
+
+            self.folders_datasets = self.folders_datasets[:self.number_volumes]
+            
         # Number of datasets defines splitting number between train/val and test datasets
         if self.use_k_folding == True:
             
@@ -176,6 +179,7 @@ class TrainerSystem():
         '''
         Rotates self.folders_datasets and builds new train/val/test dataloaders
         '''
+
         if self.current_fold != 0:
             # Rotate datasets
             self.rotate_list(self.folders_datasets, self.k_fold_number_datasets)
@@ -258,7 +262,6 @@ class TrainerSystem():
         '''
         Train model based on Pytorch Lightning
         '''
-
         self.reinitialize_logger()
         # Create dataloaders
         train_dataloader, val_dataloader, test_dataloader = self.generate_K_folding_dataloader()
@@ -283,6 +286,8 @@ class TrainerSystem():
 
         self.wandb_logger.finalize('success')
 
+        wandb.finish()
+
     def k_folding(self):
         '''
         K-fold with parameters
@@ -291,10 +296,11 @@ class TrainerSystem():
         assert(self.use_k_folding == True)
 
         for k_fold in range(self.k_fold_max):
-
+            
             print('{} fold started...'.format(self.current_fold))
             self.train_model()
             print('{} fold finished succesfully!'.format(self.current_fold))
             self.current_fold += 1
+            
 
         

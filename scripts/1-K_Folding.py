@@ -103,6 +103,7 @@ def runs(testing_options):
         data_transform = T.Compose([T.ToTensor()])
                                     
         dataloader_dict = {'datasets_folder': datasets_folder,
+                           'number_volumes' : 0,
                            'experiment_name': 'Bassi',
                            'img_resize': 100,
                            'load_shifts': True,
@@ -127,7 +128,7 @@ def runs(testing_options):
     
     if 'train_psnr' in testing_options:
         
-        model_system_dict['loss_dict']['loss_name'] = 'ssim'
+        model_system_dict['loss_dict']['loss_name'] = 'psnr'
 
         trainer = trutils.TrainerSystem(trainer_dict, dataloader_dict, model_system_dict)
         trainer.k_folding()

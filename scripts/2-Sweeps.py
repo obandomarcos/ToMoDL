@@ -31,8 +31,9 @@ use_default_model_dict = True
 use_default_dataloader_dict = True
 use_default_trainer_dict = True
 
-def runs(testing_options):
-    # Model dictionary
+def sweep(sweep_options):
+
+        # Model dictionary
     if use_default_model_dict == True:
         # ResNet dictionary parameters
         resnet_options_dict = {'number_layers': 8,
@@ -119,14 +120,14 @@ def runs(testing_options):
                            'data_transform' : data_transform}
     
     # Create Custom trainer
-    if 'train_ssim' in testing_options:
+    if 'train_ssim' in sweep_options:
         
         model_system_dict['loss_dict']['loss_name'] = 'ssim'
 
         trainer = trutils.TrainerSystem(trainer_dict, dataloader_dict, model_system_dict)
         trainer.k_folding()
     
-    if 'train_psnr' in testing_options:
+    if 'train_psnr' in sweep_options:
         
         model_system_dict['loss_dict']['loss_name'] = 'psnr'
 
@@ -135,23 +136,26 @@ def runs(testing_options):
 
 if __name__ == '__main__':
 
-    k_folding_options = []
+    sweep_options = {}
 
     parser = argparse.ArgumentParser(description='Do K-folding with different networks')
 
-    parser.add_argument('--train_psnr', help = 'Train w/PSNR loss with optimal hyperparameters', action="store_true")
-    parser.add_argument('--train_ssim', help = 'Train w/SSIM loss with optimal hyperparameters', action="store_true")
+    parser.add_argument('--K', help = 'Sweep K iterations', nargs = '+', type=int, default=argparse.SUPPRESS)
+    parser.add_argument('--layers', help = 'Train w/SSIM loss with optimal hyperparameters', nargs = '+', type=int, default=argparse.SUPPRESS)
     
     args = parser.parse_args()
 
-    if args.train_psnr:
+    if 'K' in args:
 
-        print('Training MODL with PSNR loss...')
-        k_folding_options.append('train_psnr')
+        print('Sweeping K iterations...')
+        print(args.K)
+        sweep_options['K'] = args.K
     
-    if args.train_ssim:
+
+    if 'layers' in args:
         
-        print('Training MODL with SSIM loss...')
-        k_folding_options.append('train_ssim')
+        print('Sweeping layers...')
+        print(args.layers)
+        sweep_options['layers'] = args.layers   
     
-    runs(k_folding_options)
+    sweep(sweep_options)

@@ -126,7 +126,7 @@ wandb.init(config=hyperparameter_defaults)
 # Config parameters are automatically set by W&B sweep agent
 config = wandb.config
 
-def sweep(config):
+def sweep():
     
     wandb.init()
     trainer = trutils.TrainerSystem(**hyperparameter_defaults)

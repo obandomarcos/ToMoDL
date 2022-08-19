@@ -15,7 +15,6 @@ import matplotlib.pyplot as plt
 import pandas as pd
 from utilities import dataloading_utilities as dlutils
 from utilities.folders import *
-from utilities import model_utilities as modutils
 from torch.utils.data import DataLoader, ConcatDataset
 
 def process_datasets(args_options):

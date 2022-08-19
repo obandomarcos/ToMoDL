@@ -2,11 +2,12 @@
 Processes datasets for different acceleration factors
 author: obanmarcos
 '''
+
+from config import *
 from concurrent.futures import process
-import os
 import os, sys
 
-sys.path.append('/home/obanmarcos/Balseiro/DeepOPT/')
+sys.path.append(where_am_i())
 
 import argparse
 import numpy as np

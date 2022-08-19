@@ -62,13 +62,13 @@ class MoDLReconstructor(pl.LightningModule):
             self.log_plot(filtered_fs_rec, modl_rec, 'train')
                 
         psnr_fbp_loss = self.loss_dict['psnr_loss'](filtered_us_rec, filtered_fs_rec)
-        ssim_fbp_loss = self.loss_dict['ssim_loss'](filtered_us_rec, filtered_fs_rec)
+        ssim_fbp_loss = 1-self.loss_dict['ssim_loss'](filtered_us_rec, filtered_fs_rec)
 
         self.log("train/psnr_fbp", self.psnr(psnr_fbp_loss), on_step=False, on_epoch=True)
         self.log("train/ssim_fbp", ssim_fbp_loss, on_step=False, on_epoch=True)
 
         psnr_loss = self.loss_dict['psnr_loss'](modl_rec['dc'+str(self.model.K)], filtered_fs_rec)
-        ssim_loss = self.loss_dict['ssim_loss'](modl_rec['dc'+str(self.model.K)], filtered_fs_rec)
+        ssim_loss = 1-self.loss_dict['ssim_loss'](modl_rec['dc'+str(self.model.K)], filtered_fs_rec)
 
         self.log("train/psnr", self.psnr(psnr_loss),on_step=False, on_epoch=True)
         self.log("train/ssim", ssim_loss, on_step=False, on_epoch=True)
@@ -99,13 +99,13 @@ class MoDLReconstructor(pl.LightningModule):
             self.log_plot(filtered_fs_rec, modl_rec, 'validation')
 
         psnr_fbp_loss = self.loss_dict['psnr_loss'](filtered_us_rec, filtered_fs_rec)
-        ssim_fbp_loss = self.loss_dict['ssim_loss'](filtered_us_rec, filtered_fs_rec)
+        ssim_fbp_loss = 1-self.loss_dict['ssim_loss'](filtered_us_rec, filtered_fs_rec)
 
         self.log("val/psnr_fbp", self.psnr(psnr_fbp_loss), on_step=False, on_epoch=True)
         self.log("val/ssim_fbp", ssim_fbp_loss, on_step=False, on_epoch=True)
 
         psnr_loss = self.loss_dict['psnr_loss'](modl_rec['dc'+str(self.model.K)], filtered_fs_rec)
-        ssim_loss = self.loss_dict['ssim_loss'](modl_rec['dc'+str(self.model.K)], filtered_fs_rec)
+        ssim_loss = 1-self.loss_dict['ssim_loss'](modl_rec['dc'+str(self.model.K)], filtered_fs_rec)
         
         self.log("val/psnr", self.psnr(psnr_loss), on_step=False, on_epoch=True)
         self.log("val/ssim", ssim_loss, on_step=False, on_epoch=True)
@@ -130,7 +130,7 @@ class MoDLReconstructor(pl.LightningModule):
         unfiltered_us_rec, filtered_us_rec, filtered_fs_rec = batch
         
         psnr_fbp_loss = self.loss_dict['psnr_loss'](filtered_us_rec, filtered_fs_rec)
-        ssim_fbp_loss = self.loss_dict['ssim_loss'](filtered_us_rec, filtered_fs_rec)
+        ssim_fbp_loss = 1-self.loss_dict['ssim_loss'](filtered_us_rec, filtered_fs_rec)
 
         self.log("test/psnr_fbp", self.psnr(psnr_fbp_loss))
         self.log("test/ssim_fbp", ssim_fbp_loss)
@@ -142,7 +142,7 @@ class MoDLReconstructor(pl.LightningModule):
             self.log_plot(filtered_fs_rec, modl_rec, 'test')
 
         psnr_loss = self.loss_dict['psnr_loss'](modl_rec['dc'+str(self.model.K)], filtered_fs_rec)
-        ssim_loss = self.loss_dict['ssim_loss'](modl_rec['dc'+str(self.model.K)], filtered_fs_rec)
+        ssim_loss = 1-self.loss_dict['ssim_loss'](modl_rec['dc'+str(self.model.K)], filtered_fs_rec)
         
         self.log("test/psnr", self.psnr(psnr_loss).item())
         self.log("test/ssim", ssim_loss.item())
@@ -176,33 +176,6 @@ class MoDLReconstructor(pl.LightningModule):
         image_grid = wandb.Image(image_grid, caption="Left: Unfiltered undersampled backprojection\n Center 1 : Filtered undersampled backprojection\nCenter 2: Filtered fully sampled\n Right: MoDL reconstruction")
 
         wandb.log({'images {}'.format(self.current_epoch): image_grid})
-
-    def log_unrolled(self, prediction, target):
-        '''
-        Log unrolled network
-        Params: 
-            modl_output (dict): Dictionary of outputs on each iteration rolled.
-        '''
-
-        title = 'Epoch {}'.format(self.current_epoch)
-
-        fig, ax = plt.subplots(1, len(prediction.keys())+1, figsize = (16,6))
-        
-        im = ax[0].imshow(target.detach().cpu().numpy()[0,0,:,:], cmap = 'gray')
-        ax[0].set_title('Target')
-        ax[0].axis('off') 
-        plt.suptitle(title)
-
-        for a, (key, image) in zip(ax[1:], prediction.items()):
-
-            im = a.imshow(image.detach().cpu().numpy()[0,0,:,:], cmap = 'gray')
-            a.set_title(key)
-            a.axis('off')
-        
-        cax = fig.add_axes([a.get_position().x1+0.01,a.get_position().y0,0.02,a.get_position().height])
-        plt.colorbar(im, cax = cax)
-
-        wandb.log({'plot {}'.format(self.current_epoch): fig})
 
     def process_kwdictionary(self, kw_dict):
         '''

@@ -127,7 +127,7 @@ def runs(testing_options):
     
     if 'train_psnr' in testing_options:
         
-        model_system_dict['loss_dict']['loss_name'] = 'ssim'
+        model_system_dict['loss_dict']['loss_name'] = 'psnr'
 
         trainer = trutils.TrainerSystem(trainer_dict, dataloader_dict, model_system_dict)
         trainer.k_folding()

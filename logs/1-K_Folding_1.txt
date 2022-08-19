@@ -1,0 +1,43 @@
+/home/obanmarcos/miniconda3/envs/deepopt/lib/python3.8/site-packages/scipy/__init__.py:146: UserWarning: A NumPy version >=1.16.5 and <1.23.0 is required for this version of SciPy (detected version 1.23.1
+  warnings.warn(f"A NumPy version >={np_minversion} and <{np_maxversion}"
+wandb: Currently logged in as: omarcos. Use `wandb login --relogin` to force relogin
+wandb: Tracking run with wandb version 0.13.1
+wandb: Run data is saved locally in /home/obanmarcos/Balseiro/DeepOPT/wandb/run-20220818_220144-284vc5o6
+wandb: Run `wandb offline` to turn off syncing.
+wandb: Syncing run Gamble_fold_0
+wandb: ⭐️ View project at https://wandb.ai/omarcos/deepopt
+wandb: 🚀 View run at https://wandb.ai/omarcos/deepopt/runs/284vc5o6
+Training MODL with PSNR loss...
+Training MODL with SSIM loss...
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+IPU available: False, using: 0 IPUs
+HPU available: False, using: 0 HPUs
+Running K-Folding...
+0 fold started...
+Train/Val folders in use...
+['/home/obanmarcos/Balseiro/DeepOPT/datasets/x10/140114_5dpf_upper tail_10', '/home/obanmarcos/Balseiro/DeepOPT/datasets/x10/140315_3dpf_head_10', '/home/obanmarcos/Balseiro/DeepOPT/datasets/x10/140117_3dpf_body_10', '/home/obanmarcos/Balseiro/DeepOPT/datasets/x10/140315_1dpf_head_10', '/home/obanmarcos/Balseiro/DeepOPT/datasets/x10/140117_3dpf_upper tail_10', '/home/obanmarcos/Balseiro/DeepOPT/datasets/x10/140519_5dpf_head_10', '/home/obanmarcos/Balseiro/DeepOPT/datasets/x10/140117_3dpf_head_10', '/home/obanmarcos/Balseiro/DeepOPT/datasets/x10/140117_3dpf_lower tail_10', '/home/obanmarcos/Balseiro/DeepOPT/datasets/x10/140114_5dpf_head_10', '/home/obanmarcos/Balseiro/DeepOPT/datasets/x10/140714_5dpf_head_10']
+Test folders in use...
+['/home/obanmarcos/Balseiro/DeepOPT/datasets/x10/140114_5dpf_lower tail_10', '/home/obanmarcos/Balseiro/DeepOPT/datasets/x10/140114_5dpf_body_10']
+/home/obanmarcos/miniconda3/envs/deepopt/lib/python3.8/site-packages/pytorch_lightning/loggers/wandb.py:351: UserWarning: There is a wandb run already in progress and newly created instances of `WandbLogger` will reuse this run. If this is not desired, call `wandb.finish()` before instantiating `WandbLogger`.
+  rank_zero_warn(
+GPU available: True (cuda), used: True
+TPU available: False, using: 0 TPU cores
+IPU available: False, using: 0 IPUs
+HPU available: False, using: 0 HPUs
+/home/obanmarcos/miniconda3/envs/deepopt/lib/python3.8/site-packages/torch_radon/radon.py:268: DeprecationWarning: Radon() class is deprecated, use ParallelBeam instead
+  warnings.warn(
+/home/obanmarcos/miniconda3/envs/deepopt/lib/python3.8/site-packages/pytorch_lightning/core/module.py:386: UserWarning: You are trying to `self.log()` but the `self.trainer` reference is not registered on the model yet. This is most likely because the model hasn't been passed to the `Trainer`
+  rank_zero_warn(
+wandb: logging graph, to disable use `wandb.watch(log_graph=False)`
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [0]
+
+  | Name  | Type | Params
+-------------------------------
+0 | model | modl | 223 K 
+-------------------------------
+223 K     Trainable params
+0         Non-trainable params
+223 K     Total params
+0.895     Total estimated model params size (MB)
+Sanity Checking: 0it [00:00, ?it/s]Sanity Checking:   0%|          | 0/2 [00:00<?, ?it/s]Sanity Checking DataLoader 0:   0%|          | 0/2 [00:00<?, ?it/s]Sanity Checking DataLoader 0:  50%|█████     | 1/2 [00:02<00:02,  2.15s/it]Sanity Checking DataLoader 0: 100%|██████████| 2/2 [00:02<00:00,  1.26s/it]                                                                           Training: 0it [00:00, ?it/s]Training:   0%|          | 0/1777 [00:00<?, ?it/s]Epoch 0:   0%|          | 0/1777 [00:00<?, ?it/s] Epoch 0:   0%|          | 1/1777 [00:01<51:54,  1.75s/it]Epoch 0:   0%|          | 1/1777 [00:01<51:54,  1.75s/it, loss=0.307, v_num=c5o6]Epoch 0:   0%|          | 2/1777 [00:02<41:15,  1.39s/it, loss=0.307, v_num=c5o6]Epoch 0:   0%|          | 2/1777 [00:02<41:15,  1.39s/it, loss=0.305, v_num=c5o6]Epoch 0:   0%|          | 3/1777 [00:03<37:40,  1.27s/it, loss=0.305, v_num=c5o6]Epoch 0:   0%|          | 3/1777 [00:03<37:40,  1.27s/it, loss=0.308, v_num=c5o6]Epoch 0:   0%|          | 4/1777 [00:04<35:55,  1.22s/it, loss=0.308, v_num=c5o6]Epoch 0:   0%|          | 4/1777 [00:04<35:55,  1.22s/it, loss=0.292, v_num=c5o6]Epoch 0:   0%|          | 5/1777 [00:05<35:08,  1.19s/it, loss=0.292, v_num=c5o6]Epoch 0:   0%|          | 5/1777 [00:05<35:09,  1.19s/it, loss=0.274, v_num=c5o6]Epoch 0:   0%|          | 6/1777 [00:07<34:31,  1.17s/it, loss=0.274, v_num=c5o6]Epoch 0:   0%|          | 6/1777 [00:07<34:31,  1.17s/it, loss=0.256, v_num=c5o6]Epoch 0:   0%|          | 7/1777 [00:08<34:11,  1.16s/it, loss=0.256, v_num=c5o6]Epoch 0:   0%|          | 7/1777 [00:08<34:11,  1.16s/it, loss=0.246, v_num=c5o6]Epoch 0:   0%|          | 8/1777 [00:09<33:46,  1.15s/it, loss=0.246, v_num=c5o6]Epoch 0:   0%|          | 8/1777 [00:09<33:46,  1.15s/it, loss=0.233, v_num=c5o6]Epoch 0:   1%|          | 9/1777 [00:10<33:33,  1.14s/it, loss=0.233, v_num=c5o6]Epoch 0:   1%|          | 9/1777 [00:10<33:33,  1.14s/it, loss=0.227, v_num=c5o6]Epoch 0:   1%|          | 10/1777 [00:11<33:27,  1.14s/it, loss=0.227, v_num=c5o6]Epoch 0:   1%|          | 10/1777 [00:11<33:27,  1.14s/it, loss=0.216, v_num=c5o6]Epoch 0:   1%|          | 11/1777 [00:12<33:30,  1.14s/it, loss=0.216, v_num=c5o6]Epoch 0:   1%|          | 11/1777 [00:12<33:30,  1.14s/it, loss=0.208, v_num=c5o6]Epoch 0:   1%|          | 12/1777 [00:13<33:29,  1.14s/it, loss=0.208, v_num=c5o6]Epoch 0:   1%|          | 12/1777 [00:13<33:29,  1.14s/it, loss=0.201, v_num=c5o6]Epoch 0:   1%|          | 13/1777 [00:14<33:30,  1.14s/it, loss=0.201, v_num=c5o6]Epoch 0:   1%|          | 13/1777 [00:14<33:30,  1.14s/it, loss=0.195, v_num=c5o6]Epoch 0:   1%|          | 14/1777 [00:16<33:43,  1.15s/it, loss=0.195, v_num=c5o6]Epoch 0:   1%|          | 14/1777 [00:16<33:43,  1.15s/it, loss=0.189, v_num=c5o6]Epoch 0:   1%|          | 15/1777 [00:17<33:29,  1.14s/it, loss=0.189, v_num=c5o6]Epoch 0:   1%|          | 15/1777 [00:17<33:29,  1.14s/it, loss=0.184, v_num=c5o6]Epoch 0:   1%|          | 16/1777 [00:18<33:21,  1.14s/it, loss=0.184, v_num=c5o6]Epoch 0:   1%|          | 16/1777 [00:18<33:21,  1.14s/it, loss=0.181, v_num=c5o6]Epoch 0:   1%|          | 17/1777 [00:19<33:12,  1.13s/it, loss=0.181, v_num=c5o6]Epoch 0:   1%|          | 17/1777 [00:19<33:12,  1.13s/it, loss=0.175, v_num=c5o6]Epoch 0:   1%|          | 18/1777 [00:20<33:05,  1.13s/it, loss=0.175, v_num=c5o6]Epoch 0:   1%|          | 18/1777 [00:20<33:05,  1.13s/it, loss=0.171, v_num=c5o6]Epoch 0:   1%|          | 19/1777 [00:21<32:59,  1.13s/it, loss=0.171, v_num=c5o6]Epoch 0:   1%|          | 19/1777 [00:21<32:59,  1.13s/it, loss=0.167, v_num=c5o6]Epoch 0:   1%|          | 20/1777 [00:22<32:55,  1.12s/it, loss=0.167, v_num=c5o6]Epoch 0:   1%|          | 20/1777 [00:22<32:55,  1.12s/it, loss=0.165, v_num=c5o6]Epoch 0:   1%|          | 21/1777 [00:23<32:51,  1.12s/it, loss=0.165, v_num=c5o6]Epoch 0:   1%|          | 21/1777 [00:23<32:51,  1.12s/it, loss=0.155, v_num=c5o6]Epoch 0:   1%|          | 22/1777 [00:24<32:45,  1.12s/it, loss=0.155, v_num=c5o6]Epoch 0:   1%|          | 22/1777 [00:24<32:45,  1.12s/it, loss=0.145, v_num=c5o6]Epoch 0:   1%|▏         | 23/1777 [00:25<32:40,  1.12s/it, loss=0.145, v_num=c5o6]Epoch 0:   1%|▏         | 23/1777 [00:25<32:40,  1.12s/it, loss=0.135, v_num=c5o6]Epoch 0:   1%|▏         | 24/1777 [00:26<32:36,  1.12s/it, loss=0.135, v_num=c5o6]Epoch 0:   1%|▏         | 24/1777 [00:26<32:36,  1.12s/it, loss=0.127, v_num=c5o6]Epoch 0:   1%|▏         | 25/1777 [00:27<32:34,  1.12s/it, loss=0.127, v_num=c5o6]Epoch 0:   1%|▏         | 25/1777 [00:27<32:34,  1.12s/it, loss=0.122, v_num=c5o6]Epoch 0:   1%|▏         | 26/1777 [00:28<32:30,  1.11s/it, loss=0.122, v_num=c5o6]Epoch 0:   1%|▏         | 26/1777 [00:28<32:30,  1.11s/it, loss=0.118, v_num=c5o6]Epoch 0:   2%|▏         | 27/1777 [00:30<32:24,  1.11s/it, loss=0.118, v_num=c5o6]Epoch 0:   2%|▏         | 27/1777 [00:30<32:24,  1.11s/it, loss=0.113, v_num=c5o6]Epoch 0:   2%|▏         | 28/1777 [00:31<32:23,  1.11s/it, loss=0.113, v_num=c5o6]Epoch 0:   2%|▏         | 28/1777 [00:31<32:23,  1.11s/it, loss=0.11, v_num=c5o6] Epoch 0:   2%|▏         | 29/1777 [00:32<32:19,  1.11s/it, loss=0.11, v_num=c5o6]Epoch 0:   2%|▏         | 29/1777 [00:32<32:19,  1.11s/it, loss=0.105, v_num=c5o6]Epoch 0:   2%|▏         | 30/1777 [00:33<32:16,  1.11s/it, loss=0.105, v_num=c5o6]Epoch 0:   2%|▏         | 30/1777 [00:33<32:16,  1.11s/it, loss=0.104, v_num=c5o6]

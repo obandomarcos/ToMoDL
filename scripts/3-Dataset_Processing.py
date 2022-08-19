@@ -46,6 +46,10 @@ def process_datasets(args_options):
 
 if __name__ == '__main__':
     
-    args_options = np.arange(2, 30, 2).astype(int)
+    '''
+    To-Do: ArgParsing
+    '''
+    args_options = {}
+    args_options['acc_factors'] = np.arange(2, 30, 2).astype(int)
 
     process_datasets(args_options)

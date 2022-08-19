@@ -88,7 +88,7 @@ class dw(nn.Module):
         """
         Initialises dw block
         Params:
-            - nLayer (int): Number of layers 
+            - kw_dictionary (dict): Parameters dictionary
         """
         super(dw, self).__init__()
 
@@ -96,8 +96,6 @@ class dw(nn.Module):
         
         for i in np.arange(1, self.number_layers+1):
             
-            print('Building resnet')
-            print(i, self.weights_size[i])
             self.dw_layer_dict['weights_size'] = self.weights_size[i]
 
             if i == self.number_layers:
@@ -131,15 +129,15 @@ class dw(nn.Module):
             - kw_dictionary (dict): Dictionary with keywords
         '''
         
-        self.number_layers = kw_dictionary.pop('number_layers')
+        self.number_layers = kw_dictionary['number_layers']
         self.nw = {}
-        self.kernel_size = kw_dictionary.pop('kernel_size')
-        self.features = kw_dictionary.pop('features')
-        self.in_channels = kw_dictionary.pop('in_channels')
-        self.out_channels= kw_dictionary.pop('out_channels')
-        self.stride = kw_dictionary.pop('stride')
-        self.use_batch_norm = kw_dictionary.pop('use_batch_norm')
-        self.init_method = kw_dictionary.pop('init_method') 
+        self.kernel_size = kw_dictionary['kernel_size']
+        self.features = kw_dictionary['features']
+        self.in_channels = kw_dictionary['in_channels']
+        self.out_channels= kw_dictionary['out_channels']
+        self.stride = kw_dictionary['stride']
+        self.use_batch_norm = kw_dictionary['use_batch_norm']
+        self.init_method = kw_dictionary['init_method']
 
         # Intermediate layers (in_channels, out_channels, kernel_size_x, kernel_size_y)
         self.weights_size = {key: (self.features,self.features,self.kernel_size,self.stride) for key in range(2, self.number_layers)}   
@@ -203,26 +201,26 @@ class modl(nn.Module):
     '''
 
     self.out = {}
-    self.use_torch_radon = kw_dictionary.pop('use_torch_radon')
-    self.number_layers = kw_dictionary.pop('number_layers')
-    self.K = kw_dictionary.pop('K_iterations')
-    self.number_projections_total = kw_dictionary.pop('number_projections_total')
-    self.number_projections_undersampled = kw_dictionary.pop('number_projections_undersampled') 
-    self.image_size = kw_dictionary.pop('image_size') 
+    self.use_torch_radon = kw_dictionary['use_torch_radon']
+    self.number_layers = kw_dictionary['number_layers']
+    self.K = kw_dictionary['K_iterations']
+    self.number_projections_total = kw_dictionary['number_projections_total']
+    self.number_projections_undersampled = kw_dictionary['number_projections_undersampled']
+    self.image_size = kw_dictionary['image_size'] 
     
-    self.lam = kw_dictionary.pop('lambda')
+    self.lam = kw_dictionary['lambda']
     self.lam = self.lam = torch.nn.Parameter(torch.tensor([self.lam], requires_grad = True, device = device))
     
-    self.use_shared_weights = kw_dictionary.pop('use_shared_weights')
-    self.denoiser_method = kw_dictionary.pop('denoiser_method')
+    self.use_shared_weights = kw_dictionary['use_shared_weights']
+    self.denoiser_method = kw_dictionary['denoiser_method']
     
-    self.in_channels = kw_dictionary.pop('in_channels')
-    self.out_channels = kw_dictionary.pop('out_channels')
+    self.in_channels = kw_dictionary['in_channels']
+    self.out_channels = kw_dictionary['out_channels']
 
     if self.denoiser_method == 'U-Net':
-        self.unet_options = kw_dictionary.pop('unet_options')
+        self.unet_options = kw_dictionary['unet_options']
     elif self.denoiser_method == 'resnet':
-        self.resnet_options = kw_dictionary.pop('resnet_options')
+        self.resnet_options = kw_dictionary['resnet_options']
     
     self.AtA_dictionary = {'image_size': self.image_size, 'number_projections': self.number_projections_total, 'lambda':self.lam, 'use_torch_radon': self.use_torch_radon}
 
@@ -263,10 +261,10 @@ class Aclass:
             - kw_dictionary (dict): Keyword dictionary
         '''
         
-        self.img_size = kw_dictionary.pop('image_size')
-        self.number_projections = kw_dictionary.pop('number_projections')
-        self.lam = kw_dictionary.pop('lambda')
-        self.use_torch_radon = kw_dictionary.pop('use_torch_radon')
+        self.img_size = kw_dictionary['image_size']
+        self.number_projections = kw_dictionary['number_projections']
+        self.lam = kw_dictionary['lambda']
+        self.use_torch_radon = kw_dictionary['use_torch_radon']
         self.angles = np.linspace(0, 2*np.pi, self.number_projections,endpoint = False)
         self.det_count = int(np.sqrt(2)*self.img_size+0.5)
         self.radon = Radon(self.img_size, self.angles, clip_to_circle = False, det_count = self.det_count)

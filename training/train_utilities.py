@@ -34,7 +34,7 @@ from pytorch_lightning.callbacks import ModelCheckpoint
 import torch
 import cv2
 
-class Trainer():
+class TrainerSystem():
 
     def __init__(self, trainer_kwdict, dataloader_kwdict, model_system_kwdict):
         '''
@@ -61,6 +61,7 @@ class Trainer():
             # Number of datasets for testing
             self.k_fold_number_datasets = kwdict['k_fold_number_datasets']
             self.current_fold = 0 
+        
         self.use_logger = kwdict['use_logger']
         self.lightning_trainer_dict = kwdict['lightning_trainer_dict']
 
@@ -72,7 +73,6 @@ class Trainer():
             self.logger_dict['name'] = names.get_last_name()
 
             self.reinitialize_logger()
-        
         
         self.create_trainer()
             
@@ -92,7 +92,7 @@ class Trainer():
 
             # Callbacks (default)
             if self.track_default_checkpoints == True:
-                
+
                 train_psnr_fbp_checkpoint_callback = ModelCheckpoint(monitor='train/psnr_fbp', mode='max')
                 train_ssim_fbp_checkpoint_callback = ModelCheckpoint(monitor='train/ssim_fbp', mode='max')
 
@@ -153,7 +153,7 @@ class Trainer():
         self.data_transform = kwdict['data_transform']
         
         # To-Do: Option for non-available acceleration factors (RUN ProcessDatasets)
-        self.folders_datasets = [self.datasets_folder+'/x{}/'.format(self.acceleration_factor)+x for x in os.listdir(self.datasets_folder+'x{}'.format(self.acceleration_factor))]
+        self.folders_datasets = [self.datasets_folder+'x{}/'.format(self.acceleration_factor)+x for x in os.listdir(self.datasets_folder+'x{}'.format(self.acceleration_factor))]
 
         # Number of datasets defines splitting number between train/val and test datasets
         if self.use_k_folding == True:
@@ -170,6 +170,7 @@ class Trainer():
         '''
 
         self.model_system_dict = kwdict
+        self.model_system_dict['max_epochs'] = self.lightning_trainer_dict['max_epochs']
     
     def generate_K_folding_dataloader(self):
         '''
@@ -181,7 +182,13 @@ class Trainer():
 
         # Load each dataset in Dataset class (torch.utils.data.Dataset)
         train_val_datasets_folders = self.folders_datasets[:self.k_fold_max-self.k_fold_number_datasets].copy()
-        test_datasets_folders = self.folders_datasets[:self.k_fold_max-self.k_fold_number_datasets].copy()
+        test_datasets_folders = self.folders_datasets[self.k_fold_max-self.k_fold_number_datasets:].copy()
+
+        print('Train/Val folders in use...')
+        print(train_val_datasets_folders)
+
+        print('Test folders in use...')
+        print(test_datasets_folders)
 
         # Train and validation dataloader  
         train_val_datasets = []
@@ -208,12 +215,12 @@ class Trainer():
         train_dataloader = DataLoader(train_dataset, 
                                 batch_size = self.batch_size,
                                 shuffle = self.shuffle_data,
-                                num_workers = 0)
+                                num_workers = 16)
 
         val_dataloader = DataLoader(val_dataset, 
                                 batch_size = self.batch_size,
                                 shuffle = False,
-                                num_workers = 0)
+                                num_workers = 16)
         
         test_datasets = []
         
@@ -230,7 +237,7 @@ class Trainer():
         test_dataloader = DataLoader(test_dataset, 
                                 batch_size = self.batch_size,
                                 shuffle = False,
-                                num_workers = 0)
+                                num_workers = 16)
 
         return train_dataloader, val_dataloader, test_dataloader
     

@@ -23,8 +23,6 @@ import torch
 from pytorch_lightning.callbacks import ModelCheckpoint
 from pytorch_lightning.loggers import WandbLogger
 
-import wandb 
-import cv2
 from torchvision import transforms as T
 from pytorch_msssim import SSIM
 
@@ -72,7 +70,10 @@ def test_trainer(testing_options):
         # System parameters
         model_system_dict = {'optimizer_dict': optimizer_dict,
                             'kw_dictionary_modl': modl_dict,
-                            'loss_dict': loss_dict}
+                            'loss_dict': loss_dict,                        
+                            'track_train': True,
+                            'track_val': True,
+                            'track_test': True}
     
     # PL Trainer and W&B logger dictionaries
     if use_default_trainer_dict == True:
@@ -117,7 +118,7 @@ def test_trainer(testing_options):
                            'data_transform' : data_transform}
     
     # Create Custom trainer
-    trainer = trutils.Trainer(trainer_dict, dataloader_dict, model_system_dict)
+    trainer = trutils.TrainerSystem(trainer_dict, dataloader_dict, model_system_dict)
 
     if 'train_model' in testing_options:
 

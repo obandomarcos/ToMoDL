@@ -33,21 +33,19 @@ def process_datasets(args_options):
 
     # 1 - Load datasets
     # 1a - Check ZebraDataset writing of x10 acceleration factor
-    if 'check_dataset_writing' in args_options:
-        
-        for acceleration_factor in args_options['acc_factors']:
+    for acceleration_factor in args_options['acc_factors']:
 
-            zebra_dataset_dict['number_projections_undersampled'] = zebra_dataset_dict['number_projections_undersampled']//acceleration_factor
+        zebra_dataset_dict['number_projections_undersampled'] = zebra_dataset_dict['number_projections_undersampled']//acceleration_factor
 
-            for folder in folder_paths:
-                
-                zebra_dataset_dict['folder_path'] = folder
-                zebra_dataset_test = dlutils.DatasetProcessor(zebra_dataset_dict)
+        for folder in folder_paths:
+            
+            zebra_dataset_dict['folder_path'] = folder
+            zebra_dataset_test = dlutils.DatasetProcessor(zebra_dataset_dict)
 
-                del zebra_dataset_test
+            del zebra_dataset_test
 
 if __name__ == '__main__':
-
+    
     args_options = np.arange(2, 30, 2).astype(int)
 
     process_datasets(args_options)

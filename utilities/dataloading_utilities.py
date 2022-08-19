@@ -278,8 +278,12 @@ class DatasetProcessor:
     '''    
     # Create dataset folder and subfolders for acceleration folders
     reconstructed_dataset_folder = self.dataset_folder+'/x'+str(self.acceleration_factor)+'/'+self.folder_name+'_'+sample+'_'+str(self.acceleration_factor)+'/'
-    
-    Path(reconstructed_dataset_folder).mkdir(parents=True, exist_ok=True)
+
+    # Try to build datafolder if it doesn't exist, otherwise assume that it is already available.
+    try:
+      Path(reconstructed_dataset_folder).mkdir(parents=True)
+    except FileExistsError:
+      return 
 
     us_unfiltered_dataset_folder = reconstructed_dataset_folder+'us_{}_unfiltered/'.format(self.acceleration_factor)
     fs_filtered_dataset_folder = reconstructed_dataset_folder+'fs_filtered/'

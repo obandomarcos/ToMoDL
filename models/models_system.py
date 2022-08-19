@@ -14,6 +14,7 @@ import matplotlib.pyplot as plt
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import torchvision
 from . import unet
 import wandb 
 
@@ -32,13 +33,13 @@ class MoDLReconstructor(pl.LightningModule):
         '''
         super().__init__()
         
-        wandb.init(project = 'deepopt')
+        # wandb.init(project = 'deepopt')
 
         self.process_kwdictionary(kw_dictionary_model_system)
 
         self.model = modl.modl(self.kw_dictionary_modl)
 
-        self.save_hyperparameters()
+        self.save_hyperparameters(self.hparams)
 
     def forward(self, x):
 
@@ -53,7 +54,7 @@ class MoDLReconstructor(pl.LightningModule):
         '''
 
         unfiltered_us_rec, filtered_us_rec, filtered_fs_rec = batch
-        
+
         modl_rec = self.model(unfiltered_us_rec)
 
         if (self.track_train == True) and ((self.current_epoch == 0) or (self.current_epoch == self.max_epochs-1)) and (batch_idx == 0):
@@ -161,6 +162,47 @@ class MoDLReconstructor(pl.LightningModule):
         if self.optimizer_dict['optimizer_name'] == 'Adam':
             optimizer = torch.optim.Adam(self.parameters(), lr=self.optimizer_dict['lr'])
         return optimizer
+
+    def log_samples(self, batch, model_reconstruction):
+        '''
+        Logs images from training.
+        '''
+
+        unfiltered_us_rec, filtered_us_rec, filtered_fs_rec = batch
+
+        image_tensor = [unfiltered_us_rec[0,...], filtered_us_rec[0,...], filtered_fs_rec[0,...], model_reconstruction[0, ...]]
+
+        image_grid = torchvision.utils.make_grid(image_tensor)
+        image_grid = wandb.Image(image_grid, caption="Left: Unfiltered undersampled backprojection\n Center 1 : Filtered undersampled backprojection\nCenter 2: Filtered fully sampled\n Right: MoDL reconstruction")
+
+        wandb.log({'images {}'.format(self.current_epoch): image_grid})
+
+    def log_unrolled(self, prediction, target):
+        '''
+        Log unrolled network
+        Params: 
+            modl_output (dict): Dictionary of outputs on each iteration rolled.
+        '''
+
+        title = 'Epoch {}'.format(self.current_epoch)
+
+        fig, ax = plt.subplots(1, len(prediction.keys())+1, figsize = (16,6))
+        
+        im = ax[0].imshow(target.detach().cpu().numpy()[0,0,:,:], cmap = 'gray')
+        ax[0].set_title('Target')
+        ax[0].axis('off') 
+        plt.suptitle(title)
+
+        for a, (key, image) in zip(ax[1:], prediction.items()):
+
+            im = a.imshow(image.detach().cpu().numpy()[0,0,:,:], cmap = 'gray')
+            a.set_title(key)
+            a.axis('off')
+        
+        cax = fig.add_axes([a.get_position().x1+0.01,a.get_position().y0,0.02,a.get_position().height])
+        plt.colorbar(im, cax = cax)
+
+        wandb.log({'plot {}'.format(self.current_epoch): fig})
 
     def process_kwdictionary(self, kw_dict):
         '''

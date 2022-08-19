@@ -4,7 +4,7 @@ author: obanmarcos
 '''
 import os
 import os, sys
-
+from config import *
 # Where am I asks where you are
 sys.path.append(where_am_i())
 

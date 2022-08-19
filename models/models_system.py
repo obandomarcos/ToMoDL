@@ -2,6 +2,8 @@
 This code provides with an easy way to avoid boilerplate for training and validating results.
 author: obanmarcos
 '''
+import sys
+sys.path.append('~/DeepOPT/')
 
 import torch
 from . import modl
@@ -64,14 +66,14 @@ class MoDLReconstructor(pl.LightningModule):
         psnr_fbp_loss = self.loss_dict['psnr_loss'](filtered_us_rec, filtered_fs_rec)
         ssim_fbp_loss = 1-self.loss_dict['ssim_loss'](filtered_us_rec, filtered_fs_rec)
 
-        self.log("train/psnr_fbp", self.psnr(psnr_fbp_loss), on_step=False, on_epoch=True)
-        self.log("train/ssim_fbp", ssim_fbp_loss, on_step=False, on_epoch=True)
+        self.log("train/psnr_fbp", self.psnr(psnr_fbp_loss))
+        self.log("train/ssim_fbp", 1-ssim_fbp_loss)
 
         psnr_loss = self.loss_dict['psnr_loss'](modl_rec['dc'+str(self.model.K)], filtered_fs_rec)
         ssim_loss = 1-self.loss_dict['ssim_loss'](modl_rec['dc'+str(self.model.K)], filtered_fs_rec)
 
-        self.log("train/psnr", self.psnr(psnr_loss),on_step=False, on_epoch=True)
-        self.log("train/ssim", ssim_loss, on_step=False, on_epoch=True)
+        self.log("train/psnr", self.psnr(psnr_loss))
+        self.log("train/ssim", 1-ssim_loss)
 
         if self.loss_dict['loss_name'] == 'psnr':
             
@@ -101,14 +103,14 @@ class MoDLReconstructor(pl.LightningModule):
         psnr_fbp_loss = self.loss_dict['psnr_loss'](filtered_us_rec, filtered_fs_rec)
         ssim_fbp_loss = 1-self.loss_dict['ssim_loss'](filtered_us_rec, filtered_fs_rec)
 
-        self.log("val/psnr_fbp", self.psnr(psnr_fbp_loss), on_step=False, on_epoch=True)
-        self.log("val/ssim_fbp", ssim_fbp_loss, on_step=False, on_epoch=True)
+        self.log("val/psnr_fbp", self.psnr(psnr_fbp_loss))
+        self.log("val/ssim_fbp", 1-ssim_fbp_loss)
 
         psnr_loss = self.loss_dict['psnr_loss'](modl_rec['dc'+str(self.model.K)], filtered_fs_rec)
         ssim_loss = 1-self.loss_dict['ssim_loss'](modl_rec['dc'+str(self.model.K)], filtered_fs_rec)
         
-        self.log("val/psnr", self.psnr(psnr_loss), on_step=False, on_epoch=True)
-        self.log("val/ssim", ssim_loss, on_step=False, on_epoch=True)
+        self.log("val/psnr", self.psnr(psnr_loss))
+        self.log("val/ssim", 1-ssim_loss)
 
         if self.loss_dict['loss_name'] == 'psnr':
             
@@ -133,7 +135,7 @@ class MoDLReconstructor(pl.LightningModule):
         ssim_fbp_loss = 1-self.loss_dict['ssim_loss'](filtered_us_rec, filtered_fs_rec)
 
         self.log("test/psnr_fbp", self.psnr(psnr_fbp_loss))
-        self.log("test/ssim_fbp", ssim_fbp_loss)
+        self.log("test/ssim_fbp", 1-ssim_fbp_loss)
 
         modl_rec = self.model(unfiltered_us_rec)
 
@@ -145,7 +147,7 @@ class MoDLReconstructor(pl.LightningModule):
         ssim_loss = 1-self.loss_dict['ssim_loss'](modl_rec['dc'+str(self.model.K)], filtered_fs_rec)
         
         self.log("test/psnr", self.psnr(psnr_loss).item())
-        self.log("test/ssim", ssim_loss.item())
+        self.log("test/ssim", 1-ssim_loss.item())
 
         if self.loss_dict['loss_name'] == 'psnr':
             
@@ -162,20 +164,6 @@ class MoDLReconstructor(pl.LightningModule):
         if self.optimizer_dict['optimizer_name'] == 'Adam':
             optimizer = torch.optim.Adam(self.parameters(), lr=self.optimizer_dict['lr'])
         return optimizer
-
-    def log_samples(self, batch, model_reconstruction):
-        '''
-        Logs images from training.
-        '''
-
-        unfiltered_us_rec, filtered_us_rec, filtered_fs_rec = batch
-
-        image_tensor = [unfiltered_us_rec[0,...], filtered_us_rec[0,...], filtered_fs_rec[0,...], model_reconstruction[0, ...]]
-
-        image_grid = torchvision.utils.make_grid(image_tensor)
-        image_grid = wandb.Image(image_grid, caption="Left: Unfiltered undersampled backprojection\n Center 1 : Filtered undersampled backprojection\nCenter 2: Filtered fully sampled\n Right: MoDL reconstruction")
-
-        wandb.log({'images {}'.format(self.current_epoch): image_grid})
 
     def process_kwdictionary(self, kw_dict):
         '''
@@ -227,8 +215,20 @@ class MoDLReconstructor(pl.LightningModule):
         cax = fig.add_axes([a.get_position().x1+0.01,a.get_position().y0,0.02,a.get_position().height])
         plt.colorbar(im, cax = cax)
 
-        wandb.log({'train_plot_{}'.format(self.current_epoch): fig})
+        wandb.log({'{}_plot_{}'.format(phase, self.current_epoch): fig})
 
+    def log_samples(self, batch, model_reconstruction):
+        '''
+        Logs images from training.
+        '''
 
+        unfiltered_us_rec, filtered_us_rec, filtered_fs_rec = batch
+
+        image_tensor = [unfiltered_us_rec[0,...], filtered_us_rec[0,...], filtered_fs_rec[0,...], model_reconstruction[0, ...]]
+
+        image_grid = torchvision.utils.make_grid(image_tensor)
+        image_grid = wandb.Image(image_grid, caption="Left: Unfiltered undersampled backprojection\n Center 1 : Filtered undersampled backprojection\nCenter 2: Filtered fully sampled\n Right: MoDL reconstruction")
+
+        wandb.log({'images {}'.format(self.current_epoch): image_grid})
 
 

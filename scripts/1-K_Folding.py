@@ -103,6 +103,7 @@ def runs(testing_options):
         data_transform = T.Compose([T.ToTensor()])
                                     
         dataloader_dict = {'datasets_folder': datasets_folder,
+                           'number_volumes' : 0,
                            'experiment_name': 'Bassi',
                            'img_resize': 100,
                            'load_shifts': True,

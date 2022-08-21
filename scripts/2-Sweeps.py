@@ -84,8 +84,7 @@ if use_default_trainer_dict == True:
                     'log_model': True}
 
     lightning_trainer_dict = {'max_epochs': 40,
-                                'log_every_n_steps':1,
-                                'check_val_every_n_epoch': 1,
+                                'log_every_n_steps':1000,
                                 'gradient_clip_val' : 1.0,
                                 'accelerator' : 'gpu', 
                                 'devices' : 1,

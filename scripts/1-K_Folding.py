@@ -83,7 +83,7 @@ def runs(testing_options):
                         'log_model': True}
 
         lightning_trainer_dict = {'max_epochs': 40,
-                                  'log_every_n_steps':1,
+                                  'log_every_n_steps':1000,
                                   'check_val_every_n_epoch': 1,
                                   'gradient_clip_val' : 1.0,
                                   'accelerator' : 'gpu', 

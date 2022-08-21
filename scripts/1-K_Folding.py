@@ -1,5 +1,5 @@
 '''
-Testing functionalities of train_utilities
+K-Folding script
 author: obanmarcos
 '''
 import os
@@ -41,7 +41,7 @@ def runs(testing_options):
                             'in_channels':1,
                             'out_channels':1,
                             'stride':1, 
-                            'use_batch_norm': True,
+                            'use_batch_norm': False,
                             'init_method': 'xavier'}
 
         # Model parameters
@@ -83,7 +83,7 @@ def runs(testing_options):
                         'log_model': True}
 
         lightning_trainer_dict = {'max_epochs': 40,
-                                  'log_every_n_steps':1,
+                                  'log_every_n_steps':1000,
                                   'check_val_every_n_epoch': 1,
                                   'gradient_clip_val' : 1.0,
                                   'accelerator' : 'gpu', 

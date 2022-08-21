@@ -42,7 +42,7 @@ if use_default_model_dict == True:
                         'in_channels':1,
                         'out_channels':1,
                         'stride':1, 
-                        'use_batch_norm': True,
+                        'use_batch_norm': False,
                         'init_method': 'xavier'}
 
     # Model parameters

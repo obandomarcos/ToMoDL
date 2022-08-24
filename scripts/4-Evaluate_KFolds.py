@@ -71,7 +71,8 @@ def eval_models(testing_options):
                         'lr': 1e-4}
 
         # System parameters
-        model_system_dict = {'optimizer_dict': optimizer_dict,
+        model_system_dict = {'max_epochs':40,
+                            'optimizer_dict': optimizer_dict,
                             'kw_dictionary_modl': modl_dict,
                             'loss_dict': loss_dict,                        
                             'track_train': True,
@@ -139,7 +140,6 @@ def eval_models(testing_options):
         print(test_model['hyper_parameters'])
 
     return
-
 
 if __name__ == '__main__':
 

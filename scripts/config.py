@@ -3,6 +3,7 @@ import socket
 
 marcos_computer_path = '/home/marcos/Balseiro/DeepOPT' 
 german_computer_path = '/home/marcos/DeepOPT'
+ariel_computer_path = '/home/marcos/DeepOPT'
 
 def where_am_i():
 
@@ -10,6 +11,8 @@ def where_am_i():
         return marcos_computer_path
     elif socket.gethostname() == 'cabfst42':
         return german_computer_path
+    elif socket.gethostname() == 'gpu1':
+        return ariel_computer_path
     else:
         print('Computer not found')
         sys.exit(0)

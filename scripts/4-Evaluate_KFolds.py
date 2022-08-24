@@ -13,10 +13,11 @@ import argparse
 import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
+from training import train_utilities as trutils
 from utilities import dataloading_utilities as dlutils
 from utilities.folders import *
 
-from training import train_utilities as trutils
+
 
 from models.models_system import MoDLReconstructor
 import torch

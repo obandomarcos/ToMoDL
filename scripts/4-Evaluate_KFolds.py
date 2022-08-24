@@ -2,12 +2,11 @@
 Evaluate K-Fold models from artifacts
 author: obanmarcos
 '''
-from cgi import test
-import os
 import os, sys
 from config import *
 
 sys.path.append(where_am_i())
+print(where_am_i())
 
 import pytorch_lightning as pl
 import argparse

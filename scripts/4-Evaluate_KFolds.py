@@ -6,7 +6,7 @@ import os, sys
 from config import *
 
 sys.path.append(where_am_i())
-print(where_am_i())
+print(sys.path)
 
 import pytorch_lightning as pl
 import argparse

@@ -77,7 +77,7 @@ def runs(testing_options):
     
     # PL Trainer and W&B logger dictionaries
     if use_default_trainer_dict == True:
-        
+                
         logger_dict = {'project':'deepopt',
                         'entity': 'omarcos', 
                         'log_model': True}
@@ -92,6 +92,10 @@ def runs(testing_options):
 
         trainer_dict = {'lightning_trainer_dict': lightning_trainer_dict,
                         'use_k_folding': True, 
+                        'track_checkpoints': True,
+                        'use_model_checkpoint': True,
+                        'swa' : True,
+                        'use_accumulate_batches':True,
                         'k_fold_number_datasets': 2,
                         'use_logger' : True,
                         'logger_dict': logger_dict,

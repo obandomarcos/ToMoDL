@@ -722,21 +722,16 @@ class ReconstructionDataset(Dataset):
     self.files = self.root_folder+self.us_unfilt_folder
 
   def __len__(self):
-      return len(os.listdir(self.files))
+      return len([f for f in os.listdir(self.files) if '.jpg' in f])
 
   def __getitem__(self, index):
     '''
     Retrieves undersampled unfiltered reconstruction (unfiltered_us_rec), undersampled filtered reconstruction (filtered_us_rec) and fully sampled filtered reconstruction (filtered_fs_rec), used as Input, FBP benchmark and Output respectively. 
     '''
-    unfiltered_us_rec = self.normalize_image(cv2.imread(self.root_folder+self.us_unfilt_folder+str(index)+'.jpg', cv2.IMREAD_GRAYSCALE))
-    filtered_us_rec = self.normalize_image(cv2.imread(self.root_folder+self.us_filt_folder+str(index)+'.jpg', cv2.IMREAD_GRAYSCALE))
-    filtered_fs_rec = self.normalize_image(cv2.imread(self.root_folder+self.fs_filt_folder+str(index)+'.jpg', cv2.IMREAD_GRAYSCALE))
-
-    if self.transform != None:
-
-      unfiltered_us_rec = self.transform(unfiltered_us_rec).type('torch.FloatTensor')
-      filtered_us_rec = self.transform(filtered_us_rec).type('torch.FloatTensor')
-      filtered_fs_rec = self.transform(filtered_fs_rec).type('torch.FloatTensor')
+    
+    unfiltered_us_rec = torch.load(self.root_folder+self.us_unfilt_folder+str(index)+'.pt')
+    filtered_us_rec = torch.load(self.root_folder+self.us_filt_folder+str(index)+'.pt')
+    filtered_fs_rec = torch.load(self.root_folder+self.fs_filt_folder+str(index)+'.pt')
 
     return (unfiltered_us_rec, filtered_us_rec, filtered_fs_rec)
 

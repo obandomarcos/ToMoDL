@@ -97,6 +97,10 @@ def eval_models(testing_options):
 
         trainer_dict = {'lightning_trainer_dict': lightning_trainer_dict,
                         'use_k_folding': True, 
+                        'track_checkpoints': True,
+                        'use_model_checkpoint': True,
+                        'swa' : True,
+                        'use_accumulate_batches':True,
                         'k_fold_number_datasets': 2,
                         'use_logger' : True,
                         'logger_dict': logger_dict,

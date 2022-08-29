@@ -3,12 +3,6 @@ Create main object for general training - Solve K-Folding
 author: obanmarcos
 '''
 
-
-'''
-Testing functionalities of dataloading_utilities
-
-author: obanmarcos
-'''
 import os
 import os, sys
 from re import S
@@ -29,7 +23,8 @@ from torch.utils.data import DataLoader, ConcatDataset, random_split
 
 import pytorch_lightning as pl
 from pytorch_lightning.loggers import WandbLogger
-from pytorch_lightning.callbacks import ModelCheckpoint
+from pytorch_lightning.callbacks import ModelCheckpoint, StochasticWeightAveraging, GradientAccumulationScheduler
+
 import wandb
 
 class TrainerSystem():
@@ -62,13 +57,74 @@ class TrainerSystem():
         
         self.use_logger = kwdict['use_logger']
         self.lightning_trainer_dict = kwdict['lightning_trainer_dict']
+        self.use_model_checkpoint = kwdict['use_model_checkpoint']
+        self.track_checkpoints = kwdict['track_checkpoints']
+        
+        self.lightning_trainer_dict['callbacks'] = []
+        self.use_swa = kwdict['use_swa']
+        self.use_accumulate_batches = kwdict['use_accumulate_batches']
+        self.use_auto_lr_find = kwdict['use_auto_lr_find']
+        self.use_mixed_precision = kwdict['use_mixed_precision']
+        self.profiler = kwdict['profiler'] 
+
+        if self.use_accumulate_batches == True:
+            
+            self.batch_accumulate_number = kwdict['batch_accumulate_number']
+            self.batch_accumulation_start_epoch = kwdict['batch_accumulation_start_epoch']
+
+            self.lightning_trainer_dict['callbacks'] += [GradientAccumulationScheduler(scheduling={self.batch_accumulation_start_epoch: 2})]
+            
+        if self.use_swa == True:
+
+            self.lightning_trainer_dict['callbacks'] +=[StochasticWeightAveraging(swa_lrs=1e-2)]
+
+        if self.use_model_checkpoint == True:
+            
+            self.epoch_number_checkpoint = kwdict['epoch_number_checkpoint']
+            self.lightning_trainer_dict['callbacks'] += [ModelCheckpoint(monitor="val/psnr", 
+                                                            mode="min", 
+                                                            auto_insert_metric_name = True,
+                                                            every_n_epochs = self.epoch_number_checkpoint)]
+
+        if self.use_mixed_precision == True:
+
+            self.lightning_trainer_dict['precision'] = 16
+            
+        if self.use_auto_lr_find == True:
+
+            self.lightning_trainer_dict['auto_lr_find'] = True
 
         if self.use_logger == True:
 
-            self.track_default_checkpoints = True
             self.logger_dict = kwdict['logger_dict']
 
             self.run_base_name = names.get_last_name()
+            
+        # Callbacks 
+        if self.track_checkpoints == True:
+            
+            # Default checkpoints
+            train_psnr_fbp_checkpoint_callback = ModelCheckpoint(monitor='train/psnr_fbp', mode='min')
+            train_ssim_fbp_checkpoint_callback = ModelCheckpoint(monitor='train/ssim_fbp', mode='min')
+
+            val_psnr_fbp_checkpoint_callback = ModelCheckpoint(monitor='val/psnr_fbp', mode='min')
+            val_ssim_fbp_checkpoint_callback = ModelCheckpoint(monitor='val/ssim_fbp', mode='min')
+
+            train_psnr_checkpoint_callback = ModelCheckpoint(monitor='train/psnr', mode='min')
+            train_ssim_checkpoint_callback = ModelCheckpoint(monitor='train/ssim', mode='min')
+
+            val_psnr_checkpoint_callback = ModelCheckpoint(monitor='val/psnr', mode='min')
+            val_ssim_checkpoint_callback = ModelCheckpoint(monitor='val/ssim', mode='min')
+
+            self.lightning_trainer_dict['callbacks'] += [train_psnr_fbp_checkpoint_callback,
+                                                        train_ssim_fbp_checkpoint_callback,
+                                                        val_psnr_fbp_checkpoint_callback,
+                                                        val_ssim_fbp_checkpoint_callback,
+                                                        train_psnr_checkpoint_callback,
+                                                        train_ssim_checkpoint_callback,
+                                                        val_psnr_checkpoint_callback,
+                                                        val_ssim_checkpoint_callback]
+            
         
         self.create_trainer()
             
@@ -87,30 +143,6 @@ class TrainerSystem():
             # Logger parameters
             self.wandb_logger = WandbLogger(**self.logger_dict) 
 
-            # Callbacks (default)
-            if self.track_default_checkpoints == True:
-
-                train_psnr_fbp_checkpoint_callback = ModelCheckpoint(monitor='train/psnr_fbp', mode='max')
-                train_ssim_fbp_checkpoint_callback = ModelCheckpoint(monitor='train/ssim_fbp', mode='max')
-
-                val_psnr_fbp_checkpoint_callback = ModelCheckpoint(monitor='val/psnr_fbp', mode='max')
-                val_ssim_fbp_checkpoint_callback = ModelCheckpoint(monitor='val/ssim_fbp', mode='max')
-
-                train_psnr_checkpoint_callback = ModelCheckpoint(monitor='train/psnr', mode='max')
-                train_ssim_checkpoint_callback = ModelCheckpoint(monitor='train/ssim', mode='max')
-
-                val_psnr_checkpoint_callback = ModelCheckpoint(monitor='val/psnr', mode='max')
-                val_ssim_checkpoint_callback = ModelCheckpoint(monitor='val/ssim', mode='max')
-
-                self.lightning_trainer_dict['callbacks'] = [train_psnr_fbp_checkpoint_callback,
-                                                            train_ssim_fbp_checkpoint_callback,
-                                                            val_psnr_fbp_checkpoint_callback,
-                                                            val_ssim_fbp_checkpoint_callback,
-                                                            train_psnr_checkpoint_callback,
-                                                            train_ssim_checkpoint_callback,
-                                                            val_psnr_checkpoint_callback,
-                                                            val_ssim_checkpoint_callback]
-            
             self.lightning_trainer_dict['logger'] = self.wandb_logger
          
     def create_trainer(self):
@@ -118,7 +150,7 @@ class TrainerSystem():
         Create trainer based on current trainer_dict
         '''
 
-        self.trainer = pl.Trainer(**self.lightning_trainer_dict)
+        self.trainer = pl.Trainer(**self.lightning_trainer_dict, profiler = self.profiler)
 
         return self.trainer
 
@@ -219,12 +251,14 @@ class TrainerSystem():
         train_dataloader = DataLoader(train_dataset, 
                                 batch_size = self.batch_size,
                                 shuffle = self.shuffle_data,
-                                num_workers = 16)
+                                num_workers = 16,
+                                persistent_workers = True)
 
         val_dataloader = DataLoader(val_dataset, 
                                 batch_size = self.batch_size,
                                 shuffle = False,
-                                num_workers = 16)
+                                num_workers = 16,
+                                persistent_workers = True)
         
         test_datasets = []
         
@@ -241,7 +275,9 @@ class TrainerSystem():
         test_dataloader = DataLoader(test_dataset, 
                                 batch_size = self.batch_size,
                                 shuffle = False,
-                                num_workers = 16)
+                                num_workers = 16,
+                                pin_memory = True,
+                                persistent_workers = True)
 
         return train_dataloader, val_dataloader, test_dataloader
     
@@ -275,7 +311,9 @@ class TrainerSystem():
         modl_reconstruction.log('k_fold', self.current_fold)
         # W&B logger
         self.wandb_logger.watch(modl_reconstruction)
-
+        
+        print(trainer.profiler.summary())
+        
         # Train model
         trainer.fit(model=modl_reconstruction, 
                     train_dataloaders= train_dataloader,

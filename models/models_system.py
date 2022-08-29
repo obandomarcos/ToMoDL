@@ -66,14 +66,14 @@ class MoDLReconstructor(pl.LightningModule):
         psnr_fbp_loss = self.loss_dict['psnr_loss'](filtered_us_rec, filtered_fs_rec)
         ssim_fbp_loss = 1-self.loss_dict['ssim_loss'](filtered_us_rec, filtered_fs_rec)
 
-        self.log("train/psnr_fbp", self.psnr(psnr_fbp_loss))
-        self.log("train/ssim_fbp", 1-ssim_fbp_loss)
+        self.log("train/psnr_fbp", self.psnr(psnr_fbp_loss), on_step = False, on_epoch = True, prog_bar=True)
+        self.log("train/ssim_fbp", 1-ssim_fbp_loss, on_step = False, on_epoch = True, prog_bar=True)
 
         psnr_loss = self.loss_dict['psnr_loss'](modl_rec['dc'+str(self.model.K)], filtered_fs_rec)
         ssim_loss = 1-self.loss_dict['ssim_loss'](modl_rec['dc'+str(self.model.K)], filtered_fs_rec)
 
-        self.log("train/psnr", self.psnr(psnr_loss))
-        self.log("train/ssim", 1-ssim_loss)
+        self.log("train/psnr", self.psnr(psnr_loss), on_step = False, on_epoch = True, prog_bar=True)
+        self.log("train/ssim", 1-ssim_loss, on_step = False, on_epoch = True, prog_bar=True)
 
         if self.loss_dict['loss_name'] == 'psnr':
             
@@ -103,14 +103,14 @@ class MoDLReconstructor(pl.LightningModule):
         psnr_fbp_loss = self.loss_dict['psnr_loss'](filtered_us_rec, filtered_fs_rec)
         ssim_fbp_loss = 1-self.loss_dict['ssim_loss'](filtered_us_rec, filtered_fs_rec)
 
-        self.log("val/psnr_fbp", self.psnr(psnr_fbp_loss))
-        self.log("val/ssim_fbp", 1-ssim_fbp_loss)
+        self.log("val/psnr_fbp", self.psnr(psnr_fbp_loss), on_step = False, on_epoch = True)
+        self.log("val/ssim_fbp", 1-ssim_fbp_loss, on_step = False, on_epoch = True)
 
         psnr_loss = self.loss_dict['psnr_loss'](modl_rec['dc'+str(self.model.K)], filtered_fs_rec)
         ssim_loss = 1-self.loss_dict['ssim_loss'](modl_rec['dc'+str(self.model.K)], filtered_fs_rec)
         
-        self.log("val/psnr", self.psnr(psnr_loss))
-        self.log("val/ssim", 1-ssim_loss)
+        self.log("val/psnr", self.psnr(psnr_loss), on_step = False, on_epoch = True)
+        self.log("val/ssim", 1-ssim_loss, on_step = False, on_epoch = True)
 
         if self.loss_dict['loss_name'] == 'psnr':
             
@@ -146,8 +146,8 @@ class MoDLReconstructor(pl.LightningModule):
         psnr_loss = self.loss_dict['psnr_loss'](modl_rec['dc'+str(self.model.K)], filtered_fs_rec)
         ssim_loss = 1-self.loss_dict['ssim_loss'](modl_rec['dc'+str(self.model.K)], filtered_fs_rec)
         
-        self.log("test/psnr", self.psnr(psnr_loss).item())
-        self.log("test/ssim", 1-ssim_loss.item())
+        self.log("test/psnr", self.psnr(psnr_loss).item(), on_step = False, on_epoch = True)
+        self.log("test/ssim", 1-ssim_loss.item(), on_step = False, on_epoch = True)
 
         if self.loss_dict['loss_name'] == 'psnr':
             
@@ -184,14 +184,14 @@ class MoDLReconstructor(pl.LightningModule):
         self.hparams['loss_dict'] = self.loss_dict
         self.hparams['kw_dictionary_modl'] = self.kw_dictionary_modl
         self.hparams['optimizer_dict'] = self.optimizer_dict
-    
+
     @staticmethod
     def psnr(mse):
         '''
         Calculates PSNR respect to MSE mean value
         '''
 
-        return 10*np.log10(1.0/mse.cpu().detach().numpy())
+        return 10*torch.log10(1.0/mse)
 
     def log_plot(self, target, prediction, phase):
         '''
@@ -231,4 +231,11 @@ class MoDLReconstructor(pl.LightningModule):
 
         wandb.log({'images {}'.format(self.current_epoch): image_grid})
 
+    def load_model(self):
+        '''
+        TO-DO: 
+        * Add method for model loading from checkpoint
+            * Load names from versions and choose best k.
+        '''
+        pass
 

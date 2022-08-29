@@ -186,7 +186,6 @@ class modl(nn.Module):
 
         self.out['dc'+j] = self.AtA.inverse(rhs)
         
-        torch.cuda.empty_cache()
         del rhs
 
     self.out['dc'+j] = normalize_images(self.out['dc'+j])    
@@ -324,8 +323,6 @@ class Aclass:
             p = r + beta * p
             i += 1
             rTr = rTrNew
-
-        torch.cuda.empty_cache()
 
         return x
 

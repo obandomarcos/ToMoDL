@@ -7,6 +7,8 @@ import os, sys
 
 sys.path.append('/home/obanmarcos/Balseiro/DeepOPT/')
 
+from pytorch_lightning.profiler import SimpleProfiler
+from scripts import config
 import pytorch_lightning as pl
 import argparse
 import numpy as np
@@ -35,19 +37,19 @@ def test_trainer(testing_options):
     # Model dictionary
     if use_default_model_dict == True:
         # ResNet dictionary parameters
-        resnet_options_dict = {'number_layers': 3,
+        resnet_options_dict = {'number_layers': 8,
                             'kernel_size':3,
                             'features':64,
                             'in_channels':1,
                             'out_channels':1,
                             'stride':1, 
-                            'use_batch_norm': True,
+                            'use_batch_norm': False,
                             'init_method': 'xavier'}
 
         # Model parameters
         modl_dict = {'use_torch_radon': True,
-                    'number_layers': 3,
-                    'K_iterations' : 3,
+                    'number_layers': 8,
+                    'K_iterations' : 8,
                     'number_projections_total' : 720,
                     'number_projections_undersampled' : 72, 
                     'image_size': 100,
@@ -61,7 +63,7 @@ def test_trainer(testing_options):
         # Training parameters
         loss_dict = {'loss_name': 'psnr',
                     'psnr_loss': torch.nn.MSELoss(reduction = 'mean'),
-                    'ssim_loss': SSIM(data_range = 1, size_average= True, channel = 1) }
+                    'ssim_loss': SSIM(data_range = 1, size_average= True, channel = 1)}
 
         # Optimizer parameters
         optimizer_dict = {'optimizer_name': 'Adam',
@@ -77,32 +79,46 @@ def test_trainer(testing_options):
     
     # PL Trainer and W&B logger dictionaries
     if use_default_trainer_dict == True:
-        
+                
         logger_dict = {'project':'deepopt',
                         'entity': 'omarcos', 
                         'log_model': True}
 
         lightning_trainer_dict = {'max_epochs': 1,
-                                  'log_every_n_steps':1,
+                                  'log_every_n_steps':1000,
                                   'check_val_every_n_epoch': 1,
                                   'gradient_clip_val' : 1.0,
                                   'accelerator' : 'gpu', 
                                   'devices' : 1,
                                   'default_root_dir': model_folder}
 
+        profiler = SimpleProfiler(dirpath = './logs/', filename = 'Test_training_profile')
+
         trainer_dict = {'lightning_trainer_dict': lightning_trainer_dict,
                         'use_k_folding': True, 
+                        'track_checkpoints': False,
+                        'use_model_checkpoint': True,
+                        'epoch_number_checkpoint': 10,
+                        'use_swa' : False,
+                        'use_accumulate_batches': True,
                         'k_fold_number_datasets': 2,
                         'use_logger' : True,
                         'logger_dict': logger_dict,
-                        'track_default_checkpoints' : True}
+                        'track_default_checkpoints' : False,
+                        'use_auto_lr_find': True,
+                        'batch_accumulate_number': 5,
+                        'use_mixed_precision':True,
+                        'batch_accumulation_start_epoch': 0, 
+                        'profiler': profiler}
 
     # Dataloader dictionary
     if use_default_dataloader_dict == True:
         
-        data_transform = T.Compose([T.ToTensor()])
-                                    
+        # data_transform = T.Compose([T.ToTensor()])
+        data_transform = None                                    
+        
         dataloader_dict = {'datasets_folder': datasets_folder,
+                           'number_volumes' : 3,
                            'experiment_name': 'Bassi',
                            'img_resize': 100,
                            'load_shifts': True,
@@ -116,7 +132,7 @@ def test_trainer(testing_options):
                            'sampling_method' : 'equispaced-linear',
                            'shuffle_data' : True,
                            'data_transform' : data_transform}
-    
+
     # Create Custom trainer
     trainer = trutils.TrainerSystem(trainer_dict, dataloader_dict, model_system_dict)
 

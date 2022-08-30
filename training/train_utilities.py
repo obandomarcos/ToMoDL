@@ -250,15 +250,15 @@ class TrainerSystem():
 
         train_dataloader = DataLoader(train_dataset, 
                                 batch_size = self.batch_size,
-                                shuffle = self.shuffle_data,
+                                shuffle = False,
                                 num_workers = 16,
-                                persistent_workers = True)
+                                pin_memory = True)
 
         val_dataloader = DataLoader(val_dataset, 
                                 batch_size = self.batch_size,
                                 shuffle = False,
                                 num_workers = 16,
-                                persistent_workers = True)
+                                pin_memory = True)
         
         test_datasets = []
         

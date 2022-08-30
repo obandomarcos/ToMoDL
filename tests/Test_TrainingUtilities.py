@@ -7,7 +7,7 @@ import os, sys
 
 sys.path.append('/home/obanmarcos/Balseiro/DeepOPT/')
 
-from pytorch_lightning.profiler import SimpleProfiler
+from pytorch_lightning.profiler import SimpleProfiler, PyTorchProfiler
 from scripts import config
 import pytorch_lightning as pl
 import argparse
@@ -43,11 +43,11 @@ def test_trainer(testing_options):
                             'in_channels':1,
                             'out_channels':1,
                             'stride':1, 
-                            'use_batch_norm': False,
+                            'use_batch_norm': True,
                             'init_method': 'xavier'}
 
         # Model parameters
-        modl_dict = {'use_torch_radon': True,
+        modl_dict = {'use_torch_radon': False,
                     'number_layers': 8,
                     'K_iterations' : 8,
                     'number_projections_total' : 720,
@@ -90,9 +90,12 @@ def test_trainer(testing_options):
                                   'gradient_clip_val' : 1.0,
                                   'accelerator' : 'gpu', 
                                   'devices' : 1,
+                                  'fast_dev_run' : False,
                                   'default_root_dir': model_folder}
 
-        profiler = SimpleProfiler(dirpath = './logs/', filename = 'Test_training_profile')
+        profiler = None
+        # profiler = SimpleProfiler(dirpath = './logs/', filename = 'Test_training_profile_pytorch')
+        # profiler = PyTorchProfiler(dirpath = './logs/', filename = 'Test_training_profile_pytorch')
 
         trainer_dict = {'lightning_trainer_dict': lightning_trainer_dict,
                         'use_k_folding': True, 
@@ -118,7 +121,7 @@ def test_trainer(testing_options):
         data_transform = None                                    
         
         dataloader_dict = {'datasets_folder': datasets_folder,
-                           'number_volumes' : 3,
+                           'number_volumes' : 0,
                            'experiment_name': 'Bassi',
                            'img_resize': 100,
                            'load_shifts': True,
@@ -128,7 +131,7 @@ def test_trainer(testing_options):
                            'train_factor' : 0.8, 
                            'val_factor' : 0.2,
                            'test_factor' : 0.2, 
-                           'batch_size' : 5, 
+                           'batch_size' : 10, 
                            'sampling_method' : 'equispaced-linear',
                            'shuffle_data' : True,
                            'data_transform' : data_transform}

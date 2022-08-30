@@ -719,19 +719,26 @@ class ReconstructionDataset(Dataset):
     self.us_filt_folder = 'us_{}_filtered/'.format(self.acceleration_factor)
     self.us_unfilt_folder = 'us_{}_unfiltered/'.format(self.acceleration_factor)
 
-    self.files = self.root_folder+self.us_unfilt_folder
+    self.unfiltered_us_recs_len = len([f for f in os.listdir(self.root_folder+self.us_unfilt_folder) if '.pt' in f])
+    self.filtered_us_recs_len = len([f for f in os.listdir(self.root_folder+self.us_filt_folder) if '.pt' in f])
+    self.filtered_fs_recs_len = len([f for f in os.listdir(self.root_folder+self.fs_filt_folder) if '.pt' in f])
+
+    self.unfiltered_us_recs = torch.stack([torch.load(self.root_folder+self.us_unfilt_folder+str(index)+'.pt') for index in range(self.unfiltered_us_recs_len)], 0)
+    self.filtered_us_recs = torch.stack([torch.load(self.root_folder+self.us_filt_folder+str(index)+'.pt') for index in range(self.filtered_us_recs_len)], 0)
+    self.filtered_fs_recs = torch.stack([torch.load(self.root_folder+self.fs_filt_folder+str(index)+'.pt') for index in range(self.filtered_fs_recs_len)], 0)
 
   def __len__(self):
-      return len([f for f in os.listdir(self.files) if '.jpg' in f])
+
+      return self.filtered_us_recs_len
 
   def __getitem__(self, index):
     '''
     Retrieves undersampled unfiltered reconstruction (unfiltered_us_rec), undersampled filtered reconstruction (filtered_us_rec) and fully sampled filtered reconstruction (filtered_fs_rec), used as Input, FBP benchmark and Output respectively. 
     '''
-    
-    unfiltered_us_rec = torch.load(self.root_folder+self.us_unfilt_folder+str(index)+'.pt')
-    filtered_us_rec = torch.load(self.root_folder+self.us_filt_folder+str(index)+'.pt')
-    filtered_fs_rec = torch.load(self.root_folder+self.fs_filt_folder+str(index)+'.pt')
+
+    unfiltered_us_rec = self.normalize_image(self.unfiltered_us_recs[index, ...])
+    filtered_us_rec = self.normalize_image(self.filtered_us_recs[index, ...])
+    filtered_fs_rec = self.normalize_image(self.filtered_fs_recs[index, ...])
 
     return (unfiltered_us_rec, filtered_us_rec, filtered_fs_rec)
 

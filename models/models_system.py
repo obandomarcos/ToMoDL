@@ -59,28 +59,37 @@ class MoDLReconstructor(pl.LightningModule):
 
         modl_rec = self.model(unfiltered_us_rec)
 
-        if (self.track_train == True) and ((self.current_epoch == 0) or (self.current_epoch == self.max_epochs-1)) and (batch_idx == 0):
+        if (self.track_train == True) and (batch_idx%50 == 0):
 
             self.log_plot(filtered_fs_rec, modl_rec, 'train')
                 
         psnr_fbp_loss = self.loss_dict['psnr_loss'](filtered_us_rec, filtered_fs_rec)
         ssim_fbp_loss = 1-self.loss_dict['ssim_loss'](filtered_us_rec, filtered_fs_rec)
 
-        self.log("train/psnr_fbp", self.psnr(psnr_fbp_loss), on_step = False, on_epoch = True, prog_bar=True)
-        self.log("train/ssim_fbp", 1-ssim_fbp_loss, on_step = False, on_epoch = True, prog_bar=True)
+        self.log("train/psnr_fbp", self.psnr(psnr_fbp_loss), on_step = True, on_epoch = False, prog_bar=True)
+        self.log("train/ssim_fbp", 1-ssim_fbp_loss, on_step = True, on_epoch = False, prog_bar=True)
 
         psnr_loss = self.loss_dict['psnr_loss'](modl_rec['dc'+str(self.model.K)], filtered_fs_rec)
         ssim_loss = 1-self.loss_dict['ssim_loss'](modl_rec['dc'+str(self.model.K)], filtered_fs_rec)
 
-        self.log("train/psnr", self.psnr(psnr_loss), on_step = False, on_epoch = True, prog_bar=True)
-        self.log("train/ssim", 1-ssim_loss, on_step = False, on_epoch = True, prog_bar=True)
+        self.log("train/psnr", self.psnr(psnr_loss), on_step = True, on_epoch = False, prog_bar=True)
+        self.log("train/ssim", 1-ssim_loss, on_step = True, on_epoch = False, prog_bar=True)
+
 
         if self.loss_dict['loss_name'] == 'psnr':
             
+            if torch.isnan(psnr_loss):
+                print('nan found, logging image')
+                self.log_plot(filtered_fs_rec, modl_rec, 'train')
+
             return psnr_loss
         
         elif self.loss_dict['loss_name'] == 'ssim':
             
+            if torch.isnan(ssim_loss):
+                print('nan found, logging image')
+                self.log_plot(filtered_fs_rec, modl_rec, 'train')
+
             return ssim_loss
     
     def validation_step(self, batch, batch_idx):
@@ -103,14 +112,14 @@ class MoDLReconstructor(pl.LightningModule):
         psnr_fbp_loss = self.loss_dict['psnr_loss'](filtered_us_rec, filtered_fs_rec)
         ssim_fbp_loss = 1-self.loss_dict['ssim_loss'](filtered_us_rec, filtered_fs_rec)
 
-        self.log("val/psnr_fbp", self.psnr(psnr_fbp_loss), on_step = False, on_epoch = True)
-        self.log("val/ssim_fbp", 1-ssim_fbp_loss, on_step = False, on_epoch = True)
+        self.log("val/psnr_fbp", self.psnr(psnr_fbp_loss), on_step = True, on_epoch = False)
+        self.log("val/ssim_fbp", 1-ssim_fbp_loss, on_step = True, on_epoch = False)
 
         psnr_loss = self.loss_dict['psnr_loss'](modl_rec['dc'+str(self.model.K)], filtered_fs_rec)
         ssim_loss = 1-self.loss_dict['ssim_loss'](modl_rec['dc'+str(self.model.K)], filtered_fs_rec)
         
-        self.log("val/psnr", self.psnr(psnr_loss), on_step = False, on_epoch = True)
-        self.log("val/ssim", 1-ssim_loss, on_step = False, on_epoch = True)
+        self.log("val/psnr", self.psnr(psnr_loss), on_step = True, on_epoch = False)
+        self.log("val/ssim", 1-ssim_loss, on_step = True, on_epoch = False)
 
         if self.loss_dict['loss_name'] == 'psnr':
             
@@ -146,8 +155,8 @@ class MoDLReconstructor(pl.LightningModule):
         psnr_loss = self.loss_dict['psnr_loss'](modl_rec['dc'+str(self.model.K)], filtered_fs_rec)
         ssim_loss = 1-self.loss_dict['ssim_loss'](modl_rec['dc'+str(self.model.K)], filtered_fs_rec)
         
-        self.log("test/psnr", self.psnr(psnr_loss).item(), on_step = False, on_epoch = True)
-        self.log("test/ssim", 1-ssim_loss.item(), on_step = False, on_epoch = True)
+        self.log("test/psnr", self.psnr(psnr_loss).item(), on_step = True, on_epoch = False)
+        self.log("test/ssim", 1-ssim_loss.item(), on_step = True, on_epoch = False)
 
         if self.loss_dict['loss_name'] == 'psnr':
             

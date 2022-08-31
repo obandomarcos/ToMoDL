@@ -98,7 +98,8 @@ class dw(nn.Module):
             
             self.dw_layer_dict['weights_size'] = self.weights_size[i]
 
-            if i == self.number_layers:
+            if i == self.number_layers-1:
+                print('last layer')
                 self.dw_layer_dict['is_last_layer']= True
 
             self.nw['c'+str(i)] = dwLayer(self.dw_layer_dict)
@@ -182,11 +183,13 @@ class modl(nn.Module):
         j = str(i)
         
         self.out['dw'+j] = self.dw.forward(self.out['dc'+str(i-1)])
-        rhs = x*self.lam+self.out['dw'+j]
+        rhs = x/self.lam+self.out['dw'+j]
 
-        self.out['dc'+j] = self.AtA.inverse(rhs)
+        self.out['dc'+j] = normalize_images(self.AtA.inverse(rhs))
         
         del rhs
+
+        # torch.cuda.empty_cache()
 
     self.out['dc'+j] = normalize_images(self.out['dc'+j])    
  
@@ -277,8 +280,11 @@ class Aclass:
         sinogram = self.radon.forward(img)/self.img_size 
         iradon = self.radon.backprojection(sinogram)*np.pi/self.number_projections
         del sinogram
-        output = self.lam*iradon+img
+        output = iradon/self.lam+img
         
+        # print('Term z max {}, min {}'.format((iradon/self.lam).max(), (iradon/self.lam).min()))
+        # print('Term input max {}, min {}'.format(img.max(), img.min()))
+        # print('Term output max {}, min {}'.format(output.max(), output.min()))
         return output
     
     def inverse(self, rhs):
@@ -287,9 +293,19 @@ class Aclass:
         Params: 
             - rhs (torch.Tensor): Right-hand side tensor for applying inversion of (A^H A + lam*I) operator
         """
-                
-        y = self.conjugate_gradients(self.forward, rhs) # This indexing may fail
+
+        y = torch.zeros_like(rhs)
+
+        if self.use_torch_radon == False:
+            
+            y = self.conjugate_gradients(self.forward, rhs) # This indexing may fail
         
+        else:
+
+            for i in range(rhs.shape[0]):
+
+                y[i,0,:,:] = cg(self.forward, torch.zeros_like(rhs[i,0,:,:]), rhs[i, 0, :,:])
+
         return y
     
     @staticmethod
@@ -321,6 +337,7 @@ class Aclass:
                 p = r + beta * p
                 i += 1
                 rTr = rTrNew
+
 
             x_full[idx, 0, ...] = x.clone()
 

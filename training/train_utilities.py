@@ -82,7 +82,7 @@ class TrainerSystem():
             
             self.epoch_number_checkpoint = kwdict['epoch_number_checkpoint']
             self.lightning_trainer_dict['callbacks'] += [ModelCheckpoint(monitor="val/psnr", 
-                                                            mode="min", 
+                                                            mode="max", 
                                                             auto_insert_metric_name = True,
                                                             every_n_epochs = self.epoch_number_checkpoint)]
 
@@ -104,17 +104,17 @@ class TrainerSystem():
         if self.track_checkpoints == True:
             
             # Default checkpoints
-            train_psnr_fbp_checkpoint_callback = ModelCheckpoint(monitor='train/psnr_fbp', mode='min')
-            train_ssim_fbp_checkpoint_callback = ModelCheckpoint(monitor='train/ssim_fbp', mode='min')
+            train_psnr_fbp_checkpoint_callback = ModelCheckpoint(monitor='train/psnr_fbp', mode='max')
+            train_ssim_fbp_checkpoint_callback = ModelCheckpoint(monitor='train/ssim_fbp', mode='max')
 
-            val_psnr_fbp_checkpoint_callback = ModelCheckpoint(monitor='val/psnr_fbp', mode='min')
-            val_ssim_fbp_checkpoint_callback = ModelCheckpoint(monitor='val/ssim_fbp', mode='min')
+            val_psnr_fbp_checkpoint_callback = ModelCheckpoint(monitor='val/psnr_fbp', mode='max')
+            val_ssim_fbp_checkpoint_callback = ModelCheckpoint(monitor='val/ssim_fbp', mode='max')
 
-            train_psnr_checkpoint_callback = ModelCheckpoint(monitor='train/psnr', mode='min')
-            train_ssim_checkpoint_callback = ModelCheckpoint(monitor='train/ssim', mode='min')
+            train_psnr_checkpoint_callback = ModelCheckpoint(monitor='train/psnr', mode='max')
+            train_ssim_checkpoint_callback = ModelCheckpoint(monitor='train/ssim', mode='max')
 
-            val_psnr_checkpoint_callback = ModelCheckpoint(monitor='val/psnr', mode='min')
-            val_ssim_checkpoint_callback = ModelCheckpoint(monitor='val/ssim', mode='min')
+            val_psnr_checkpoint_callback = ModelCheckpoint(monitor='val/psnr', mode='max')
+            val_ssim_checkpoint_callback = ModelCheckpoint(monitor='val/ssim', mode='max')
 
             self.lightning_trainer_dict['callbacks'] += [train_psnr_fbp_checkpoint_callback,
                                                         train_ssim_fbp_checkpoint_callback,
@@ -250,7 +250,7 @@ class TrainerSystem():
 
         train_dataloader = DataLoader(train_dataset, 
                                 batch_size = self.batch_size,
-                                shuffle = False,
+                                shuffle = True,
                                 num_workers = 16,
                                 pin_memory = True)
 

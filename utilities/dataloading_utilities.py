@@ -744,5 +744,7 @@ class ReconstructionDataset(Dataset):
 
   @staticmethod
   def normalize_image(image):
-
-    return (image - image.min())/(image.max()-image.min())
+    '''
+    Normalizes image to 
+    '''
+    return 2*((image - image.min())/(image.max()-image.min())-0.5)

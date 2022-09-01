@@ -170,7 +170,8 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser(description='Do K-folding with different networks')
 
-    parser.add_argument('--train_projections_kfold_ssim', help = 'Train w/PSNR loss with optimal hyperparameters', action="store_true")
+    parser.add_argument('--train_projections_kfold_ssim', help = 'Train w/SSIM loss with optimal hyperparameters', action="store_true")
+    parser.add_argument('--train_projections_kfold_psnr', help = 'Train w/PSNR loss with optimal hyperparameters', action="store_true")
     
     args = parser.parse_args()
 

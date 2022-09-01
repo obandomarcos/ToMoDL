@@ -206,7 +206,8 @@ class modl(nn.Module):
     self.use_torch_radon = kw_dictionary['use_torch_radon']
     self.K = kw_dictionary['K_iterations']
     self.number_projections_total = kw_dictionary['number_projections_total']
-    self.number_projections_undersampled = kw_dictionary['number_projections_undersampled']
+    self.acceleration_factor = kw_dictionary['acceleration_factor']
+    self.number_projections_undersampled = self.number_projections_total//self.acceleration_factor
     self.image_size = kw_dictionary['image_size'] 
     
     self.lam = kw_dictionary['lambda']

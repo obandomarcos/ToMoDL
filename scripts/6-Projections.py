@@ -33,7 +33,7 @@ use_default_dataloader_dict = True
 use_default_trainer_dict = True
 
 def runs(testing_options):
-# Model dictionary
+    
     if use_default_model_dict == True:
         # ResNet dictionary parameters
         resnet_options_dict = {'number_layers': 8,
@@ -42,7 +42,7 @@ def runs(testing_options):
                             'in_channels':1,
                             'out_channels':1,
                             'stride':1, 
-                            'use_batch_norm': True,
+                            'use_batch_norm': False,
                             'init_method': 'xavier'}
 
         # Model parameters
@@ -51,8 +51,9 @@ def runs(testing_options):
                     'K_iterations' : 8,
                     'number_projections_total' : 720,
                     'number_projections_undersampled' : 72, 
+                    'acceleration_factor':10,
                     'image_size': 100,
-                    'lambda': 0.1,
+                    'lambda': 0.05,
                     'use_shared_weights': True,
                     'denoiser_method': 'resnet',
                     'resnet_options': resnet_options_dict,
@@ -62,10 +63,11 @@ def runs(testing_options):
         # Training parameters
         loss_dict = {'loss_name': 'psnr',
                     'psnr_loss': torch.nn.MSELoss(reduction = 'mean'),
-                    'ssim_loss': SSIM(data_range = 1, size_average= True, channel = 1)}
+                    'ssim_loss': SSIM(data_range=1, size_average=True, channel=1),
+                    'msssim_loss': MSSSIM(kernel_size = 1)}
 
         # Optimizer parameters
-        optimizer_dict = {'optimizer_name': 'Adam',
+        optimizer_dict = {'optimizer_name': 'Adam+Tanh',
                         'lr': 1e-4}
 
         # System parameters
@@ -86,7 +88,7 @@ def runs(testing_options):
         lightning_trainer_dict = {'max_epochs': 40,
                                   'log_every_n_steps': 10,
                                   'check_val_every_n_epoch': 1,
-                                  'gradient_clip_val' : 1.0,
+                                  'gradient_clip_val' : 0.5,
                                   'accelerator' : 'gpu', 
                                   'devices' : 1,
                                   'fast_dev_run' : False,
@@ -98,18 +100,17 @@ def runs(testing_options):
 
         trainer_dict = {'lightning_trainer_dict': lightning_trainer_dict,
                         'use_k_folding': True, 
-                        'track_checkpoints': False,
-                        'use_model_checkpoint': True,
+                        'track_checkpoints': True,
                         'epoch_number_checkpoint': 10,
                         'use_swa' : False,
                         'use_accumulate_batches': False,
                         'k_fold_number_datasets': 2,
                         'use_logger' : True,
                         'logger_dict': logger_dict,
-                        'track_default_checkpoints' : False,
+                        'track_default_checkpoints'  : False,
                         'use_auto_lr_find': False,
-                        'batch_accumulate_number': 0,
-                        'use_mixed_precision':True,
+                        'batch_accumulate_number': 3,
+                        'use_mixed_precision': False,
                         'batch_accumulation_start_epoch': 0, 
                         'profiler': profiler}
 
@@ -127,10 +128,11 @@ def runs(testing_options):
                            'save_shifts':False,
                            'number_projections_total': 720,
                            'number_projections_undersampled': 72,
+                           'acceleration_factor':10,
                            'train_factor' : 0.8, 
                            'val_factor' : 0.2,
                            'test_factor' : 0.2, 
-                           'batch_size' : 10, 
+                           'batch_size' : 8, 
                            'sampling_method' : 'equispaced-linear',
                            'shuffle_data' : True,
                            'data_transform' : data_transform}
@@ -140,29 +142,27 @@ def runs(testing_options):
     # Create Custom trainer
     if 'train_projections_kfold_ssim' in testing_options:
         
+        model_system_dict['loss_dict']['loss_name'] = 'ssim'
+        
         for acc_factor in acceleration_factors:
 
-            dataloader_dict['number_projections_undersampled'] = dataloader_dict['number_projections_total']//acc_factor
-
-            model_system_dict['loss_dict']['loss_name'] = 'ssim'
+            dataloader_dict['acceleration_factor'] = acc_factor
+            model_system_dict['kw_dictionary_modl']['acceleration_factor'] = acc_factor
 
             trainer = trutils.TrainerSystem(trainer_dict, dataloader_dict, model_system_dict)
             trainer.k_folding()
 
     if 'train_projections_kfold_psnr' in testing_options:
         
+        model_system_dict['loss_dict']['loss_name'] = 'psnr'
+
         for acc_factor in acceleration_factors:
 
-            dataloader_dict['number_projections_undersampled'] = dataloader_dict['number_projections_total']//acc_factor
-
-            model_system_dict['loss_dict']['loss_name'] = 'psnr'
+            dataloader_dict['acceleration_factor'] = acc_factor
+            model_system_dict['kw_dictionary_modl']['acceleration_factor'] = acc_factor
 
             trainer = trutils.TrainerSystem(trainer_dict, dataloader_dict, model_system_dict)
             trainer.k_folding()
-
-    
-    
-    
 
 if __name__ == '__main__':
 

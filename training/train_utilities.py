@@ -158,15 +158,16 @@ class TrainerSystem():
         self.load_shifts = kwdict['load_shifts']
         self.save_shifts = kwdict['save_shifts']                  
         self.number_projections_total = kwdict['number_projections_total']
-        self.number_projections_undersampled = kwdict['number_projections_undersampled']
-        
+        self.acceleration_factor = kwdict['acceleration_factor']
+        self.number_projections_undersampled = self.number_projections_total//self.acceleration_factor
+
         # Dataset splitting (fraction)
         self.train_factor = kwdict['train_factor']
         self.val_factor = kwdict['val_factor']
         self.test_factor = kwdict['test_factor']
 
         self.batch_size = kwdict['batch_size']
-        self.acceleration_factor = self.number_projections_total//self.number_projections_undersampled
+        
         self.sampling_method= kwdict['sampling_method']
         self.shuffle_data = kwdict['shuffle_data']
 

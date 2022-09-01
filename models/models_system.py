@@ -48,8 +48,6 @@ class MoDLReconstructor(pl.LightningModule):
 
         return self.model(x)['dc'+str(self.model.K)]
     
-
-
     def training_step(self, batch, batch_idx):
         '''
         Training step for modl. 

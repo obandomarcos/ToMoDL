@@ -78,7 +78,7 @@ class DatasetProcessor:
     # Define number of angles and radon transform to undersample  
     self.number_projections_total = kw_dictionary['number_projections_total']
     self.number_projections_undersampled = kw_dictionary['number_projections_undersampled']
-    self.acceleration_factor = self.number_projections_total//self.number_projections_undersampled
+    self.acceleration_factor = kw_dictionary['acceleration_factor']
 
     self._create_radon()
 

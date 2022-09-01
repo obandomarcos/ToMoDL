@@ -6,7 +6,7 @@ german_computer_path = '/home/marcos/DeepOPT'
 ariel_computer_path = '/home/marcos/DeepOPT'
 ariel_computer_path = '/Datos/DeepOPT'
 
-def where_am_i(path):
+def where_am_i(path = None):
 
     if socket.gethostname() in ['copote', 'copito']:
         return marcos_computer_path

@@ -185,11 +185,11 @@ class modl(nn.Module):
         self.out['dw'+j] = self.dw.forward(self.out['dc'+str(i-1)])
         rhs = x/self.lam+self.out['dw'+j]
 
-        self.out['dc'+j] = normalize_images(self.AtA.inverse(rhs))
+        self.out['dc'+j] = self.AtA.inverse(rhs)
         
         del rhs
 
-        # torch.cuda.empty_cache()
+        torch.cuda.empty_cache()
 
     self.out['dc'+j] = normalize_images(self.out['dc'+j])    
  
@@ -296,52 +296,44 @@ class Aclass:
 
         y = torch.zeros_like(rhs)
 
-        if self.use_torch_radon == False:
-            
-            y = self.conjugate_gradients(self.forward, rhs) # This indexing may fail
-        
-        else:
+        for i in range(rhs.shape[0]):
 
-            for i in range(rhs.shape[0]):
-
+            if self.use_torch_radon == False:
+                
+                y[i,0,:,:] = self.conjugate_gradients(self.forward, rhs[i,0,:,:]) # This indexing may fail
+             
+            else:
+                
                 y[i,0,:,:] = cg(self.forward, torch.zeros_like(rhs[i,0,:,:]), rhs[i, 0, :,:])
-
+        
         return y
     
     @staticmethod
-    def conjugate_gradients(A, rhs_full):
+    def conjugate_gradients(A, rhs):
         
         """
         My implementation of conjugate gradients in PyTorch
         """
-        x_full = torch.zeros_like(rhs_full)
 
-        for idx, rhs in enumerate(rhs_full):
+        i = 0
+        x = torch.zeros_like(rhs)
+        r = rhs 
+        p = rhs 
+        rTr = torch.sum(r*r)
+        
+        while((i<10) and torch.ge(rTr, 1e-5)):
             
-            rhs = rhs[0,...]
+            Ap = A(p)
+            alpha = rTr/torch.sum(p*Ap)
+            x = x + alpha*p
+            r = r - alpha*Ap
+            rTrNew = torch.sum(r*r)
+            beta = rTrNew/rTr
+            p = r + beta * p
+            i += 1
+            rTr = rTrNew
 
-            i = 0
-            x = torch.zeros_like(rhs)
-            r = rhs 
-            p = rhs 
-            rTr = torch.sum(r*r)
-            
-            while((i<10) and torch.ge(rTr, 1e-6)):
-                
-                Ap = A(p)
-                alpha = rTr/torch.sum(p*Ap)
-                x = x + alpha*p
-                r = r - alpha*Ap
-                rTrNew = torch.sum(r*r)
-                beta = rTrNew/rTr
-                p = r + beta * p
-                i += 1
-                rTr = rTrNew
-
-
-            x_full[idx, 0, ...] = x.clone()
-
-        return x_full
+        return x
 
 def normalize_images(images):
     '''
@@ -352,9 +344,9 @@ def normalize_images(images):
     
     image_norm = torch.zeros_like(images)
 
-    for i, img in enumerate(images):
+    for i, image in enumerate(images):
          
-        image_norm[i,...] = (img - img.min())/(img.max()-img.min())
+        image_norm[i,...] = 2*((image - image.min())/(image.max()-image.min())-0.5)
 
     return image_norm
 

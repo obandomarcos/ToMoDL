@@ -57,7 +57,6 @@ class TrainerSystem():
         
         self.use_logger = kwdict['use_logger']
         self.lightning_trainer_dict = kwdict['lightning_trainer_dict']
-        self.use_model_checkpoint = kwdict['use_model_checkpoint']
         self.track_checkpoints = kwdict['track_checkpoints']
         
         self.lightning_trainer_dict['callbacks'] = []
@@ -77,14 +76,6 @@ class TrainerSystem():
         if self.use_swa == True:
 
             self.lightning_trainer_dict['callbacks'] +=[StochasticWeightAveraging(swa_lrs=1e-2)]
-
-        if self.use_model_checkpoint == True:
-            
-            self.epoch_number_checkpoint = kwdict['epoch_number_checkpoint']
-            self.lightning_trainer_dict['callbacks'] += [ModelCheckpoint(monitor="val/psnr", 
-                                                            mode="max", 
-                                                            auto_insert_metric_name = True,
-                                                            every_n_epochs = self.epoch_number_checkpoint)]
 
         if self.use_mixed_precision == True:
 
@@ -251,14 +242,12 @@ class TrainerSystem():
         train_dataloader = DataLoader(train_dataset, 
                                 batch_size = self.batch_size,
                                 shuffle = True,
-                                num_workers = 16,
-                                pin_memory = True)
+                                num_workers = 16)
 
         val_dataloader = DataLoader(val_dataset, 
                                 batch_size = self.batch_size,
                                 shuffle = False,
-                                num_workers = 16,
-                                pin_memory = True)
+                                num_workers = 16)
         
         test_datasets = []
         

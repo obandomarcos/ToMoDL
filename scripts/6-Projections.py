@@ -106,7 +106,7 @@ def runs(testing_options):
                         'epoch_number_checkpoint': 10,
                         'use_swa' : False,
                         'use_accumulate_batches': False,
-                        'k_fold_number_datasets': 2,
+                        'k_fold_number_datasets': 3,
                         'use_logger' : True,
                         'logger_dict': logger_dict,
                         'track_default_checkpoints'  : False,

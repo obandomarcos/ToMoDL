@@ -4,7 +4,7 @@ import socket
 marcos_computer_path = '/home/obanmarcos/Balseiro/DeepOPT' 
 german_computer_path = '/home/marcos/DeepOPT'
 ariel_computer_path = '/home/marcos/DeepOPT'
-ariel_computer_path = '/Datos/DeepOPT'
+ariel_computer_path_datasets = '/Datos/DeepOPT'
 
 def where_am_i(path = None):
 

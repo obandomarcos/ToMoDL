@@ -139,7 +139,7 @@ def runs(testing_options):
                            'shuffle_data' : True,
                            'data_transform' : data_transform}
     
-    acceleration_factors = np.arange(2, 34, 4).astype(int)
+    acceleration_factors = np.arange(2, 34, 4).astype(int)[::-1]
 
     # Create Custom trainer
     if 'train_projections_kfold_ssim' in testing_options:

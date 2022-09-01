@@ -26,6 +26,8 @@ from pytorch_lightning.loggers import WandbLogger
 
 from torchvision import transforms as T
 from pytorch_msssim import SSIM
+# from torchmetrics import StructuralSimilarityIndexMeasure as SSIM
+from torchmetrics import MultiScaleStructuralSimilarityIndexMeasure as MSSSIM
 
 # Options for folding menu
 use_default_model_dict = True
@@ -166,7 +168,7 @@ def runs(testing_options):
 
 if __name__ == '__main__':
 
-    k_folding_options = []
+    projection_options = []
 
     parser = argparse.ArgumentParser(description='Do K-folding with different networks')
 
@@ -178,11 +180,11 @@ if __name__ == '__main__':
     if args.train_projections_kfold_ssim:
 
         print('Training MODL with ssim loss for different projections...')
-        k_folding_options.append('train_projections_kfold_ssim')
+        projection_options.append('train_projections_kfold_ssim')
     
     if args.train_projections_kfold_psnr:
 
         print('Training MODL with psnr loss for different projections...')
-        k_folding_options.append('train_projections_kfold_psnr')
+        projection_options.append('train_projections_kfold_psnr')
     
-    runs(projections_options)
+    runs(projection_options)

@@ -123,7 +123,7 @@ def runs(testing_options):
         data_transform = None                                    
         
         dataloader_dict = {'datasets_folder': datasets_folder,
-                           'number_volumes' : 4,
+                           'number_volumes' : 0,
                            'experiment_name': 'Bassi',
                            'img_resize': 100,
                            'load_shifts': True,
@@ -133,7 +133,7 @@ def runs(testing_options):
                            'train_factor' : 0.8, 
                            'val_factor' : 0.2,
                            'test_factor' : 0.2, 
-                           'batch_size' : 5, 
+                           'batch_size' : 8, 
                            'sampling_method' : 'equispaced-linear',
                            'shuffle_data' : True,
                            'data_transform' : data_transform}

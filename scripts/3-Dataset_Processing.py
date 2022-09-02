@@ -30,13 +30,15 @@ def process_datasets(args_options):
                           'number_projections_total':720,
                           'number_projections_undersampled': 72,
                           'batch_size': 5,
-                          'sampling_method': 'equispaced-linear'}
+                          'sampling_method': 'equispaced-linear',
+                          'acceleration_factor': 10}
 
     # 1 - Load datasets
     # 1a - Check ZebraDataset writing of x10 acceleration factor
     for acceleration_factor in args_options['acc_factors']:
-
-        zebra_dataset_dict['number_projections_undersampled'] = zebra_dataset_dict['number_projections_total']//acceleration_factor
+        
+        zebra_dataset_dict['acceleration_factor'] = acceleration_factor
+        zebra_dataset_dict['number_projections_undersampled'] = zebra_dataset_dict['number_projections_total']//zebra_dataset_dict['acceleration_factor']
 
         for folder in folder_paths:
             

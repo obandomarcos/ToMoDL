@@ -174,6 +174,7 @@ class TrainerSystem():
         self.data_transform = kwdict['data_transform']
         
         self.number_volumes = kwdict['number_volumes']
+        self.num_workers = kwdict['num_workers']
         
         # To-Do: Option for non-available acceleration factors (RUN ProcessDatasets)
         self.folders_datasets = [self.datasets_folder+'x{}/'.format(self.acceleration_factor)+x for x in os.listdir(self.datasets_folder+'x{}'.format(self.acceleration_factor))]
@@ -243,12 +244,12 @@ class TrainerSystem():
         train_dataloader = DataLoader(train_dataset, 
                                 batch_size = self.batch_size,
                                 shuffle = True,
-                                num_workers = 16)
+                                num_workers = self.num_workers)
 
         val_dataloader = DataLoader(val_dataset, 
                                 batch_size = self.batch_size,
                                 shuffle = False,
-                                num_workers = 16)
+                                num_workers = self.num_workers)
         
         test_datasets = []
         
@@ -265,7 +266,7 @@ class TrainerSystem():
         test_dataloader = DataLoader(test_dataset, 
                                 batch_size = self.batch_size,
                                 shuffle = False,
-                                num_workers = 16,
+                                num_workers = self.num_workers,
                                 pin_memory = True,
                                 persistent_workers = True)
 

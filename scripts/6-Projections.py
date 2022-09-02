@@ -137,7 +137,8 @@ def runs(testing_options):
                            'batch_size' : 8, 
                            'sampling_method' : 'equispaced-linear',
                            'shuffle_data' : True,
-                           'data_transform' : data_transform}
+                           'data_transform' : data_transform,
+                           'num_workers' : 16}
     
     acceleration_factors = np.arange(2, 30, 4).astype(int)[::-1]
 

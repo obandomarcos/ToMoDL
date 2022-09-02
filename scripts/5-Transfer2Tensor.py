@@ -8,7 +8,7 @@ def normalize_image(image):
 
     return (image - image.min())/(image.max()-image.min())
 
-acceleration_factors = np.arange(2, 34, 2).astype(int)
+acceleration_factors = np.arange(12, 34, 2).astype(int)
 
 for acc_factor in acceleration_factors:
     

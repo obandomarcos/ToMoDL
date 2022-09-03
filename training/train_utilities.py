@@ -87,6 +87,7 @@ class TrainerSystem():
 
         if self.use_logger == True:
 
+            self.resume = kwdict['resume']
             self.logger_dict = kwdict['logger_dict']
 
             self.run_base_name = names.get_last_name()
@@ -95,25 +96,10 @@ class TrainerSystem():
         if self.track_checkpoints == True:
             
             # Default checkpoints
-            train_psnr_fbp_checkpoint_callback = ModelCheckpoint(monitor='train/psnr_fbp', mode='max')
-            train_ssim_fbp_checkpoint_callback = ModelCheckpoint(monitor='train/ssim_fbp', mode='max')
-
-            val_psnr_fbp_checkpoint_callback = ModelCheckpoint(monitor='val/psnr_fbp', mode='max')
-            val_ssim_fbp_checkpoint_callback = ModelCheckpoint(monitor='val/ssim_fbp', mode='max')
-
-            train_psnr_checkpoint_callback = ModelCheckpoint(monitor='train/psnr', mode='max')
-            train_ssim_checkpoint_callback = ModelCheckpoint(monitor='train/ssim', mode='max')
-
             val_psnr_checkpoint_callback = ModelCheckpoint(monitor='val/psnr', mode='max')
             val_ssim_checkpoint_callback = ModelCheckpoint(monitor='val/ssim', mode='max')
 
-            self.lightning_trainer_dict['callbacks'] += [train_psnr_fbp_checkpoint_callback,
-                                                        train_ssim_fbp_checkpoint_callback,
-                                                        val_psnr_fbp_checkpoint_callback,
-                                                        val_ssim_fbp_checkpoint_callback,
-                                                        train_psnr_checkpoint_callback,
-                                                        train_ssim_checkpoint_callback,
-                                                        val_psnr_checkpoint_callback,
+            self.lightning_trainer_dict['callbacks'] += [val_psnr_checkpoint_callback,
                                                         val_ssim_checkpoint_callback]
             
         
@@ -131,6 +117,11 @@ class TrainerSystem():
                 self.logger_dict['group'] = self.run_base_name
                 self.logger_dict['name'] = 'K-Fold {}/{}'.format(self.current_fold, self.k_fold_max-1) 
 
+            id_ = wandb.util.generate_id()
+            self.logger_dict['id'] = id_
+             
+            self.logger_dict['resume'] = self.resume
+            
             # Logger parameters
             self.wandb_logger = WandbLogger(**self.logger_dict) 
 

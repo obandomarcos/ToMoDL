@@ -60,7 +60,7 @@ class MoDLReconstructor(pl.LightningModule):
 
         modl_rec = self.model(unfiltered_us_rec)
 
-        if (self.track_train == True) and (batch_idx%50 == 0):
+        if (self.track_train == True) and (batch_idx%500 == 0):
 
             self.log_plot(filtered_fs_rec, modl_rec, 'train')
                 
@@ -263,6 +263,7 @@ class MoDLReconstructor(pl.LightningModule):
         plt.colorbar(im, cax = cax)
 
         wandb.log({'{}_plot_{}'.format(phase, self.current_epoch): fig})
+        plt.close(fig)
 
     def log_samples(self, batch, model_reconstruction):
         '''

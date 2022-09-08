@@ -55,6 +55,10 @@ class TrainerSystem():
             self.k_fold_number_datasets = kwdict['k_fold_number_datasets']
             self.current_fold = 0 
         
+        self.restore_fold = kwdict['restore_fold']
+        self.fold_number_restore = kwdict['fold_number_restore']
+        self.acc_factor_restore = kwdict['acc_factor_restore']
+
         self.use_logger = kwdict['use_logger']
         self.lightning_trainer_dict = kwdict['lightning_trainer_dict']
         self.track_checkpoints = kwdict['track_checkpoints']
@@ -317,6 +321,17 @@ class TrainerSystem():
 
         for k_fold in range(self.k_fold_max):
             
+            if (self.restore_fold == True) and (self.acceleration_factor == self.acc_factor_restore) and (self.current_fold < self.fold_number_restore):
+                
+                print('Fold {} for acceleration factor x{} already done...'.format(self.current_fold, self.acceleration_factor))
+                self.reinitialize_logger()
+                # Create dataloaders
+                _, _, _ = self.generate_K_folding_dataloader()
+                self.current_fold += 1
+                self.wandb_logger.finalize('success')
+
+                continue
+                
             print('{} fold started...'.format(self.current_fold))
             self.train_model()
             print('{} fold finished succesfully!'.format(self.current_fold))

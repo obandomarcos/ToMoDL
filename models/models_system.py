@@ -170,8 +170,8 @@ class MoDLReconstructor(pl.LightningModule):
         psnr_loss = self.loss_dict['psnr_loss'](modl_rec['dc'+str(self.model.K)], filtered_fs_rec)
         ssim_loss = 1-self.loss_dict['ssim_loss'](self.normalize_image_01(modl_rec['dc'+str(self.model.K)]), self.normalize_image_01(filtered_fs_rec))
         
-        self.log("test/psnr", self.psnr(psnr_loss, range_max_min = [filtered_fs_rec.max(), filtered_fs_rec.min()]).item(), on_step = True, on_epoch = False)
-        self.log("test/ssim", 1-ssim_loss.item(), on_step = True, on_epoch = False)
+        self.log("test/psnr", self.psnr(psnr_loss, range_max_min = [filtered_fs_rec.max(), filtered_fs_rec.min()]).item())
+        self.log("test/ssim", 1-ssim_loss.item())
 
         if self.loss_dict['loss_name'] == 'psnr':
             

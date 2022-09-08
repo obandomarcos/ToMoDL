@@ -115,7 +115,10 @@ def runs(testing_options):
                         'batch_accumulate_number': 3,
                         'use_mixed_precision': False,
                         'batch_accumulation_start_epoch': 0, 
-                        'profiler': profiler}
+                        'profiler': profiler,
+                        'restore_fold': True,
+                        'fold_number_restore': 2,
+                        'acc_factor_restore': 22}
 
     # Dataloader dictionary
     if use_default_dataloader_dict == True:
@@ -141,7 +144,7 @@ def runs(testing_options):
                            'data_transform' : data_transform,
                            'num_workers' : 16}
     
-    acceleration_factors = np.arange(2, 30, 4).astype(int)[::-1]
+    acceleration_factors = np.arange(2, 26, 4).astype(int)[::-1]
 
     # Create Custom trainer
     if 'train_projections_kfold_ssim' in testing_options:

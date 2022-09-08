@@ -85,9 +85,10 @@ class down(nn.Module):
 
 
 class up(nn.Module):
-    def __init__(self, in_ch, out_ch, bilinear=True, batch_norm = False):
+    def __init__(self, kw_unet_dict):
         super(up, self).__init__()
 
+        self.process_kwdictionary(kw_unet_dict)
         #  would be a nice idea if the upsampling could be learned too,
         #  but my machine do not have enough memory to handle all those weights
         if bilinear:
@@ -96,6 +97,15 @@ class up(nn.Module):
             self.up = nn.ConvTranspose2d(in_ch//2, in_ch//2, 2, stride=2)
 
         self.conv = double_conv(in_ch, out_ch, batch_norm)
+    
+    def process_kwdictionary(kw_unet_dict):
+        '''
+        Process KW dictionary
+        '''
+        self.in_ch = kw_unet_dict['in_channel']
+        self.out_ch = kw_unet_dict['out_channel']
+        self.bilinear = kw_unet_dict['bilinear']
+        self.batch_norm = kw_unet_dict['batch_norm']
 
     def forward(self, x1, x2):
         x1 = self.up(x1)

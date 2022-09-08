@@ -191,7 +191,7 @@ class TrainerSystem():
         Params:
             kwdict (dict): Dictionary for model creation
         '''
-
+        self.model_system_method = kwdict['method']
         self.model_system_dict = kwdict
         self.model_system_dict['max_epochs'] = self.lightning_trainer_dict['max_epochs']
     
@@ -291,8 +291,12 @@ class TrainerSystem():
         # PL train model + Update wandb
         trainer = self.create_trainer()
         
-        # Create model reconstructor
-        modl_reconstruction = modsys.MoDLReconstructor(self.model_system_dict)
+
+        if self.model_system_method == 'modl':
+            # Create model reconstructor
+            model = modsys.MoDLReconstructor(self.model_system_dict)
+        elif self.model_system_method == 'unet':
+            model = modsys.UNetReconstructor(self.model_system_dict)
 
         modl_reconstruction.log('k_fold', self.current_fold)
         # W&B logger

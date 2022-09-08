@@ -172,11 +172,12 @@ if __name__ == '__main__':
 
         artifact = run.use_artifact(user_project_name+artifact_name, type='model')
         artifact_dir = artifact.download()
-    
-        train_dataloader, val_dataloader, test_dataloader = trainer_system.generate_K_folding_dataloader()
-        trainer_system.current_fold += 1
 
-        model = MoDLReconstructor.load_from_checkpoint(Path(artifact_dir) / "model.ckpt", kw_dictionary_model_system = model_system_dict) 
+        trainer_system.print_check_datasets()
+        # train_dataloader, val_dataloader, test_dataloader = trainer_system.generate_K_folding_dataloader()
+        # trainer_system.current_fold += 1
+
+        #model = MoDLReconstructor.load_from_checkpoint(Path(artifact_dir) / "model.ckpt", kw_dictionary_model_system = model_system_dict) 
 
         # trainer = trainer_system.create_trainer()
 

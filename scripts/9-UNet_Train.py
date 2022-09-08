@@ -39,10 +39,13 @@ def runs(testing_options):
 # Model dictionary
     if use_default_model_dict == True:
         #U-Net model
-        unet_dict = {'in_channel': 1,
-                     'out_channel':1,
-                      'bilinear': True,
-                      'batch_norm': True}
+        unet_dict = {'n_channels': 1,
+                     'n_classes':1,
+                     'bilinear': True,
+                     'batch_norm': True,
+                     'batch_norm_inconv':True,
+                     'residual':True,
+                     'up_conv': False}
 
         # Training parameters
         loss_dict = {'loss_name': 'psnr',

@@ -195,6 +195,24 @@ class TrainerSystem():
         self.model_system_dict = kwdict
         self.model_system_dict['max_epochs'] = self.lightning_trainer_dict['max_epochs']
     
+    def print_check_datasets(self):
+
+        if self.current_fold != 0:
+            # Rotate datasets
+            self.rotate_list(self.folders_datasets, self.k_fold_number_datasets)
+
+        # Load each dataset in Dataset class (torch.utils.data.Dataset)
+        train_val_datasets_folders = self.folders_datasets[:self.datasets_number-self.k_fold_number_datasets].copy()
+        test_datasets_folders = self.folders_datasets[self.datasets_number-self.k_fold_number_datasets:].copy()
+
+        print('Train/Val folders in use...')
+        print(train_val_datasets_folders)
+
+        print('Test folders in use...')
+        print(test_datasets_folders)
+
+        self.current_fold += 1
+
     def generate_K_folding_dataloader(self):
         '''
         Rotates self.folders_datasets and builds new train/val/test dataloaders

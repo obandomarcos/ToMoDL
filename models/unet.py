@@ -117,7 +117,7 @@ class outconv(nn.Module):
         x = self.conv(x)
         return x
 
-class UNet(nn.Module):
+class unet(nn.Module):
     def __init__(self, kw_dict):
         
         super(UNet, self).__init__()

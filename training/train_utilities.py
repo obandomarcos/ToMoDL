@@ -200,6 +200,7 @@ class TrainerSystem():
         Rotates self.folders_datasets and builds new train/val/test dataloaders
         '''
 
+        
         if self.current_fold != 0:
             # Rotate datasets
             self.rotate_list(self.folders_datasets, self.k_fold_number_datasets)
@@ -298,19 +299,19 @@ class TrainerSystem():
         elif self.model_system_method == 'unet':
             model = modsys.UNetReconstructor(self.model_system_dict)
 
-        modl_reconstruction.log('k_fold', self.current_fold)
+        model.log('k_fold', self.current_fold)
         # W&B logger
-        self.wandb_logger.watch(modl_reconstruction)
+        self.wandb_logger.watch(model)
         
         print(trainer.profiler.summary())
         
         # Train model
-        trainer.fit(model=modl_reconstruction, 
+        trainer.fit(model=model, 
                     train_dataloaders= train_dataloader,
                     val_dataloaders = val_dataloader)
 
         # test model
-        trainer.test(model = modl_reconstruction, dataloaders = test_dataloader)
+        trainer.test(model = model, dataloaders = test_dataloader)
 
         self.wandb_logger.finalize('success')
 

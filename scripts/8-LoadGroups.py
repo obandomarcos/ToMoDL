@@ -38,7 +38,7 @@ use_default_model_dict = True
 use_default_dataloader_dict = True
 use_default_trainer_dict = True
 
-acceleration_factor = 26
+acceleration_factor = 22
 
 if use_default_model_dict == True:
     # ResNet dictionary parameters
@@ -79,7 +79,8 @@ if use_default_model_dict == True:
     # System parameters
     model_system_dict = {'optimizer_dict': optimizer_dict,
                         'kw_dictionary_modl': modl_dict,
-                        'loss_dict': loss_dict,                        
+                        'loss_dict': loss_dict, 
+                        'method':'unet',                       
                         'track_train': True,
                         'track_val': True,
                         'track_test': True,
@@ -151,10 +152,11 @@ if use_default_dataloader_dict == True:
 
 artifact_names_x26_psnr = [
 'model-32wj43mf:v0', 'model-3kmtjdm4:v0' ,'model-3l028zex:v0', 'model-2jnmr8t0:v0']
+artifact_names_x22_psnr = ['model-3dp1wex6:v0', 'model-2jwf0rwa:v0', 'model-1qtf5f8u:v0', 'model-2nxos558:v0']
 
 if __name__ == '__main__':
     
-    artifact_names = artifact_names_x26_psnr
+    artifact_names = artifact_names_x22_psnr
     testing_name_group = 'x{}'.format(acceleration_factor)
 
     run_name = 'test_metrics_kfold_x{}'.format(acceleration_factor)
@@ -176,14 +178,14 @@ if __name__ == '__main__':
 
         model = MoDLReconstructor.load_from_checkpoint(Path(artifact_dir) / "model.ckpt", kw_dictionary_model_system = model_system_dict) 
 
-        trainer = trainer_system.create_trainer()
+        # trainer = trainer_system.create_trainer()
 
-        test_dict = trainer.test(model = model, dataloaders = test_dataloader)[0]    
+        # test_dict = trainer.test(model = model, dataloaders = test_dataloader)[0]    
         
-        print(test_dict)
-        # TO-DO: Agregar U-Net y métodos alternantes
+        # print(test_dict)
+        # # TO-DO: Agregar U-Net y métodos alternantes
 
-        wandb.log({'acc_factor': acceleration_factor,'k_fold': k_fold, 'psnr_modl': test_dict['test/psnr']})
-        wandb.log({'acc_factor': acceleration_factor, 'k_fold': k_fold, 'psnr_fbp': test_dict['test/psnr_fbp']})
-        wandb.log({'acc_factor': acceleration_factor,'k_fold': k_fold, 'ssim_modl': test_dict['test/ssim']})
-        wandb.log({'acc_factor': acceleration_factor, 'k_fold': k_fold, 'ssim_fbp': test_dict['test/ssim_fbp']})
+        # wandb.log({'acc_factor': acceleration_factor,'k_fold': k_fold, 'psnr_modl': test_dict['test/psnr']})
+        # wandb.log({'acc_factor': acceleration_factor, 'k_fold': k_fold, 'psnr_fbp': test_dict['test/psnr_fbp']})
+        # wandb.log({'acc_factor': acceleration_factor,'k_fold': k_fold, 'ssim_modl': test_dict['test/ssim']})
+        # wandb.log({'acc_factor': acceleration_factor, 'k_fold': k_fold, 'ssim_fbp': test_dict['test/ssim_fbp']})

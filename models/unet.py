@@ -85,10 +85,9 @@ class down(nn.Module):
 
 
 class up(nn.Module):
-    def __init__(self, kw_unet_dict):
+    def __init__(self, in_ch, out_ch, bilinear=True, batch_norm = False):
         super(up, self).__init__()
 
-        self.process_kwdictionary(kw_unet_dict)
         #  would be a nice idea if the upsampling could be learned too,
         #  but my machine do not have enough memory to handle all those weights
         if bilinear:
@@ -97,15 +96,6 @@ class up(nn.Module):
             self.up = nn.ConvTranspose2d(in_ch//2, in_ch//2, 2, stride=2)
 
         self.conv = double_conv(in_ch, out_ch, batch_norm)
-    
-    def process_kwdictionary(kw_unet_dict):
-        '''
-        Process KW dictionary
-        '''
-        self.in_ch = kw_unet_dict['in_channel']
-        self.out_ch = kw_unet_dict['out_channel']
-        self.bilinear = kw_unet_dict['bilinear']
-        self.batch_norm = kw_unet_dict['batch_norm']
 
     def forward(self, x1, x2):
         x1 = self.up(x1)
@@ -128,23 +118,25 @@ class outconv(nn.Module):
         return x
 
 class UNet(nn.Module):
-    def __init__(self, n_channels, n_classes, up_conv = False, residual = False, batch_norm = False, batch_norm_inconv = False):
+    def __init__(self, kw_dict):
         
         super(UNet, self).__init__()
         
-        self.residual = residual
+        self.process_kwdictionary(kw_dict)
+
         if self.residual is True:
             self.lam = torch.nn.Parameter(torch.tensor([0.1], requires_grad = True, device = dev))
-        self.inc = inconv(n_channels, 64, batch_norm = batch_norm_inconv)
-        self.down1 = down(64, 128, batch_norm = batch_norm)
-        self.down2 = down(128, 256, batch_norm = batch_norm)
-        self.down3 = down(256, 512,  batch_norm = batch_norm)
-        self.down4 = down(512, 512, batch_norm = batch_norm)
-        self.up1 = up(1024, 256, bilinear = up_conv, batch_norm = batch_norm)
-        self.up2 = up(512, 128, bilinear = up_conv, batch_norm = batch_norm)
-        self.up3 = up(256, 64, bilinear = up_conv, batch_norm = batch_norm)
-        self.up4 = up(128, 64 , bilinear = up_conv, batch_norm = batch_norm)
-        self.outc = outconv(64, n_classes)
+
+        self.inc = inconv(self.n_channels, 64, batch_norm = self.batch_norm_inconv)
+        self.down1 = down(64, 128, batch_norm = self.batch_norm)
+        self.down2 = down(128, 256, batch_norm = self.batch_norm)
+        self.down3 = down(256, 512,  batch_norm = self.batch_norm)
+        self.down4 = down(512, 512, batch_norm = self.batch_norm)
+        self.up1 = up(1024, 256, bilinear = self.up_conv, batch_norm = self.batch_norm)
+        self.up2 = up(512, 128, bilinear = self.up_conv, batch_norm = self.batch_norm)
+        self.up3 = up(256, 64, bilinear = self.up_conv, batch_norm = self.batch_norm)
+        self.up4 = up(128, 64 , bilinear = self.up_conv, batch_norm = self.batch_norm)
+        self.outc = outconv(64, self.n_classes)
     
     def forward(self, x0):
         
@@ -162,3 +154,16 @@ class UNet(nn.Module):
             x = x+self.lam*x0
 
         return x#F.sigmoid(x)
+    
+    def process_kwdictionary(self, kw_unet_dict):
+        '''
+        Process KW dictionary
+        '''
+
+        self.in_ch = kw_unet_dict['n_channels']
+        self.n_classes = kw_unet_dict['n_classes']
+        self.bilinear = kw_unet_dict['bilinear']
+        self.batch_norm = kw_unet_dict['batch_norm']
+        self.batch_norm_inconv = kw_unet_dict['batch_norm_inconv']
+        self.residual = kw_unet_dict['residual']
+        self.up_conv = kw_unet_dict['up_conv']

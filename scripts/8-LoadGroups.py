@@ -164,26 +164,25 @@ if __name__ == '__main__':
 
     user_project_name = 'omarcos/deepopt/'
     
-    run = wandb.init(project = 'deepopt', name = testing_name_group)
+    run = wandb.init(project = 'deepopt', name = testing_name_group, job_type = 'Dataset Evaluation + K-Folding')
     
     trainer_system = trutils.TrainerSystem(trainer_dict, dataloader_dict, model_system_dict)
 
     for k_fold, artifact_name in enumerate(artifact_names):        
 
-        artifact = run.use_artifact(user_project_name+artifact_name, type='model')
-        artifact_dir = artifact.download()
+        # artifact = run.use_artifact(user_project_name+artifact_name, type='model')
+        # artifact_dir = artifact.download()
 
         trainer_system.print_check_datasets()
         # train_dataloader, val_dataloader, test_dataloader = trainer_system.generate_K_folding_dataloader()
         # trainer_system.current_fold += 1
-
-        #model = MoDLReconstructor.load_from_checkpoint(Path(artifact_dir) / "model.ckpt", kw_dictionary_model_system = model_system_dict) 
+        # model = MoDLReconstructor.load_from_checkpoint(Path(artifact_dir) / "model.ckpt", kw_dictionary_model_system = model_system_dict) 
 
         # trainer = trainer_system.create_trainer()
 
         # test_dict = trainer.test(model = model, dataloaders = test_dataloader)[0]    
         
-        # print(test_dict)
+        # # print(test_dict)
         # # TO-DO: Agregar U-Net y métodos alternantes
 
         # wandb.log({'acc_factor': acceleration_factor,'k_fold': k_fold, 'psnr_modl': test_dict['test/psnr']})

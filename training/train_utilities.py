@@ -48,7 +48,8 @@ class TrainerSystem():
         '''
 
         self.use_k_folding = kwdict['use_k_folding']
-        
+        self.kfold_monitor_dict = {}
+
         if self.use_k_folding == True:
             
             # Number of datasets for testing
@@ -213,12 +214,47 @@ class TrainerSystem():
 
         self.current_fold += 1
 
+    def kfold_monitor(self, train_val_datasets, test_datasets):
+        '''
+        Monitor K-Fold datasets, parsing its structure
+        '''
+        
+        self.kfold_monitor_dict[self.current_fold] = {'train/val' : self.__parse_dataset_list(train_val_datasets),
+                                                 'test' : self.__parse_dataset_list(test_datasets)}
+
+        print(self.kfold_monitor_dict[self.current_fold])
+        wandb.log({'k_fold':self.kfold_monitor_dict,
+                   'dataset_monitor': self.kfold_monitor_dict[self.current_fold]})
+
+    def __parse_dataset_list(self, dataset_list):
+        
+        # Remove root path
+        dataset_names_list = [dataset.split('/')[-1] for dataset in dataset_list]
+
+        fish_part = [dataset_path.split('_')[2] for dataset_path in dataset_names_list]
+        fish_dpf = [dataset_path.split('_')[1] for dataset_path in dataset_names_list]
+
+        stats_dict = {'fish_part' : self.__dict_counting(fish_part, 'part'),
+                      'fish_dpf' : self.__dict_counting(fish_dpf, 'dpf')}
+
+        return stats_dict
+
+    def __dict_counting(self, items, feature):
+
+        if feature == 'part':
+            counts = {'head': 0, 'body': 0, 'lower tail': 0, 'upper tail': 0}
+        elif feature == 'dpf':
+            counts = {'1dpf':0, '3dpf':0, '5dpf':0}
+
+        for i in items:
+            counts[i] = counts.get(i, 0) + 1
+        
+        return counts
+
     def generate_K_folding_dataloader(self):
         '''
         Rotates self.folders_datasets and builds new train/val/test dataloaders
         '''
-
-        
         if self.current_fold != 0:
             # Rotate datasets
             self.rotate_list(self.folders_datasets, self.k_fold_number_datasets)
@@ -232,6 +268,8 @@ class TrainerSystem():
 
         print('Test folders in use...')
         print(test_datasets_folders)
+
+        self.kfold_monitor(train_val_datasets_folders, test_datasets_folders)
 
         # Train and validation dataloader  
         train_val_datasets = []
@@ -309,13 +347,12 @@ class TrainerSystem():
 
         # PL train model + Update wandb
         trainer = self.create_trainer()
-        
 
         if self.model_system_method == 'modl':
             # Create model reconstructor
-            model = modsys.MoDLReconstructor(self.model_system_dict)
+            self.model = modsys.MoDLReconstructor(self.model_system_dict)
         elif self.model_system_method == 'unet':
-            model = modsys.UNetReconstructor(self.model_system_dict)
+            self.model = modsys.UNetReconstructor(self.model_system_dict)
 
         model.log('k_fold', self.current_fold)
         # W&B logger
@@ -327,9 +364,6 @@ class TrainerSystem():
         trainer.fit(model=model, 
                     train_dataloaders= train_dataloader,
                     val_dataloaders = val_dataloader)
-
-        # test model
-        trainer.test(model = model, dataloaders = test_dataloader)
 
         self.wandb_logger.finalize('success')
 
@@ -359,6 +393,7 @@ class TrainerSystem():
             self.train_model()
             print('{} fold finished succesfully!'.format(self.current_fold))
             self.current_fold += 1
+        
             
 
         

@@ -336,11 +336,11 @@ class UNetReconstructor(pl.LightningModule):
 
         unfiltered_us_rec, filtered_us_rec, filtered_fs_rec = batch
 
-        unet_rec = self.model(unfiltered_us_rec)
+        unet_rec = self.model(filtered_us_rec)
 
         if (self.track_train == True) and (batch_idx%500 == 0):
 
-            self.log_plot(filtered_fs_rec, unet_rec, 'train')
+            self.log_plot(filtered_fs_rec, unet_rec, filtered_fs_rec, 'train')
                 
         psnr_fbp_loss = self.loss_dict['psnr_loss'](filtered_us_rec, filtered_fs_rec)
         ssim_fbp_loss = 1-self.loss_dict['ssim_loss'](self.normalize_image_01(filtered_us_rec), self.normalize_image_01(filtered_fs_rec))
@@ -348,8 +348,8 @@ class UNetReconstructor(pl.LightningModule):
         self.log("train/psnr_fbp", self.psnr(psnr_fbp_loss, range_max_min = [filtered_fs_rec.max(), filtered_fs_rec.min()]), on_step = True, on_epoch = False, prog_bar=True)
         self.log("train/ssim_fbp", 1-ssim_fbp_loss, on_step = True, on_epoch = False, prog_bar=True)
 
-        psnr_loss = self.loss_dict['psnr_loss'](unet_rec['dc'+str(self.model.K)], filtered_fs_rec)
-        ssim_loss = 1-self.loss_dict['ssim_loss'](self.normalize_image_01(unet_rec['dc'+str(self.model.K)]), self.normalize_image_01(filtered_fs_rec))
+        psnr_loss = self.loss_dict['psnr_loss'](unet_rec, filtered_fs_rec)
+        ssim_loss = 1-self.loss_dict['ssim_loss'](self.normalize_image_01(unet_rec), self.normalize_image_01(filtered_fs_rec))
 
         self.log("train/psnr", self.psnr(psnr_loss, range_max_min = [filtered_fs_rec.max(), filtered_fs_rec.min()]), on_step = True, on_epoch = False, prog_bar=True)
         self.log("train/ssim", 1-ssim_loss, on_step = True, on_epoch = False, prog_bar=True)
@@ -389,11 +389,11 @@ class UNetReconstructor(pl.LightningModule):
 
         unfiltered_us_rec, filtered_us_rec, filtered_fs_rec = batch
         
-        unet_rec = self.model(unfiltered_us_rec)
+        unet_rec = self.model(filtered_us_rec)
 
         if (self.track_val == True) and ((self.current_epoch == 0) or (self.current_epoch == self.max_epochs-1)) and (batch_idx == 0):
 
-            self.log_plot(filtered_fs_rec, unet_rec, 'validation')
+            self.log_plot(filtered_fs_rec, unet_rec, filtered_fs_rec, 'validation')
 
         psnr_fbp_loss = self.loss_dict['psnr_loss'](filtered_us_rec, filtered_fs_rec)
         ssim_fbp_loss = 1-self.loss_dict['ssim_loss'](self.normalize_image_01(filtered_us_rec), self.normalize_image_01(filtered_fs_rec))
@@ -439,11 +439,11 @@ class UNetReconstructor(pl.LightningModule):
         self.log("test/psnr_fbp", self.psnr(psnr_fbp_loss, range_max_min = [filtered_fs_rec.max(), filtered_fs_rec.min()]))
         self.log("test/ssim_fbp", 1-ssim_fbp_loss)
 
-        unet_rec = self.model(unfiltered_us_rec)
+        unet_rec = self.model(filtered_us_rec)
 
         if (self.track_test == True) and (batch_idx == 0):
 
-            self.log_plot(filtered_fs_rec, unet_rec, 'test')
+            self.log_plot(filtered_fs_rec, unet_rec, filtered_fs_rec, 'test')
 
         psnr_loss = self.loss_dict['psnr_loss'](unet_rec, filtered_fs_rec)
         ssim_loss = 1-self.loss_dict['ssim_loss'](self.normalize_image_01(unet_rec), self.normalize_image_01(filtered_fs_rec))
@@ -518,12 +518,12 @@ class UNetReconstructor(pl.LightningModule):
 
         return 10*torch.log10((range_max_min[1]-range_max_min[0])**2/mse)
 
-    def log_plot(self, target, prediction, phase):
+    def log_plot(self, target, prediction, benchmark, phase):
         '''
         Plots target and prediction (unrolled) and logs it. 
         '''
         
-        fig, ax = plt.subplots(1, len(prediction.keys())+1, figsize = (16,6))
+        fig, ax = plt.subplots(1, 3, figsize = (16,6))
         
         im = ax[0].imshow(target.detach().cpu().numpy()[0,0,:,:], cmap = 'gray')
         ax[0].set_title('Target')
@@ -531,16 +531,19 @@ class UNetReconstructor(pl.LightningModule):
         
         plt.suptitle('Epoch {} in {} phase'.format(self.current_epoch, phase))
 
-        for a, (key, image) in zip(ax[1:], prediction.items()):
+        im = ax[1].imshow(prediction.detach().cpu().numpy()[0,0,:,:], cmap = 'gray')
+        ax[1].set_title('U-Net reconstruction')
+        ax[1].axis('off')
 
-            im = a.imshow(image.detach().cpu().numpy()[0,0,:,:], cmap = 'gray')
-            a.set_title(key)
-            a.axis('off')
+        im = ax[2].imshow(benchmark.detach().cpu().numpy()[0,0,:,:], cmap = 'gray')
+        ax[2].set_title('FBP reconstruction')
+        ax[2].axis('off')
         
-        cax = fig.add_axes([a.get_position().x1+0.01,a.get_position().y0,0.02,a.get_position().height])
+        cax = fig.add_axes([ax[2].get_position().x1+0.01,ax[2].get_position().y0,0.02, ax[2].get_position().height])
         plt.colorbar(im, cax = cax)
 
-        wandb.log({'{}_plot_{}'.format(phase, self.current_epoch): fig})
+        wandb.log({'epoch':self.current_epoch, '{}_plot_{}'.format(phase, self.current_epoch): fig})
+        
         plt.close(fig)
 
     def log_samples(self, batch, model_reconstruction):

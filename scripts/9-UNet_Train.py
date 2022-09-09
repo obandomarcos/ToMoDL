@@ -35,6 +35,8 @@ use_default_model_dict = True
 use_default_dataloader_dict = True
 use_default_trainer_dict = True
 
+profiler = None
+
 def runs(testing_options):
 # Model dictionary
     if use_default_model_dict == True:
@@ -90,6 +92,7 @@ def runs(testing_options):
                         'use_accumulate_batches': False,
                         'k_fold_number_datasets': 2,
                         'use_logger' : True,
+                        'resume':'allow',
                         'logger_dict': logger_dict,
                         'track_default_checkpoints'  : False,
                         'use_auto_lr_find': False,
@@ -115,7 +118,7 @@ def runs(testing_options):
                            'save_shifts':False,
                            'number_projections_total': 720,
                            'number_projections_undersampled': 720//20,
-                           'acceleration_factor':20
+                           'acceleration_factor':20,
                            'train_factor' : 0.8, 
                            'val_factor' : 0.2,
                            'test_factor' : 0.2, 

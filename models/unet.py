@@ -120,12 +120,12 @@ class outconv(nn.Module):
 class unet(nn.Module):
     def __init__(self, kw_dict):
         
-        super(UNet, self).__init__()
+        super(unet, self).__init__()
         
         self.process_kwdictionary(kw_dict)
 
         if self.residual is True:
-            self.lam = torch.nn.Parameter(torch.tensor([0.1], requires_grad = True, device = dev))
+            self.lam = torch.nn.Parameter(torch.tensor([0.1], requires_grad = True, device = device))
 
         self.inc = inconv(self.n_channels, 64, batch_norm = self.batch_norm_inconv)
         self.down1 = down(64, 128, batch_norm = self.batch_norm)
@@ -160,7 +160,7 @@ class unet(nn.Module):
         Process KW dictionary
         '''
 
-        self.in_ch = kw_unet_dict['n_channels']
+        self.n_channels = kw_unet_dict['n_channels']
         self.n_classes = kw_unet_dict['n_classes']
         self.bilinear = kw_unet_dict['bilinear']
         self.batch_norm = kw_unet_dict['batch_norm']

@@ -174,6 +174,8 @@ class TrainerSystem():
         
         # To-Do: Option for non-available acceleration factors (RUN ProcessDatasets)
         self.folders_datasets = [self.datasets_folder+'x{}/'.format(self.acceleration_factor)+x for x in os.listdir(self.datasets_folder+'x{}'.format(self.acceleration_factor))]
+        
+        print('Printeo listdir:\n', os.listdir(self.datasets_folder+'x{}'.format(self.acceleration_factor)))
 
         if self.number_volumes != 0:
 

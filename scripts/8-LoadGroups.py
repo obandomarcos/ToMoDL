@@ -154,6 +154,8 @@ artifact_names_x26_psnr = [
 'model-32wj43mf:v0', 'model-3kmtjdm4:v0' ,'model-3l028zex:v0', 'model-2jnmr8t0:v0']
 artifact_names_x22_psnr = ['model-3dp1wex6:v0', 'model-2jwf0rwa:v0', 'model-1qtf5f8u:v0', 'model-2nxos558:v0']
 
+dataset_list_x22 = ['140315_3dpf_head_22', '140114_5dpf_head_22', '140519_5dpf_head_22', '140117_3dpf_body_22', '140114_5dpf_upper tail_22', '140315_1dpf_head_22', '140114_5dpf_lower tail_22', '140714_5dpf_head_22', '140117_3dpf_head_22', '140117_3dpf_lower tail_22', '140117_3dpf_upper tail_22', '140114_5dpf_body_22']
+
 if __name__ == '__main__':
     
     artifact_names = artifact_names_x22_psnr
@@ -161,21 +163,24 @@ if __name__ == '__main__':
 
     run_name = 'test_metrics_kfold_x{}'.format(acceleration_factor)
     metric = 'psnr'
+    dataset_list = dataset_list_x22 
 
     user_project_name = 'omarcos/deepopt/'
     
     run = wandb.init(project = 'deepopt', name = testing_name_group, job_type = 'Dataset Evaluation + K-Folding')
     
     trainer_system = trutils.TrainerSystem(trainer_dict, dataloader_dict, model_system_dict)
+    trainer_system.set_datasets_list(dataset_list)
+
+    
 
     for k_fold, artifact_name in enumerate(artifact_names):        
 
         # artifact = run.use_artifact(user_project_name+artifact_name, type='model')
         # artifact_dir = artifact.download()
 
-        trainer_system.print_check_datasets()
-        # train_dataloader, val_dataloader, test_dataloader = trainer_system.generate_K_folding_dataloader()
-        # trainer_system.current_fold += 1
+        train_dataloader, val_dataloader, test_dataloader = trainer_system.generate_K_folding_dataloader()
+        trainer_system.current_fold += 1
         # model = MoDLReconstructor.load_from_checkpoint(Path(artifact_dir) / "model.ckpt", kw_dictionary_model_system = model_system_dict) 
 
         # trainer = trainer_system.create_trainer()

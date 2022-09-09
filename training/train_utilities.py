@@ -173,18 +173,18 @@ class TrainerSystem():
         self.num_workers = kwdict['num_workers']
         
         # To-Do: Option for non-available acceleration factors (RUN ProcessDatasets)
-        self.folders_datasets = [self.datasets_folder+'x{}/'.format(self.acceleration_factor)+x for x in os.listdir(self.datasets_folder+'x{}'.format(self.acceleration_factor))]
-        
-        print('Printeo listdir:\n', os.listdir(self.datasets_folder+'x{}'.format(self.acceleration_factor)))
+        self.folders_datasets_list = [self.datasets_folder+'x{}/'.format(self.acceleration_factor)+x for x in os.listdir(self.datasets_folder+'x{}'.format(self.acceleration_factor))]
 
+        wandb.log({'datasets_folders_list': [x.split('/') for x in self.folders_datasets_list]})
+        
         if self.number_volumes != 0:
 
-            self.folders_datasets = self.folders_datasets[:self.number_volumes]
+            self.folders_datasets_list = self.folders_datasets_list[:self.number_volumes]
             
         # Number of datasets defines splitting number between train/val and test datasets
         if self.use_k_folding == True:
             
-            self.datasets_number = len(self.folders_datasets)
+            self.datasets_number = len(self.folders_datasets_list)
 
             self.k_fold_max = self.datasets_number//self.k_fold_number_datasets
             
@@ -202,11 +202,11 @@ class TrainerSystem():
 
         if self.current_fold != 0:
             # Rotate datasets
-            self.rotate_list(self.folders_datasets, self.k_fold_number_datasets)
+            self.rotate_list(self.folders_datasets_list, self.k_fold_number_datasets)
 
         # Load each dataset in Dataset class (torch.utils.data.Dataset)
-        train_val_datasets_folders = self.folders_datasets[:self.datasets_number-self.k_fold_number_datasets].copy()
-        test_datasets_folders = self.folders_datasets[self.datasets_number-self.k_fold_number_datasets:].copy()
+        train_val_datasets_folders = self.folders_datasets_list[:self.datasets_number-self.k_fold_number_datasets].copy()
+        test_datasets_folders = self.folders_datasets_list[self.datasets_number-self.k_fold_number_datasets:].copy()
 
         print('Train/Val folders in use...')
         print(train_val_datasets_folders)
@@ -215,6 +215,13 @@ class TrainerSystem():
         print(test_datasets_folders)
 
         self.current_fold += 1
+
+    def set_datasets_list(self, dataset_folder):
+
+        self.folders_datasets_list = [self.datasets_folder+'x{}/'.format(self.acceleration_factor)+x for x in dataset_folder]
+
+        # Saves in the order run for repetivity
+        wandb.log({'datasets_folders_list': dataset_folder})
 
     def kfold_monitor(self, train_val_datasets, test_datasets):
         '''
@@ -255,15 +262,15 @@ class TrainerSystem():
 
     def generate_K_folding_dataloader(self):
         '''
-        Rotates self.folders_datasets and builds new train/val/test dataloaders
+        Rotates self.folders_datasets_list and builds new train/val/test dataloaders
         '''
         if self.current_fold != 0:
             # Rotate datasets
-            self.rotate_list(self.folders_datasets, self.k_fold_number_datasets)
+            self.rotate_list(self.folders_datasets_list, self.k_fold_number_datasets)
 
         # Load each dataset in Dataset class (torch.utils.data.Dataset)
-        train_val_datasets_folders = self.folders_datasets[:self.datasets_number-self.k_fold_number_datasets].copy()
-        test_datasets_folders = self.folders_datasets[self.datasets_number-self.k_fold_number_datasets:].copy()
+        train_val_datasets_folders = self.folders_datasets_list[:self.datasets_number-self.k_fold_number_datasets].copy()
+        test_datasets_folders = self.folders_datasets_list[self.datasets_number-self.k_fold_number_datasets:].copy()
 
         print('Train/Val folders in use...')
         print(train_val_datasets_folders)

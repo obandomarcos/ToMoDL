@@ -1,11 +1,12 @@
 '''
-K-Folding script
-author: obanmarcos
+Load K-folding models from groups and evaluate performance
+
+author : obanmarcos
 '''
 import os
 import os, sys
-from config import *
-# Where am I asks where you are
+from config import * 
+
 sys.path.append(where_am_i())
 
 import pytorch_lightning as pl
@@ -26,15 +27,18 @@ from pytorch_lightning.loggers import WandbLogger
 
 from torchvision import transforms as T
 from pytorch_msssim import SSIM
-import wandb
-
 # from torchmetrics import StructuralSimilarityIndexMeasure as SSIM
 from torchmetrics import MultiScaleStructuralSimilarityIndexMeasure as MSSSIM
+import wandb
+from pathlib import Path
 
-# Options for folding menu
+group_name = ''
+
 use_default_model_dict = True
 use_default_dataloader_dict = True
 use_default_trainer_dict = True
+
+acceleration_factor = 22
 
 if use_default_model_dict == True:
     # ResNet dictionary parameters
@@ -52,8 +56,8 @@ if use_default_model_dict == True:
                 'number_layers': 8,
                 'K_iterations' : 8,
                 'number_projections_total' : 720,
-                'number_projections_undersampled' : 72, 
-                'acceleration_factor':10,
+                'number_projections_undersampled' : 720//acceleration_factor, 
+                'acceleration_factor': acceleration_factor,
                 'image_size': 100,
                 'lambda': 0.05,
                 'use_shared_weights': True,
@@ -75,10 +79,12 @@ if use_default_model_dict == True:
     # System parameters
     model_system_dict = {'optimizer_dict': optimizer_dict,
                         'kw_dictionary_modl': modl_dict,
-                        'loss_dict': loss_dict,                        
+                        'loss_dict': loss_dict, 
+                        'method':'unet',                       
                         'track_train': True,
                         'track_val': True,
-                        'track_test': True}
+                        'track_test': True,
+                        'max_epochs':40}
 
 # PL Trainer and W&B logger dictionaries
 if use_default_trainer_dict == True:
@@ -115,7 +121,10 @@ if use_default_trainer_dict == True:
                     'batch_accumulate_number': 3,
                     'use_mixed_precision': False,
                     'batch_accumulation_start_epoch': 0, 
-                    'profiler': profiler}
+                    'profiler': profiler,
+                    'restore_fold': False,
+                    'fold_number_restore': 2,
+                    'acc_factor_restore': 22}
 
 # Dataloader dictionary
 if use_default_dataloader_dict == True:
@@ -130,8 +139,8 @@ if use_default_dataloader_dict == True:
                         'load_shifts': True,
                         'save_shifts':False,
                         'number_projections_total': 720,
-                        'number_projections_undersampled': 72,
-                        'acceleration_factor':10,
+                        'number_projections_undersampled': 720//acceleration_factor,
+                        'acceleration_factor':acceleration_factor,
                         'train_factor' : 0.8, 
                         'val_factor' : 0.2,
                         'test_factor' : 0.2, 
@@ -139,21 +148,49 @@ if use_default_dataloader_dict == True:
                         'sampling_method' : 'equispaced-linear',
                         'shuffle_data' : True,
                         'data_transform' : data_transform,
-                        'num_workers' : 12}
+                        'num_workers' : 16}
 
-hyperparameter_defaults = {'trainer_kwdict': trainer_dict,
-                            'dataloader_kwdict' : dataloader_dict, 'model_system_kwdict': model_system_dict}
+artifact_names_x26_psnr = [
+'model-32wj43mf:v0', 'model-3kmtjdm4:v0' ,'model-3l028zex:v0', 'model-2jnmr8t0:v0']
+artifact_names_x22_psnr = ['model-3dp1wex6:v0', 'model-2jwf0rwa:v0', 'model-1qtf5f8u:v0', 'model-2nxos558:v0']
 
-wandb.init(config=hyperparameter_defaults)
-# Config parameters are automatically set by W&B sweep agent
-config = wandb.config
-
-def sweep():
-    
-    wandb.init()
-    trainer = trutils.TrainerSystem(**hyperparameter_defaults)
-    trainer.train_model()
+dataset_list_x22 = ['140315_3dpf_head_22', '140114_5dpf_head_22', '140519_5dpf_head_22', '140117_3dpf_body_22', '140114_5dpf_upper tail_22', '140315_1dpf_head_22', '140114_5dpf_lower tail_22', '140714_5dpf_head_22', '140117_3dpf_head_22', '140117_3dpf_lower tail_22', '140117_3dpf_upper tail_22', '140114_5dpf_body_22']
 
 if __name__ == '__main__':
+    
+    artifact_names = artifact_names_x22_psnr
+    testing_name_group = 'x{}'.format(acceleration_factor)
 
-    sweep()
+    run_name = 'test_metrics_kfold_x{}'.format(acceleration_factor)
+    metric = 'psnr'
+    dataset_list = dataset_list_x22 
+
+    user_project_name = 'omarcos/deepopt/'
+    
+    run = wandb.init(project = 'deepopt', name = testing_name_group, job_type = 'Dataset Evaluation + K-Folding')
+    
+    trainer_system = trutils.TrainerSystem(trainer_dict, dataloader_dict, model_system_dict)
+    trainer_system.set_datasets_list(dataset_list)
+
+    
+
+    for k_fold, artifact_name in enumerate(artifact_names):        
+
+        # artifact = run.use_artifact(user_project_name+artifact_name, type='model')
+        # artifact_dir = artifact.download()
+
+        train_dataloader, val_dataloader, test_dataloader = trainer_system.generate_K_folding_dataloader()
+        trainer_system.current_fold += 1
+        # model = MoDLReconstructor.load_from_checkpoint(Path(artifact_dir) / "model.ckpt", kw_dictionary_model_system = model_system_dict) 
+
+        # trainer = trainer_system.create_trainer()
+
+        # test_dict = trainer.test(model = model, dataloaders = test_dataloader)[0]    
+        
+        # # print(test_dict)
+        # # TO-DO: Agregar U-Net y métodos alternantes
+
+        # wandb.log({'acc_factor': acceleration_factor,'k_fold': k_fold, 'psnr_modl': test_dict['test/psnr']})
+        # wandb.log({'acc_factor': acceleration_factor, 'k_fold': k_fold, 'psnr_fbp': test_dict['test/psnr_fbp']})
+        # wandb.log({'acc_factor': acceleration_factor,'k_fold': k_fold, 'ssim_modl': test_dict['test/ssim']})
+        # wandb.log({'acc_factor': acceleration_factor, 'k_fold': k_fold, 'ssim_fbp': test_dict['test/ssim_fbp']})

@@ -98,7 +98,8 @@ class dw(nn.Module):
             
             self.dw_layer_dict['weights_size'] = self.weights_size[i]
 
-            if i == self.number_layers:
+            if i == self.number_layers-1:
+                print('last layer')
                 self.dw_layer_dict['is_last_layer']= True
 
             self.nw['c'+str(i)] = dwLayer(self.dw_layer_dict)
@@ -186,8 +187,9 @@ class modl(nn.Module):
 
         self.out['dc'+j] = self.AtA.inverse(rhs)
         
-        torch.cuda.empty_cache()
         del rhs
+
+        torch.cuda.empty_cache()
 
     self.out['dc'+j] = normalize_images(self.out['dc'+j])    
  
@@ -204,7 +206,8 @@ class modl(nn.Module):
     self.use_torch_radon = kw_dictionary['use_torch_radon']
     self.K = kw_dictionary['K_iterations']
     self.number_projections_total = kw_dictionary['number_projections_total']
-    self.number_projections_undersampled = kw_dictionary['number_projections_undersampled']
+    self.acceleration_factor = kw_dictionary['acceleration_factor']
+    self.number_projections_undersampled = self.number_projections_total//self.acceleration_factor
     self.image_size = kw_dictionary['image_size'] 
     
     self.lam = kw_dictionary['lambda']
@@ -280,6 +283,9 @@ class Aclass:
         del sinogram
         output = iradon/self.lam+img
         
+        # print('Term z max {}, min {}'.format((iradon/self.lam).max(), (iradon/self.lam).min()))
+        # print('Term input max {}, min {}'.format(img.max(), img.min()))
+        # print('Term output max {}, min {}'.format(output.max(), output.min()))
         return output
     
     def inverse(self, rhs):
@@ -288,17 +294,19 @@ class Aclass:
         Params: 
             - rhs (torch.Tensor): Right-hand side tensor for applying inversion of (A^H A + lam*I) operator
         """
-    
+
         y = torch.zeros_like(rhs)
 
         for i in range(rhs.shape[0]):
 
             if self.use_torch_radon == False:
+                
                 y[i,0,:,:] = self.conjugate_gradients(self.forward, rhs[i,0,:,:]) # This indexing may fail
-            
+             
             else:
+                
                 y[i,0,:,:] = cg(self.forward, torch.zeros_like(rhs[i,0,:,:]), rhs[i, 0, :,:])
-
+        
         return y
     
     @staticmethod
@@ -307,15 +315,16 @@ class Aclass:
         """
         My implementation of conjugate gradients in PyTorch
         """
+
         i = 0
         x = torch.zeros_like(rhs)
         r = rhs 
         p = rhs 
         rTr = torch.sum(r*r)
+        
+        while((i<10) and torch.ge(rTr, 1e-5)):
             
-        while((i<10) and torch.ge(rTr, 1e-6)):
-            
-            Ap = A.myAtA(p)
+            Ap = A(p)
             alpha = rTr/torch.sum(p*Ap)
             x = x + alpha*p
             r = r - alpha*Ap
@@ -324,8 +333,6 @@ class Aclass:
             p = r + beta * p
             i += 1
             rTr = rTrNew
-
-        torch.cuda.empty_cache()
 
         return x
 
@@ -338,9 +345,9 @@ def normalize_images(images):
     
     image_norm = torch.zeros_like(images)
 
-    for i, img in enumerate(images):
+    for i, image in enumerate(images):
          
-        image_norm[i,...] = (img - img.min())/(img.max()-img.min())
+        image_norm[i,...] = 2*((image - image.min())/(image.max()-image.min())-0.5)
 
     return image_norm
 

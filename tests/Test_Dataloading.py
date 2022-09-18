@@ -14,7 +14,6 @@ import matplotlib.pyplot as plt
 import pandas as pd
 from utilities import dataloading_utilities as dlutils
 from utilities.folders import *
-from utilities import model_utilities as modutils
 from torch.utils.data import DataLoader, ConcatDataset
 import torch
 import cv2
@@ -81,7 +80,7 @@ def test_dataloader(testing_options):
     if 'check_dataloader_building' in testing_options:
         
         acceleration_factor = 10
-
+        print(datasets_folder)
         folders_datasets = [datasets_folder+'/x{}/'.format(acceleration_factor)+x for x in os.listdir(datasets_folder+'x{}'.format(acceleration_factor))]
 
         for enum, folder in enumerate(folders_datasets):
@@ -94,18 +93,19 @@ def test_dataloader(testing_options):
             dataloader = DataLoader(dataset, shuffle = True)
 
             (us_uf_img, us_fil_img, fs_fil_img) = next(iter(dataloader))
+            print(us_uf_img.shape)
+            us_uf_img = us_uf_img[0, 0,...].cpu().detach().numpy()
+            us_fil_img = us_fil_img[0,0,...].cpu().detach().numpy()
+            fs_fil_img = fs_fil_img[0,0,...].cpu().detach().numpy()
             
-            us_uf_img = us_uf_img[0,...].cpu().detach().numpy()
-            us_fil_img = us_fil_img[0,...].cpu().detach().numpy()
-            fs_fil_img = fs_fil_img[0,...].cpu().detach().numpy()
+            thumbs = cv2.imwrite(dataloader_testing_folder+'Test_new_Image_Dataloader_us_fil_imgs_uf_{}.jpg'.format(enum), us_fil_img)
+            
+            thumbs = cv2.imwrite(dataloader_testing_folder+'Test_new_Image_Dataloader_us_uf_imgs_uf_{}.jpg'.format(enum), us_uf_img)
 
-            thumbs = cv2.imwrite(dataloader_testing_folder+'Test_Image_Dataloader_us_fil_imgs_uf_{}.jpg'.format(enum), 255.0*us_fil_img)
+            thumbs = cv2.imwrite(dataloader_testing_folder+'Test_new_Image_Dataloader_fs_fil_imgs_uf_{}.jpg'.format(enum), fs_fil_img)       
             
-            thumbs = cv2.imwrite(dataloader_testing_folder+'Test_Image_Dataloader_us_uf_imgs_uf_{}.jpg'.format(enum), 255.0*us_uf_img)
+            print(thumbs)
 
-            thumbs = cv2.imwrite(dataloader_testing_folder+'Test_Image_Dataloader_fs_fil_imgs_uf_{}.jpg'.format(enum), 255.0*fs_fil_img)       
-            
-    
     if 'check_multiple_dataset_dataloader_building' in testing_options:
 
 
@@ -164,7 +164,7 @@ if __name__ == '__main__':
     if args.dataloaders_building:
 
         print('Checking Dataloaders building + masking datasets')
-        testing_options.append('check_dataloaders_building')
+        testing_options.append('check_dataloader_building')
     
     if args.multidataset_dataloader_building:
 

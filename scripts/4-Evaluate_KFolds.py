@@ -12,6 +12,7 @@ import argparse
 import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
+from torchsummary import summary
 from training import train_utilities as trutils
 from utilities import dataloading_utilities as dlutils
 from utilities.folders import *
@@ -96,6 +97,10 @@ def eval_models(testing_options):
 
         trainer_dict = {'lightning_trainer_dict': lightning_trainer_dict,
                         'use_k_folding': True, 
+                        'track_checkpoints': True,
+                        'use_model_checkpoint': True,
+                        'swa' : True,
+                        'use_accumulate_batches':True,
                         'k_fold_number_datasets': 2,
                         'use_logger' : True,
                         'logger_dict': logger_dict,
@@ -123,12 +128,12 @@ def eval_models(testing_options):
                            'data_transform' : data_transform}
 
     if 'load_run' in testing_options:
-        
-        test_model = MoDLReconstructor(model_system_dict)
 
         run = wandb.init()
         artifact = run.use_artifact('omarcos/deepopt/model-1ud4xx3w:v0', type='model')
         artifact_dir = artifact.download()
+        
+        checkpoint_path = artifact_dir.replace('./', '') + '/' + [each for each in os.listdir(artifact_dir) if each.endswith('.ckpt')][0]
 
         print('Artifact directory:\n')
         print(artifact_dir)
@@ -136,8 +141,8 @@ def eval_models(testing_options):
         print('Artifact:\n')
         print(artifact)
 
-        test_model.load_from_checkpoint(artifact_dir)
-        print(test_model['hyper_parameters'])
+        test_model = MoDLReconstructor.load_from_checkpoint(checkpoint_path, kw_dictionary_model_system = model_system_dict)
+        print(test_model)
 
     return
 

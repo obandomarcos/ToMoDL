@@ -16,12 +16,34 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torchvision
-from . import unet, modl
+from . import unet, modl, alternating
+from collections.abc import Iterable
 import wandb 
 from timm.scheduler import TanhLRScheduler
 
 # Modify for multi-gpu
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+
+new_float_type = {
+    # preserved types
+    np.float32().dtype.char: np.float32,
+    np.float64().dtype.char: np.float64,
+    np.complex64().dtype.char: np.complex64,
+    np.complex128().dtype.char: np.complex128,
+    # altered types
+    np.float16().dtype.char: np.float32,
+    'g': np.float64,      # np.float128 ; doesn't exist on windows
+    'G': np.complex128,   # np.complex256 ; doesn't exist on windows
+}
+
+dtype_range = {bool: (False, True),
+               np.bool_: (False, True),
+               np.bool8: (False, True),
+               float: (-1, 1),
+               np.float_: (-1, 1),
+               np.float16: (-1, 1),
+               np.float32: (-1, 1),
+               np.float64: (-1, 1)}
 
 class MoDLReconstructor(pl.LightningModule):
     '''
@@ -41,6 +63,9 @@ class MoDLReconstructor(pl.LightningModule):
 
         self.model = modl.modl(self.kw_dictionary_modl)
 
+        if self.track_alternating_admm == True:
+
+            self.ADMM = altmodels.ADMM()
         self.save_hyperparameters(self.hparams)
 
     def forward(self, x):
@@ -59,45 +84,35 @@ class MoDLReconstructor(pl.LightningModule):
 
         modl_rec = self.model(unfiltered_us_rec)
 
+        unfiltered_us_rec = self.normalize_image_01(unfiltered_us_rec)
+        filtered_us_rec = self.normalize_image_01(filtered_us_rec)
+        filtered_fs_rec = self.normalize_image_01(filtered_fs_rec)
+
         if (self.track_train == True) and (batch_idx%500 == 0):
 
             self.log_plot(filtered_fs_rec, modl_rec, 'train')
+
+        modl_rec = self.normalize_image_01(modl_rec['dc'+str(self.model.K)])
                 
         psnr_fbp_loss = self.loss_dict['psnr_loss'](filtered_us_rec, filtered_fs_rec)
-        ssim_fbp_loss = 1-self.loss_dict['ssim_loss'](self.normalize_image_01(filtered_us_rec), self.normalize_image_01(filtered_fs_rec))
+        ssim_fbp_loss = 1-self.loss_dict['ssim_loss'](filtered_us_rec, filtered_fs_rec)
 
-        self.log("train/psnr_fbp", self.psnr(psnr_fbp_loss, range_max_min = [filtered_fs_rec.max(), filtered_fs_rec.min()]), on_step = True, on_epoch = False, prog_bar=True)
+        self.log("train/psnr_fbp", self.psnr(psnr_fbp_loss), on_step = True, on_epoch = False, prog_bar=True)
         self.log("train/ssim_fbp", 1-ssim_fbp_loss, on_step = True, on_epoch = False, prog_bar=True)
 
-        psnr_loss = self.loss_dict['psnr_loss'](modl_rec['dc'+str(self.model.K)], filtered_fs_rec)
-        ssim_loss = 1-self.loss_dict['ssim_loss'](self.normalize_image_01(modl_rec['dc'+str(self.model.K)]), self.normalize_image_01(filtered_fs_rec))
+        psnr_loss = self.loss_dict['psnr_loss'](modl_rec, filtered_fs_rec)
+        ssim_loss = 1-self.loss_dict['ssim_loss'](modl_rec, filtered_fs_rec)
 
-        self.log("train/psnr", self.psnr(psnr_loss, range_max_min = [filtered_fs_rec.max(), filtered_fs_rec.min()]), on_step = True, on_epoch = False, prog_bar=True)
+        self.log("train/psnr", self.psnr(psnr_loss), on_step = True, on_epoch = False, prog_bar=True)
         self.log("train/ssim", 1-ssim_loss, on_step = True, on_epoch = False, prog_bar=True)
 
-
         if self.loss_dict['loss_name'] == 'psnr':
-            
-            if torch.isnan(psnr_loss):
-                print('nan found, logging image')
-                self.log_plot(filtered_fs_rec, modl_rec, 'train')
 
             return psnr_loss
         
         elif self.loss_dict['loss_name'] == 'ssim':
-            
-            if torch.isnan(ssim_loss):
-                print('nan found, logging image')
-                self.log_plot(filtered_fs_rec, modl_rec, 'train')
-
+        
             return ssim_loss
-            
-        elif self.loss_dict['loss_name'] == 'mssim':
-
-            msssim_loss = 1-self.loss_dict['msssim_loss'](modl_rec['dc'+str(self.model.K)], filtered_fs_rec)
-            self.log("train/msssim", msssim_loss)
-            
-            return msssim_loss
     
     def validation_step(self, batch, batch_idx):
 
@@ -109,39 +124,38 @@ class MoDLReconstructor(pl.LightningModule):
         '''
 
         unfiltered_us_rec, filtered_us_rec, filtered_fs_rec = batch
-        
+
         modl_rec = self.model(unfiltered_us_rec)
 
-        if (self.track_val == True) and ((self.current_epoch == 0) or (self.current_epoch == self.max_epochs-1)) and (batch_idx == 0):
+        unfiltered_us_rec = self.normalize_image_01(unfiltered_us_rec)
+        filtered_us_rec = self.normalize_image_01(filtered_us_rec)
+        filtered_fs_rec = self.normalize_image_01(filtered_fs_rec)
 
-            self.log_plot(filtered_fs_rec, modl_rec, 'validation')
+        if (self.track_val == True) and (batch_idx%500 == 0):
 
+            self.log_plot(filtered_fs_rec, modl_rec, 'val')
+
+        modl_rec = self.normalize_image_01(modl_rec['dc'+str(self.model.K)])
+                
         psnr_fbp_loss = self.loss_dict['psnr_loss'](filtered_us_rec, filtered_fs_rec)
-        ssim_fbp_loss = 1-self.loss_dict['ssim_loss'](self.normalize_image_01(filtered_us_rec), self.normalize_image_01(filtered_fs_rec))
+        ssim_fbp_loss = 1-self.loss_dict['ssim_loss'](filtered_us_rec, filtered_fs_rec)
 
-        self.log("val/psnr_fbp", self.psnr(psnr_fbp_loss, range_max_min = [filtered_fs_rec.max(), filtered_fs_rec.min()]))
-        self.log("val/ssim_fbp", 1-ssim_fbp_loss)
+        self.log("val/psnr_fbp", self.psnr(psnr_fbp_loss), on_step = True, on_epoch = False, prog_bar=True)
+        self.log("val/ssim_fbp", 1-ssim_fbp_loss, on_step = True, on_epoch = False, prog_bar=True)
 
-        psnr_loss = self.loss_dict['psnr_loss'](modl_rec['dc'+str(self.model.K)], filtered_fs_rec)
-        ssim_loss = 1-self.loss_dict['ssim_loss'](self.normalize_image_01(modl_rec['dc'+str(self.model.K)]), self.normalize_image_01(filtered_fs_rec))
-        
-        self.log("val/psnr", self.psnr(psnr_loss, range_max_min = [filtered_fs_rec.max(), filtered_fs_rec.min()]))
-        self.log("val/ssim", 1-ssim_loss)
+        psnr_loss = self.loss_dict['psnr_loss'](modl_rec, filtered_fs_rec)
+        ssim_loss = 1-self.loss_dict['ssim_loss'](modl_rec, filtered_fs_rec)
+
+        self.log("val/psnr", self.psnr(psnr_loss), on_step = True, on_epoch = False, prog_bar=True)
+        self.log("val/ssim", 1-ssim_loss, on_step = True, on_epoch = False, prog_bar=True)
 
         if self.loss_dict['loss_name'] == 'psnr':
-            
+
             return psnr_loss
         
         elif self.loss_dict['loss_name'] == 'ssim':
-            
-            return ssim_loss
         
-        elif self.loss_dict['loss_name'] == 'msssim':
-            
-            msssim_loss = 1-self.loss_dict['msssim_loss'](modl_rec['dc'+str(self.model.K)], filtered_fs_rec)
-            self.log("val/msssim", msssim_loss)
-
-            return msssim_loss
+            return ssim_loss
 
     def test_step(self, batch, batch_idx):
 
@@ -153,41 +167,61 @@ class MoDLReconstructor(pl.LightningModule):
         '''
 
         unfiltered_us_rec, filtered_us_rec, filtered_fs_rec = batch
-        
-        psnr_fbp_loss = self.loss_dict['psnr_loss'](filtered_us_rec, filtered_fs_rec)
-        ssim_fbp_loss = 1-self.loss_dict['ssim_loss'](self.normalize_image_01(filtered_us_rec), self.normalize_image_01(filtered_fs_rec))
-
-        self.log("test/psnr_fbp", self.psnr(psnr_fbp_loss, range_max_min = [filtered_fs_rec.max(), filtered_fs_rec.min()]))
-        self.log("test/ssim_fbp", 1-ssim_fbp_loss)
 
         modl_rec = self.model(unfiltered_us_rec)
+
+        unfiltered_us_rec = self.normalize_image_01(unfiltered_us_rec)
+        filtered_us_rec = self.normalize_image_01(filtered_us_rec)
+        filtered_fs_rec = self.normalize_image_01(filtered_fs_rec)
 
         if (self.track_test == True) and (batch_idx == 0):
 
             self.log_plot(filtered_fs_rec, modl_rec, 'test')
 
-        psnr_loss = self.loss_dict['psnr_loss'](modl_rec['dc'+str(self.model.K)], filtered_fs_rec)
-        ssim_loss = 1-self.loss_dict['ssim_loss'](self.normalize_image_01(modl_rec['dc'+str(self.model.K)]), self.normalize_image_01(filtered_fs_rec))
+        modl_rec = self.normalize_image_01(modl_rec['dc'+str(self.model.K)])
+                
+        psnr_fbp_loss = self.loss_dict['psnr_loss'](filtered_us_rec, filtered_fs_rec)
+        ssim_fbp_loss = 1-self.loss_dict['ssim_loss'](filtered_us_rec, filtered_fs_rec)
+
+        self.log("test/psnr_fbp", self.psnr(filtered_us_rec, filtered_fs_rec), on_step = True, prog_bar = True)
+        self.log("test/ssim_fbp", (1-ssim_fbp_loss).cpu(), on_step = True, prog_bar = True)
+
+        psnr_loss = self.loss_dict['psnr_loss'](modl_rec, filtered_fs_rec)
+        ssim_loss = 1-self.loss_dict['ssim_loss'](modl_rec, filtered_fs_rec)
+
+        self.log("test/psnr", self.psnr(modl_rec, filtered_fs_rec), on_step = True,prog_bar = True)
+        self.log("test/ssim", (1-ssim_loss).cpu(), on_step = True, prog_bar = True)
+
+        self.test_metric['test/psnr'].append(self.psnr(modl_rec, filtered_fs_rec))
+        self.test_metric['test/ssim'].append((1-ssim_loss).cpu())
         
-        self.log("test/psnr", self.psnr(psnr_loss, range_max_min = [filtered_fs_rec.max(), filtered_fs_rec.min()]).item())
-        self.log("test/ssim", 1-ssim_loss.item())
+        self.test_metric['test/psnr_fbp'].append(self.psnr(filtered_us_rec, filtered_fs_rec))
+        self.test_metric['test/ssim_fbp'].append((1-ssim_fbp_loss).cpu())
+        
+        if self.track_alternating_admm == True:
+
+            admm_rec = torch.zeros_like(filt_fs_rec_image)
+
+            for i, filt_fs_rec_image in enumerate(filtered_fs_rec):
+
+                admm_rec[i,0, ...] = tensor.FloatTensor(self.ADMM(filt_fs_rec_image.cpu().numpy()[0,...]))
+
+            self.test_metric['test/psnr_admm'].append(self.psnr(admm_rec, 
+            filtered_fs_rec))
+            self.test_metric['test/ssim_admm'].append(self.loss_dict['ssim_loss'](admm_rec, filtered_fs_rec))
 
         if self.loss_dict['loss_name'] == 'psnr':
-            
+
             return psnr_loss
         
         elif self.loss_dict['loss_name'] == 'ssim':
-            
-            return ssim_loss
         
-        elif self.loss_dict['loss_name'] == 'msssim':
-            
-            msssim_loss = 1-self.loss_dict['msssim_loss'](modl_rec['dc'+str(self.model.K)], filtered_fs_rec)
-            self.log("test/msssim", msssim_loss)
+            return ssim_loss
 
-            return msssim_loss
+    def create_test_metric(self):
 
-    
+        self.test_metric = {'test/psnr':[], 'test/ssim':[], 'test/psnr_fbp':[], 'test/ssim_fbp':[]}
+
     def configure_optimizers(self):
         '''
         Configure optimizer
@@ -217,7 +251,7 @@ class MoDLReconstructor(pl.LightningModule):
         Params: 
             - kw_dictionary (dict): Dictionary with keywords
         '''
-        
+        self.track_alternating_admm = kw_dict['track_alternating_admm']
         self.optimizer_dict = kw_dict['optimizer_dict']
         self.kw_dictionary_modl = kw_dict['kw_dictionary_modl']
         self.loss_dict = kw_dict['loss_dict']
@@ -230,15 +264,18 @@ class MoDLReconstructor(pl.LightningModule):
         self.hparams['loss_dict'] = self.loss_dict
         self.hparams['kw_dictionary_modl'] = self.kw_dictionary_modl
         self.hparams['optimizer_dict'] = self.optimizer_dict
-
+    
     @staticmethod
-    def psnr(mse, range_max_min = [0,1]):
-        '''
-        Calculates PSNR respect to MSE mean value
-        '''
+    def psnr(imgs1, imgs2):
 
-        return 10*torch.log10((range_max_min[1]-range_max_min[0])**2/mse)
+        psnr_list = []
 
+        for img1, img2 in zip(imgs1, imgs2):
+
+            psnr_list.append(_psnr(img1[0,...].detach().cpu().numpy(), img2[0,...].detach().cpu().numpy())) 
+        
+        return np.array(psnr_list).mean()
+    
     def log_plot(self, target, prediction, phase):
         '''
         Plots target and prediction (unrolled) and logs it. 
@@ -301,6 +338,90 @@ class MoDLReconstructor(pl.LightningModule):
             image_norm[i,...] = ((image - image.min())/(image.max()-image.min()))
 
         return image_norm        
+
+def _as_floats(image0, image1):
+    """
+    Promote im1, im2 to nearest appropriate floating point precision.
+    """
+    float_type = _supported_float_type([image0.dtype, image1.dtype])
+    image0 = np.asarray(image0, dtype=float_type)
+    image1 = np.asarray(image1, dtype=float_type)
+    
+    return image0, image1
+
+def _supported_float_type(input_dtype, allow_complex=False):
+    """Return an appropriate floating-point dtype for a given dtype.
+    float32, float64, complex64, complex128 are preserved.
+    float16 is promoted to float32.
+    complex256 is demoted to complex128.
+    Other types are cast to float64.
+    Parameters
+    ----------
+    input_dtype : np.dtype or Iterable of np.dtype
+        The input dtype. If a sequence of multiple dtypes is provided, each
+        dtype is first converted to a supported floating point type and the
+        final dtype is then determined by applying `np.result_type` on the
+        sequence of supported floating point types.
+    allow_complex : bool, optional
+        If False, raise a ValueError on complex-valued inputs.
+    Returns
+    -------
+    float_type : dtype
+        Floating-point dtype for the image.
+    """
+    if isinstance(input_dtype, Iterable) and not isinstance(input_dtype, str):
+        return np.result_type(*(_supported_float_type(d) for d in input_dtype))
+    input_dtype = np.dtype(input_dtype)
+    if not allow_complex and input_dtype.kind == 'c':
+        raise ValueError("complex valued input is not supported")
+    return new_float_type.get(input_dtype.char, np.float64)
+
+def mean_squared_error(image0, image1):
+    """
+    Compute the mean-squared error between two images.
+    Parameters
+    ----------
+    image0, image1 : ndarray
+        Images.  Any dimensionality, must have same shape.
+    Returns
+    -------
+    mse : float
+        The mean-squared error (MSE) metric.
+    Notes
+    -----
+    .. versionchanged:: 0.16
+        This function was renamed from ``skimage.measure.compare_mse`` to
+        ``skimage.metrics.mean_squared_error``.
+    """
+    image0, image1 = _as_floats(image0, image1)
+    return np.mean((image0 - image1) ** 2, dtype=np.float64)
+
+def _psnr(image_test, image_true, data_range = None):
+    '''
+    Calculates PSNR respect to MSE mean value
+    '''
+
+    if data_range is None:
+        if image_true.dtype != image_test.dtype:
+            warn("Inputs have mismatched dtype.  Setting data_range based on "
+                "image_true.")
+        dmin, dmax = dtype_range[image_true.dtype.type]
+        true_min, true_max = np.min(image_true), np.max(image_true)
+        if true_max > dmax or true_min < dmin:
+            raise ValueError(
+                "image_true has intensity values outside the range expected "
+                "for its data type. Please manually specify the data_range.")
+        if true_min >= 0:
+            # most common case (255 for uint8, 1 for float)
+            data_range = dmax
+        else:
+            data_range = dmax - dmin
+
+    image_true, image_test = _as_floats(image_true, image_test)
+
+    err = mean_squared_error(image_true, image_test)
+    
+    return 10 * np.log10((data_range ** 2) / err) 
 
 class UNetReconstructor(pl.LightningModule):
     '''

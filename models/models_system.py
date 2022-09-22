@@ -16,7 +16,9 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torchvision
-from . import unet, modl, alternating
+from skimage.transform import radon, iradon
+from . import unet, modl
+from . import alternating as altmodels
 from collections.abc import Iterable
 import wandb 
 from timm.scheduler import TanhLRScheduler
@@ -64,8 +66,30 @@ class MoDLReconstructor(pl.LightningModule):
         self.model = modl.modl(self.kw_dictionary_modl)
 
         if self.track_alternating_admm == True:
+            
+            angles = np.linspace(0, 2*180, self.admm_dictionary['number_projections'], endpoint = False)
 
-            self.ADMM = altmodels.ADMM()
+            self.hR = lambda x: radon(x, angles, circle = False)
+            self.hRT = lambda sino: iradon(sino, angles, circle = False)
+            self.Psi = lambda x,th: altmodels.TVdenoise(x,
+                                                        2/th,
+                                                        self.admm_dictionary['tv_iters'])
+            self.Phi = lambda x: altmodels.TVnorm(x)
+            
+            self.ADMM = lambda y, y_true: altmodels.ADMM(y = self.hR(y), 
+                                                        A = self.hR, 
+                                                        AT = self.hRT, 
+                                                        Den = self.Psi, 
+                                                        alpha = self.admm_dictionary['alpha'],
+                                                        delta = self.admm_dictionary['delta'], 
+                                                        max_iter = self.admm_dictionary['max_iter'], 
+                                                        phi = self.Phi, 
+                                                        tol = self.admm_dictionary['tol'], 
+                                                        invert = self.admm_dictionary['use_invert'], 
+                                                        warm = self.admm_dictionary['use_warm_init'],
+                                                        true_img = y_true,
+                                                        verbose = self.admm_dictionary['verbose'])
+
         self.save_hyperparameters(self.hparams)
 
     def forward(self, x):
@@ -200,16 +224,16 @@ class MoDLReconstructor(pl.LightningModule):
         
         if self.track_alternating_admm == True:
 
-            admm_rec = torch.zeros_like(filt_fs_rec_image)
+            admm_rec = torch.zeros_like(filtered_fs_rec)
 
-            for i, filt_fs_rec_image in enumerate(filtered_fs_rec):
-
-                admm_rec[i,0, ...] = tensor.FloatTensor(self.ADMM(filt_fs_rec_image.cpu().numpy()[0,...]))
+            for i, (filt_us_rec_image, filt_fs_rec_image) in enumerate(zip(filtered_us_rec, filtered_fs_rec)):
+                
+                admm_rec[i,0, ...] = torch.FloatTensor(self.ADMM(filt_us_rec_image.cpu().numpy()[0,...].T, filt_fs_rec_image.cpu().numpy()[0,...].T)[0])
 
             self.test_metric['test/psnr_admm'].append(self.psnr(admm_rec, 
             filtered_fs_rec))
             self.test_metric['test/ssim_admm'].append(self.loss_dict['ssim_loss'](admm_rec, filtered_fs_rec))
-
+            
         if self.loss_dict['loss_name'] == 'psnr':
 
             return psnr_loss
@@ -220,7 +244,7 @@ class MoDLReconstructor(pl.LightningModule):
 
     def create_test_metric(self):
 
-        self.test_metric = {'test/psnr':[], 'test/ssim':[], 'test/psnr_fbp':[], 'test/ssim_fbp':[]}
+        self.test_metric = {'test/psnr_admm': [], 'test/ssim_admm': [],'test/psnr':[], 'test/ssim':[], 'test/psnr_fbp':[], 'test/ssim_fbp':[]}
 
     def configure_optimizers(self):
         '''
@@ -245,6 +269,7 @@ class MoDLReconstructor(pl.LightningModule):
         Lr scheduler step
         '''
         scheduler.step(epoch=self.current_epoch)
+    
     def process_kwdictionary(self, kw_dict):
         '''
         Process keyword dictionary.
@@ -252,6 +277,11 @@ class MoDLReconstructor(pl.LightningModule):
             - kw_dictionary (dict): Dictionary with keywords
         '''
         self.track_alternating_admm = kw_dict['track_alternating_admm']
+
+        if self.track_alternating_admm == True:
+
+            self.admm_dictionary = kw_dict['admm_dictionary']
+
         self.optimizer_dict = kw_dict['optimizer_dict']
         self.kw_dictionary_modl = kw_dict['kw_dictionary_modl']
         self.loss_dict = kw_dict['loss_dict']

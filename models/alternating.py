@@ -8,12 +8,11 @@ from time import time
 from skimage.metrics import structural_similarity as ssim
 import sys
 # cambiar para drive
-sys.path.append('/home/obanmarcos/Balseiro/Maestría/Proyecto/Implementación/1-DL')
-import DataLoading as dl 
+# import DataLoading as dl 
 
 def TwIST(y, A, AT, tau, kwarg, true_img = None):
   '''
-  his function solves the regularization problem
+  This function solves the regularization problem
      arg min_x = 0.5*|| y - A x ||_2^2 + tau phi( x ), 
 
   where A is a generic matrix and phi(.) is a regularizarion 
@@ -442,7 +441,7 @@ def TwIST(y, A, AT, tau, kwarg, true_img = None):
 
 def ADMM(y, A, AT, Den, alpha, delta, max_iter, 
           phi, tol, warm, invert, true_img = None, 
-          alpha_weight = False, alpha_decay = 0.6):
+          alpha_weight = False, alpha_decay = 0.6, verbose = True):
   # % ADMM Reconstruction based in Alternative directions method of multipliers
   # % This function solves the regularization problem 
   # %
@@ -472,11 +471,11 @@ def ADMM(y, A, AT, Den, alpha, delta, max_iter,
 
 
   assert callable(A) 
-  print("A is callable")  # Assert A is callable
+  # print("A is callable")  # Assert A is callable
   assert callable(AT) 
-  print("AT is callable")  # Assert AT is callable
+  # print("AT is callable")  # Assert AT is callable
   assert callable(Den) 
-  print("Denoiser is callable")  # Assert Denoiser is callable
+  # print("Denoiser is callable")  # Assert Denoiser is callable
 
   # Normalization  
   b = np.zeros(AT(y).shape)
@@ -485,7 +484,8 @@ def ADMM(y, A, AT, Den, alpha, delta, max_iter,
 
   tol = 1e-4
 
-  print('\n'.join(('ADMM reconstruction', 'Iteration | ISNR | objective | criterion | Phi Norm', '----')))
+  if verbose == True:
+    print('\n'.join(('ADMM reconstruction', 'Iteration | ISNR | objective | criterion | Phi Norm', '----')))
 
   objective = []
   error_MSE = []
@@ -530,7 +530,7 @@ def ADMM(y, A, AT, Den, alpha, delta, max_iter,
       
       if true_img is not None:
         
-        ISNR=20*np.log10(np.linalg.norm((AT(y)-true_img).flatten())/np.linalg.norm((s-true_img).flatten()));
+        ISNR=20*np.log10(np.linalg.norm((AT(y)-true_img).flatten())/np.linalg.norm((s-true_img).flatten()))
       
       y_new = A(snew)
       y_new = (y_new-y_new.min())/(y_new.max()-y_new.min())
@@ -544,7 +544,8 @@ def ADMM(y, A, AT, Den, alpha, delta, max_iter,
       if i>=2:
           crit = abs(objective[i]-objective[i-1])/objective[i-1]; 
 
-          print('{}\t|{}\t|{}\t|{}\t{}'.format(
+          if verbose == True:
+            print('{}\t|{}\t|{}\t|{}\t{}'.format(
                 i, np.round(10*np.log10(np.sum((AT(y)-true_img)**2)/np.sum((s-true_img)**2)),3), 
                 objective[i], crit/tol, alpha*phi(snew)))
           #if crit < tol:

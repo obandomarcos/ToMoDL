@@ -3,7 +3,7 @@ Folders to be used in data processing
 author: obanmarcos
 """
 
-main_folder = '/home/obanmarcos/Balseiro/DeepOPT/DataOPT/'
+main_folder = '/home/marcos/DeepOPT/DataOPT/'
 
 
 f140114_5dpf = main_folder+'140114_5dpf'  # 5 days post-fertilization
@@ -18,7 +18,7 @@ f140714_5dpf = main_folder+'140714_5dpf'
 f140827_3dpf_4X = main_folder+'140827_3dpf_4X'
 f140827_5dpf_4X = main_folder+'140827_5dpf_4X'
 
-results_folder = '/home/obanmarcos/Balseiro/DeepOPT/Resultados/'
-model_folder = '/home/obanmarcos/Balseiro/DeepOPT/SavedModels/'
-datasets_folder = '/home/obanmarcos/Balseiro/DeepOPT/datasets/'
-volumes_folder = '/home/obanmarcos/Balseiro/DeepOPT/Volumes/'
+results_folder = '/home/marcos/DeepOPT/Resultados/'
+model_folder = '/home/marcos/DeepOPT/SavedModels/'
+datasets_folder = '/data/marcos/datasets/'
+volumes_folder = '/home/marcos/DeepOPT/Volumes/'

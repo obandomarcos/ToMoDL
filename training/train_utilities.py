@@ -175,7 +175,7 @@ class TrainerSystem():
         # To-Do: Option for non-available acceleration factors (RUN ProcessDatasets)
         self.folders_datasets_list = [self.datasets_folder+'x{}/'.format(self.acceleration_factor)+x for x in os.listdir(self.datasets_folder+'x{}'.format(self.acceleration_factor))]
 
-        wandb.log({'datasets_folders_list': [x.split('/') for x in self.folders_datasets_list]})
+        # wandb.log({'datasets_folders_list': [x.split('/') for x in self.folders_datasets_list]})
         
         if self.number_volumes != 0:
 
@@ -221,19 +221,18 @@ class TrainerSystem():
         self.folders_datasets_list = [self.datasets_folder+'x{}/'.format(self.acceleration_factor)+x for x in dataset_folder]
 
         # Saves in the order run for repetivity
-        wandb.log({'datasets_folders_list': dataset_folder})
+        # wandb.log({'datasets_folders_list': dataset_folder})
 
     def kfold_monitor(self, train_val_datasets, test_datasets):
         '''
         Monitor K-Fold datasets, parsing its structure
         '''
         
-        self.kfold_monitor_dict[self.current_fold] = {'train/val' : self.__parse_dataset_list(train_val_datasets),
+        self.kfold_monitor_dict[self.current_fold] = {'k_fold':self.current_fold, 'train/val' : self.__parse_dataset_list(train_val_datasets),
                                                  'test' : self.__parse_dataset_list(test_datasets)}
 
-        print(self.kfold_monitor_dict[self.current_fold])
-        wandb.log({'k_fold':self.kfold_monitor_dict,
-                   'dataset_monitor': self.kfold_monitor_dict[self.current_fold]})
+        # print(self.kfold_monitor_dict[self.current_fold])
+        # wandb.log({'dataset_monitor': self.kfold_monitor_dict[self.current_fold]})
 
     def __parse_dataset_list(self, dataset_list):
         

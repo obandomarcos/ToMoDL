@@ -5,6 +5,7 @@ from config import *
 sys.path.append(where_am_i())
 
 from utilities import dataloading_utilities as dlutils
+from scipy.signal import correlate
 from torch.utils.data import DataLoader
 from utilities.folders import *
 import pandas as pd
@@ -16,11 +17,12 @@ import skimage.measure
 import seaborn as sns
 
 pickle_file = './logs/14-IntensityStructure.pkl'
+dataframe_pickle = 'logs/test_dataframe_x22.pkl'
 
 def variance_datasets():
 
     acceleration_factor = 22
-    dataset_list_names = ['140117_3dpf_lower tail_22', '140114_5dpf_head_22', '140519_5dpf_head_22', '140117_3dpf_body_22', '140114_5dpf_upper tail_22', '140315_1dpf_head_22', '140114_5dpf_lower tail_22', '140714_5dpf_head_22', '140117_3dpf_head_22', '140117_3dpf_lower tail_22', '140117_3dpf_upper tail_22', '140114_5dpf_body_22'] # paths
+    dataset_list_names = ['140315_3dpf_head_22', '140114_5dpf_head_22', '140519_5dpf_head_22', '140117_3dpf_body_22', '140114_5dpf_upper tail_22', '140315_1dpf_head_22', '140114_5dpf_lower tail_22', '140714_5dpf_head_22', '140117_3dpf_head_22', '140117_3dpf_lower tail_22', '140117_3dpf_upper tail_22', '140114_5dpf_body_22'] # paths
 
     dataset_list_paths = [datasets_folder+'x{}/'.format(acceleration_factor)+x for x in dataset_list_names] 
 
@@ -78,6 +80,8 @@ def plot_intensities():
 
         variance = pickle.load(f)
     
+    dataframe = pd.read(dataframe_pickle)
+    
     fig, axs = plt.subplots(3,len(dataset_names)//3, figsize = (20, 16))
 
     axs = axs.flatten()
@@ -95,11 +99,68 @@ def plot_intensities():
 
     fig.savefig('logs/14-IntensityStructure_AllDatasets.pdf'.format(dataset_name), bbox_inches = 'tight')
 
+def correlate_intensity():
+
+    acceleration_factor = 22
+    dataset_names = ['140315_3dpf_head_22', '140114_5dpf_head_22', '140519_5dpf_head_22', '140117_3dpf_body_22', '140114_5dpf_upper tail_22', '140315_1dpf_head_22', '140114_5dpf_lower tail_22', '140714_5dpf_head_22', '140117_3dpf_head_22', '140117_3dpf_lower tail_22', '140117_3dpf_upper tail_22', '140114_5dpf_body_22']
+
+    with open(pickle_file, 'rb') as f:
+
+        variance = pickle.load(f)
+    
+    dataframe = pd.read_pickle(dataframe_pickle)
+
+    datacode_string = lambda  datacode, dpf, part, acc_factor: '{}_{}_{}_{}'.format(datacode, dpf, part, acc_factor)
+
+    metrics = ['psnr', 'ssim']
+    model_metrics = ['test/{}', 'test/{}_fbp', 'test/{}_admm']
+    model_metric_names = ['{} - MoDL', '{} - FBP', '{} - ADMM']
+
+    for metric in metrics:
+
+        i = 0
+
+        fig, axs = plt.subplots(3,len(dataset_names)//3, figsize = (20, 18), sharex = True, sharey = True)
+
+        axs = axs.flatten()
+
+        for model_metric, model_metric_name in zip(model_metrics, model_metric_names):
+        
+            for dataset_name, ax in zip(dataset_names, axs):
+                
+                
+                datacode = dataset_name.split('_')[-4].split('/')[-1]
+                fish_part = dataset_name.split('_')[-2]
+                fish_dpf = dataset_name.split('_')[-3]
+                
+                entropy = dataframe[(dataframe['datacode'] == datacode) & (dataframe['fish_part'] == fish_part) & (dataframe['fish_dpf'] == fish_dpf)][model_metric.format(metric)].apply(pd.Series).astype(np.float64).stack().reset_index(drop=True)  
+
+                cross_corr = np.log10(correlate(entropy, variance[dataset_name][:,0], mode = 'same'))
+                slices = np.arange(len(cross_corr))-len(cross_corr)//2
+
+                ax.scatter(entropy, variance[dataset_name][:,0], label = model_metric_name.format(metric.upper()))
+
+                if i >= 9:
+                    ax.set_xlabel('{}\nUnfiltered Backprojection'.format(metric))
+                
+                if i % 4 == 0:
+                    ax.set_ylabel('Entropy')
+
+                if i == 5:
+                    ax.legend()
+                    
+                ax.set_title(dataset_name)
+                sns.despine()
+                i += 1
+
+        fig.savefig('logs/14-EntropyMetrics_{}_AllDatasets.pdf'.format(metric), bbox_inches = 'tight')
+
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
     parser.add_argument('--var', help='Calculate Variance', action='store_true')
     parser.add_argument('--plot', help='Plot Variance', action='store_true')
+    parser.add_argument('--corr', help='Correlate entropy and performance', action='store_true')
 
     args = vars(parser.parse_args())
     
@@ -111,3 +172,8 @@ if __name__ == '__main__':
         
         print('Plotting variances...')
         plot_intensities()  
+    
+    if args['corr'] == True:
+        
+        print('Correlating intensities...')
+        correlate_intensity()

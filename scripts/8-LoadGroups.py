@@ -113,7 +113,7 @@ if use_default_trainer_dict == True:
                     'use_swa' : False,
                     'use_accumulate_batches': False,
                     'k_fold_number_datasets': 3,
-                    'use_logger' : True,
+                    'use_logger' : False,
                     'resume':'allow',
                     'logger_dict': logger_dict,
                     'track_default_checkpoints'  : False,
@@ -148,7 +148,7 @@ if use_default_dataloader_dict == True:
                         'sampling_method' : 'equispaced-linear',
                         'shuffle_data' : True,
                         'data_transform' : data_transform,
-                        'num_workers' : 16}
+                        'num_workers' : 8}
 
 artifact_names_x26_psnr = [
 'model-32wj43mf:v0', 'model-3kmtjdm4:v0' ,'model-3l028zex:v0', 'model-2jnmr8t0:v0']
@@ -159,38 +159,48 @@ dataset_list_x22 = ['140315_3dpf_head_22', '140114_5dpf_head_22', '140519_5dpf_h
 if __name__ == '__main__':
     
     artifact_names = artifact_names_x22_psnr
-    testing_name_group = 'x{}'.format(acceleration_factor)
+    testing_name_group = 'x{}_test2'.format(acceleration_factor)
 
     run_name = 'test_metrics_kfold_x{}'.format(acceleration_factor)
     metric = 'psnr'
     dataset_list = dataset_list_x22 
 
     user_project_name = 'omarcos/deepopt/'
-    
-    run = wandb.init(project = 'deepopt', name = testing_name_group, job_type = 'Dataset Evaluation + K-Folding')
-    
-    trainer_system = trutils.TrainerSystem(trainer_dict, dataloader_dict, model_system_dict)
+
+    trainer_system = trutils.TrainerSystem(trainer_dict, dataloader_dict,model_system_dict)
     trainer_system.set_datasets_list(dataset_list)
 
-    
-
-    for k_fold, artifact_name in enumerate(artifact_names):        
-
-        # artifact = run.use_artifact(user_project_name+artifact_name, type='model')
-        # artifact_dir = artifact.download()
-
+    for k_fold, artifact_name in enumerate(artifact_names):
+        
+        run = wandb.init(project = 'deepopt', reinit = True, group = testing_name_group, job_type = 'Dataset Evaluation + K-Folding', name = '{} fold'.format(k_fold))
+        
         train_dataloader, val_dataloader, test_dataloader = trainer_system.generate_K_folding_dataloader()
-        trainer_system.current_fold += 1
-        # model = MoDLReconstructor.load_from_checkpoint(Path(artifact_dir) / "model.ckpt", kw_dictionary_model_system = model_system_dict) 
 
-        # trainer = trainer_system.create_trainer()
+        artifact = run.use_artifact(user_project_name+artifact_name, type='model')
+        artifact_dir = artifact.download()
+        
+        model = MoDLReconstructor.load_from_checkpoint(Path(artifact_dir) / "model.ckpt", kw_dictionary_model_system = model_system_dict) 
 
-        # test_dict = trainer.test(model = model, dataloaders = test_dataloader)[0]    
+        trainer = trainer_system.create_trainer()
+
+        test_dict = trainer.test(model = model, dataloaders = test_dataloader)[0]    
         
         # # print(test_dict)
         # # TO-DO: Agregar U-Net y métodos alternantes
 
-        # wandb.log({'acc_factor': acceleration_factor,'k_fold': k_fold, 'psnr_modl': test_dict['test/psnr']})
-        # wandb.log({'acc_factor': acceleration_factor, 'k_fold': k_fold, 'psnr_fbp': test_dict['test/psnr_fbp']})
-        # wandb.log({'acc_factor': acceleration_factor,'k_fold': k_fold, 'ssim_modl': test_dict['test/ssim']})
-        # wandb.log({'acc_factor': acceleration_factor, 'k_fold': k_fold, 'ssim_fbp': test_dict['test/ssim_fbp']})
+        for (key, number) in trainer_system.kfold_monitor_dict[trainer_system.current_fold]['test']['fish_part'].items():
+
+            for _ in range(number):
+                wandb.log({'fish_part': key, '{}/metric'.format(key): test_dict})
+        
+        for (key, number) in trainer_system.kfold_monitor_dict[trainer_system.current_fold]['test']['fish_dpf'].items():
+
+            for _ in range(number):
+                wandb.log({'fish_dpf': key, '{}/metric'.format(key): test_dict})
+
+        wandb.log({'acc_factor': acceleration_factor,'k_fold': k_fold, 'psnr_modl': test_dict['test/psnr'], 'monitor': trainer_system.kfold_monitor_dict[trainer_system.current_fold]})
+        wandb.log({'acc_factor': acceleration_factor, 'k_fold': k_fold, 'psnr_fbp': test_dict['test/psnr_fbp'],'monitor': trainer_system.kfold_monitor_dict[trainer_system.current_fold]})
+        wandb.log({'acc_factor': acceleration_factor,'k_fold': k_fold, 'ssim_modl': test_dict['test/ssim'], 'monitor': trainer_system.kfold_monitor_dict[trainer_system.current_fold]})
+        wandb.log({'acc_factor': acceleration_factor, 'k_fold': k_fold, 'ssim_fbp': test_dict['test/ssim_fbp'], 'monitor': trainer_system.kfold_monitor_dict[trainer_system.current_fold]})
+        
+        trainer_system.current_fold += 1

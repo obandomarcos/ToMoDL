@@ -30,6 +30,7 @@ from training import train_utilities as trutils
 from skimage.metrics import structural_similarity as ssim 
 from skimage.metrics import peak_signal_noise_ratio as psnr_skimage
 from cv2 import PSNR as psnr_cv2
+from matplotlib.patches import Rectangle
 
 use_default_model_dict = True
 use_default_dataloader_dict = True
@@ -155,6 +156,15 @@ dataset_list_x22 = ['140315_3dpf_head_22', '140114_5dpf_head_22', '140519_5dpf_h
 def normalize_01(img):
     return (img-img.min())/(img.max()-img.min())
 
+
+def psnr_per_box(target, rec, box):
+
+    return round(psnr_cv2(target[box[0,0]:box[0,1],box[1,0]:box[1,1]], rec[box[0,0]:box[0,1],box[1,0]:box[1,1]], 1), 2)
+
+def box_list(c, h, w):
+
+    return [[c[0], c[0]+w], [c[1], c[1]+h]]
+
 if __name__ == '__main__':
     
     part = dataset_list_x22[-3].split('_')[-2] 
@@ -192,16 +202,30 @@ if __name__ == '__main__':
     modl_reconstructed = normalize_01(model(unfiltered_us_rec.to(device))[idx,0,...].detach().cpu().numpy())
 
     images = [filtered_fs_rec_image, unfiltered_us_rec_image, filtered_us_rec_image,  modl_reconstructed]
-    
+
+    # Boxes
+    c_green = [0, 0]
+    h_green, w_green = (20, 20)
+    c_red = [40, 40]
+    h_red, w_red = (20, 20)
+
+    box_green = box_list(c_green, w_green, h_green)
+    box_red = box_list(c_red, w_red, h_red)
+
+    rect_green = patches.Rectangle(c_green, w_green, h_green, linewidth=1, edgecolor='r', facecolor='none')
+    rect_red = patches.Rectangle(c_red, w_red, h_red, linewidth=1, edgecolor='g', facecolor='none')
+
+    boxes = [box_green, box_red]
+
     titles = ['Filtered backprojection - \nFully Sampled\n',
               'Unfiltered backprojection - \nUndersampled\n', 
               'Filtered backprojection - \nUndersampled X22\n',
               'MoDL reconstruction\n']
 
     metrics = ['',
-               'SSIM: {}\n PSNR (CV2): {} dB\n PSNR (SKIMAGE): {} dB'.format(round(ssim(images[0], images[1]), 2), round(psnr_cv2(images[0], images[1], 1), 2), round(psnr_skimage(images[0], images[1]), 2)),
-               'SSIM: {}\n PSNR (CV2): {} dB\n PSNR (SKIMAGE): {} dB'.format(round(ssim(images[0], images[2]), 2), round(psnr_cv2(images[0], images[2], 1), 2), round(psnr_skimage(images[0], images[2]), 2)),
-               'SSIM: {}\n PSNR (CV2): {} dB\n PSNR (SKIMAGE): {}'.format(round(ssim(images[0], images[3]), 2), round(psnr_cv2(images[0], images[3], 1), 2), round(psnr_skimage(images[0], images[3]),2))]
+               'SSIM: {}\n PSNR (Box Green): {} dB\n PSNR (Box Red): {} dB'.format(round(ssim(images[0], images[1]), 2), psnr_per_box(images[0], images[1], box_green), psnr_per_box(images[0], images[1], box_red)),
+               'SSIM: {}\n PSNR (Box Green): {} dB\n PSNR (Box Red): {} dB'.format(round(ssim(images[0], images[2]), 2), psnr_per_box(images[0], images[2], box_green), psnr_per_box(images[0], images[2], box_red)),
+               'SSIM: {}\n PSNR (Box Green): {} dB\n PSNR (Box Red): {} dB'.format(round(ssim(images[0], images[3]), 2), psnr_per_box(images[0], images[3], box_green), psnr_per_box(images[0], images[3], box_red))]
 
     fig, axs = plt.subplots(2, len(images)//2, figsize = (8,10))
     axs = axs.flatten()
@@ -211,6 +235,8 @@ if __name__ == '__main__':
         ax.imshow(image)
         ax.set_title(title+metric)
         ax.set_axis_off()
+        ax.add_patch(rect_green)
+        ax.add_patch(rect_red)
 
-    fig.savefig('./logs/Test_PSNR-11-{}.pdf'.format(part), bbox_inches = 'tight')
+    fig.savefig('./logs/Test_PSNR-11_PerPatch-{}.pdf'.format(part), bbox_inches = 'tight')
 

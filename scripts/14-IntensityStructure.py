@@ -4,6 +4,7 @@ from config import *
 
 sys.path.append(where_am_i())
 
+from Pathlib import Path
 from utilities import dataloading_utilities as dlutils
 from scipy.signal import correlate
 from torch.utils.data import DataLoader
@@ -14,6 +15,7 @@ import pickle
 import argparse
 import matplotlib.pyplot as plt
 import skimage.measure    
+import scipy
 import seaborn as sns
 
 pickle_file = './logs/14-IntensityStructure.pkl'
@@ -126,7 +128,7 @@ def correlate_intensity():
 
         for model_metric, model_metric_name in zip(model_metrics, model_metric_names):
         
-            for dataset_name, ax in zip(dataset_names, axs):
+            for enum, (dataset_name, ax) in enumerate(zip(dataset_names, axs)):
                 
                 
                 datacode = dataset_name.split('_')[-4].split('/')[-1]
@@ -137,21 +139,20 @@ def correlate_intensity():
 
                 cross_corr = np.log10(correlate(entropy, variance[dataset_name][:,0], mode = 'same'))
                 slices = np.arange(len(cross_corr))-len(cross_corr)//2
+                pearson = round(scipy.stats.pearsonr(entropy, variance[dataset_name][:,0]).statistic, 3)
 
-                ax.scatter(entropy, variance[dataset_name][:,0], label = model_metric_name.format(metric.upper()))
+                ax.scatter(entropy, variance[dataset_name][:,0], label = model_metric_name.format(metric.upper())+'\nr = {}'.format(pearson))
 
-                if i >= 9:
+                if enum >= 8:
                     ax.set_xlabel('{}\nUnfiltered Backprojection'.format(metric))
                 
-                if i % 4 == 0:
+                if enum % 4 == 0:
                     ax.set_ylabel('Entropy')
 
-                if i == 5:
-                    ax.legend()
+                ax.legend()
                     
                 ax.set_title(dataset_name)
-                sns.despine()
-                i += 1
+                sns.despine()     
 
         fig.savefig('logs/14-EntropyMetrics_{}_AllDatasets.pdf'.format(metric), bbox_inches = 'tight')
 
@@ -161,9 +162,15 @@ if __name__ == '__main__':
     parser.add_argument('--var', help='Calculate Variance', action='store_true')
     parser.add_argument('--plot', help='Plot Variance', action='store_true')
     parser.add_argument('--corr', help='Correlate entropy and performance', action='store_true')
+    parser.add_argument('--check_psnr', help='Check PSNR', action='store_true')
 
     args = vars(parser.parse_args())
     
+    if args['check_psnr'] == True:
+        
+        print('Checking PSNR...')
+        check_psnr_patches()
+        
     if args['var'] == True:
         print('Calculating variances...')
         variance_datasets()

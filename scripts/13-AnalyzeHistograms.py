@@ -6,16 +6,16 @@ import numpy as np
 
 acceleration_factor = 22
 loss = 'PSNR'
-df_pkl_path = 'logs/test_dataframe_x22.pkl'
+df_pkl_path = 'logs/test_dataframe_x22_normalization.pkl'
 dataframe_x22 = pd.read_pickle(df_pkl_path)
 
 # dataframe_x22['test/ssim_admm'] = pd.Series([[i.cpu().numpy() for i in x]for x in dataframe_x22['test/ssim_admm']])
 
-dataframe_x22.to_pickle(df_pkl_path)
+# dataframe_x22.to_pickle(df_pkl_path)
 # sys.exit(0)
 # Subset by part
 
-def plot_boxes(path):
+def plot_boxes(path, plot):
 
     metrics = ['psnr', 'ssim']
     model_metrics = ['test/{}', 'test/{}_fbp', 'test/{}_admm'] 
@@ -36,15 +36,22 @@ def plot_boxes(path):
              
             dataframe_test = dataframe_x22[[model_metric]]
             pd_metric[model_metric] = dataframe_test[model_metric].apply(pd.Series).astype(np.float64).stack().reset_index(drop=True)
-              
-        hist = sns.boxplot(data = pd_metric, ax = axs, showfliers = False)
+        
+        if plot == 'violin':
+            
+            hist = sns.violinplot(data = pd_metric, ax = axs, kde = True)
+        
+        elif plot == 'box':
+
+            hist = sns.boxplot(data = pd_metric, ax = axs)
+
         hist.set(xlabel = 'Reconstruction Method', ylabel = metric)
         hist.set_ylim(metric_min, metric_max)
         sns.despine()
 
         fig.savefig(path.format(metric, acceleration_factor, loss), bbox_inches = 'tight')
 
-def plot_histogram_per_parts(path):
+def plot_histogram_per_parts(path, plot):
 
     metrics = ['psnr', 'ssim']
     model_metrics = ['test/{}', 'test/{}_fbp', 'test/{}_admm'] 
@@ -73,8 +80,15 @@ def plot_histogram_per_parts(path):
 
                     series_per_part = dataframe_test[dataframe_test[feature] == part][model_metric].apply(pd.Series).astype(np.float64).stack().reset_index(drop=True)
                     pd_metric[part] = series_per_part
+                
+                if plot == 'violin':
                     
-                hist = sns.boxplot(data = pd_metric, ax = ax, showfliers = False)
+                    hist = sns.violinplot(data = pd_metric, ax = ax, kde = True)
+                
+                elif plot == 'box':
+
+                    hist = sns.boxplot(data = pd_metric, ax = ax)
+
                 hist.set(xlabel = model_metric_label, ylabel = metric)
                 hist.set_ylim(metric_min, metric_max)
                 sns.despine()
@@ -83,8 +97,10 @@ def plot_histogram_per_parts(path):
 
 if __name__ == '__main__':
 
-    violin_path = 'logs/13-Boxplot_PerParts_metric-{}-acc_factor_{}-loss_{}.pdf'
-    box_path = 'logs/13-Boxplot_metric-{}-acc_factor_{}-loss_{}.pdf'
+    plot = 'box'
 
-    plot_histogram_per_parts(violin_path)
-    plot_boxes(box_path)
+    violin_path = 'logs/13-'+plot+'plot_PerParts_normalization_metric-{}-acc_factor_{}-loss_{}.pdf'
+    box_path = 'logs/13-'+plot+'plot_normalization_metric-{}-acc_factor_{}-loss_{}.pdf'
+
+    plot_histogram_per_parts(violin_path, 'box')
+    plot_boxes(box_path, 'box')

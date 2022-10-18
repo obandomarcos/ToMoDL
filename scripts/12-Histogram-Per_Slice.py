@@ -70,15 +70,24 @@ if use_default_model_dict == True:
                 'out_channels': 1}
     
     admm_dictionary = {'number_projections': modl_dict['number_projections_undersampled'],
-                    'tv_iters': 5,
-                    'alpha': 0.01, 
-                    'delta': 0.5, 
-                    'max_iter': 10, 
+                    'alpha': 0.005, 
+                    'delta': 2, 
+                    'max_iter': 30, 
                     'tol': 10e-7, 
                     'use_invert': 0,
                     'use_warm_init' : 1,
-                    'verbose':False}
+                    'verbose': True}
 
+    twist_dictionary = {'number_projections': modl_dict['number_projections_undersampled'], 
+                        'lambda': 1e-4, 
+                        'tolerance':1e-4,
+                        'stop_criterion':1, 
+                        'verbose':0,
+                        'initialization':0,
+                        'max_iter':10000, 
+                        'gpu':0,
+                        'tau': 0.02}
+     
     # Training parameters
     loss_dict = {'loss_name': 'psnr',
                 'psnr_loss': torch.nn.MSELoss(reduction = 'mean'),
@@ -98,8 +107,11 @@ if use_default_model_dict == True:
                         'track_val': True,
                         'track_test': True,
                         'max_epochs':40, 
-                        'track_alternating_admm':True,
-                        'admm_dictionary': admm_dictionary}
+                        'tv_iters': 40,
+                        'track_alternating_admm': True,
+                        'admm_dictionary': admm_dictionary,
+                        'track_alternating_twist': True,
+                        'twist_dictionary': twist_dictionary}
 
 # PL Trainer and W&B logger dictionaries
 if use_default_trainer_dict == True:
@@ -180,7 +192,7 @@ if __name__ == '__main__':
     run_name = 'test_metrics_histogram_x{}'.format(acceleration_factor)
     metric = 'psnr'
     dataset_list = dataset_list_x22 
-    df_path = 'logs/test_dataframe_x22.pkl'
+    df_path = 'logs/test_dataframe_x22_normalization.pkl'
 
     user_project_name = 'omarcos/deepopt/'
 
@@ -188,18 +200,17 @@ if __name__ == '__main__':
     
     run = wandb.init(project = 'deepopt', reinit = True, group = testing_name_group, job_type = 'Dataset Evaluation', name = run_name)
 
-    # dataframe_x22 = pd.DataFrame(columns = ['test/psnr', 'test/ssim', 'test/psnr_fbp', 'test/ssim_fbp', 'fish_part', 'fish_dpf'])
-    dataframe = pd.read_pickle(df_path)
-    dataframe['datacode'] = ''
-
+    dataframe = pd.DataFrame(columns = ['test/psnr', 'test/ssim','test/psnr_admm', 'test/ssim_admm', 'test/psnr_fbp', 'test/ssim_fbp', 'fish_part', 'fish_dpf', 'datacode'])
+    # dataframe = pd.read_pickle(df_path)
+    
     for k_fold, artifact_name in enumerate(artifact_names):
         
-        # artifact = run.use_artifact(user_project_name+artifact_name, type='model')
-        # artifact_dir = artifact.download()
+        artifact = run.use_artifact(user_project_name+artifact_name, type='model')
+        artifact_dir = artifact.download()
         
-        # model = MoDLReconstructor.load_from_checkpoint(Path(artifact_dir) / "model.ckpt", kw_dictionary_model_system = model_system_dict) 
+        model = MoDLReconstructor.load_from_checkpoint(Path(artifact_dir) / "model.ckpt", kw_dictionary_model_system = model_system_dict) 
 
-        # trainer = trainer_system.create_trainer()
+        trainer = trainer_system.create_trainer()
 
         test_datasets_folders = [datasets_folder+'x{}/'.format(acceleration_factor)+x for x in dataset_list[-3:]]
 
@@ -208,30 +219,32 @@ if __name__ == '__main__':
         # Run testing over slices/everything
         for i, test_dataset_folder in enumerate(test_datasets_folders):
             
-            idx = k_fold*len(test_datasets_folders)+i
-            print(idx)
-            # model.create_test_metric() # Creo el logger para cada dataset
+            # idx = k_fold*len(test_datasets_folders)+i
+            # print(idx)
+            model.create_test_metric() # Creo el logger para cada dataset
 
             datacode = test_dataset_folder.split('_')[-4].split('/')[-1]
             fish_part = test_dataset_folder.split('_')[-2]
             fish_dpf = test_dataset_folder.split('_')[-3]
             
-            dataframe['datacode'].iloc[idx] = datacode
-            # dataset_dict = {'root_folder' : test_dataset_folder, 
-                            # 'acceleration_factor' : acceleration_factor,
-                            # 'transform' : None}
+            dataset_dict = {'root_folder' : test_dataset_folder, 
+                            'acceleration_factor' : acceleration_factor,
+                            'transform' : None}
 
-            # test_dataset = dlutils.ReconstructionDataset(**dataset_dict)    
+            test_dataset = dlutils.ReconstructionDataset(**dataset_dict)    
 
-            # # test_dataloader = DataLoader(test_dataset, 
-            #                             batch_size = 1,
-            #                             shuffle = False,
-            #                             num_workers = 8)
+            test_dataloader = DataLoader(test_dataset, 
+                                        batch_size = 1,
+                                        shuffle = False,
+                                        num_workers = 8)
 
-            # test_dict = trainer.test(model = model, dataloaders = test_dataloader)[0]
+            test_dict = trainer.test(model = model, dataloaders = test_dataloader)[0]
 
-            # row = {'test/psnr_admm': model.test_metric['test/psnr_admm'], 'test/ssim_admm': model.test_metric['test/ssim_admm'], 'test/psnr':model.test_metric['test/psnr'], 'test/ssim':model.test_metric['test/ssim'] ,'test/psnr_fbp':model.test_metric['test/psnr_fbp'], 'test/ssim_fbp': model.test_metric['test/ssim_fbp'], 'fish_part': fish_part, 'fish_dpf': fish_dpf}
-        
+            row = {'test/psnr_admm': model.test_metric['test/psnr_admm'], 'test/ssim_admm': model.test_metric['test/ssim_admm'], 'test/psnr':model.test_metric['test/psnr'], 'test/ssim':model.test_metric['test/ssim'] ,'test/psnr_fbp':model.test_metric['test/psnr_fbp'], 'test/ssim_fbp': model.test_metric['test/ssim_fbp'], 'fish_part': fish_part, 'fish_dpf': fish_dpf, 'datacode':datacode}
+            
+            # row = {'test/psnr':model.test_metric['test/psnr'], 'test/ssim':model.test_metric['test/ssim'] ,'test/psnr_fbp':model.test_metric['test/psnr_fbp'], 'test/ssim_fbp': model.test_metric['test/ssim_fbp'], 'fish_part': fish_part, 'fish_dpf': fish_dpf, 'datacode':datacode}
+
+            dataframe = dataframe.append(row, ignore_index=True)
         # Rotate
         trainer_system.rotate_list(dataset_list, 3)
 

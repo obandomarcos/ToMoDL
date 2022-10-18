@@ -40,6 +40,7 @@ acceleration_factor = 22
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 if use_default_model_dict == True:
+
     # ResNet dictionary parameters
     resnet_options_dict = {'number_layers': 8,
                         'kernel_size':3,
@@ -64,7 +65,26 @@ if use_default_model_dict == True:
                 'resnet_options': resnet_options_dict,
                 'in_channels': 1,
                 'out_channels': 1}
+    
+    admm_dictionary = {'number_projections': modl_dict['number_projections_undersampled'],
+                    'alpha': 0.01, 
+                    'delta': 1, 
+                    'max_iter': 30, 
+                    'tol': 10e-7, 
+                    'use_invert': 0,
+                    'use_warm_init' : 1,
+                    'verbose': True}
 
+    twist_dictionary = {'number_projections': modl_dict['number_projections_undersampled'], 
+                        'lambda': 1e-4, 
+                        'tolerance':1e-4,
+                        'stop_criterion':1, 
+                        'verbose':1,
+                        'initialization':0,
+                        'max_iter':10000, 
+                        'gpu':0,
+                        'tau': 0.1}
+     
     # Training parameters
     loss_dict = {'loss_name': 'psnr',
                 'psnr_loss': torch.nn.MSELoss(reduction = 'mean'),
@@ -83,7 +103,12 @@ if use_default_model_dict == True:
                         'track_train': True,
                         'track_val': True,
                         'track_test': True,
-                        'max_epochs':40}
+                        'max_epochs':40, 
+                        'tv_iters': 5,
+                        'track_alternating_admm': True,
+                        'admm_dictionary': admm_dictionary,
+                        'track_alternating_twist': True,
+                        'twist_dictionary': twist_dictionary}
 
 # PL Trainer and W&B logger dictionaries
 if use_default_trainer_dict == True:
@@ -151,19 +176,35 @@ if use_default_dataloader_dict == True:
 
 artifact_names_x22_psnr = ['model-3dp1wex6:v0', 'model-2jwf0rwa:v0', 'model-1qtf5f8u:v0', 'model-2nxos558:v0']
 
-dataset_list_x22 = ['140315_3dpf_head_22', '140114_5dpf_head_22', '140519_5dpf_head_22', '140117_3dpf_body_22', '140114_5dpf_upper tail_22', '140315_1dpf_head_22', '140114_5dpf_lower tail_22', '140714_5dpf_head_22', '140117_3dpf_head_22', '140117_3dpf_lower tail_22', '140117_3dpf_upper tail_22', '140114_5dpf_body_22']
+dataset_list_x22 = ['140315_3dpf_head_22', '140114_5dpf_head_22', '140519_5dpf_head_22', '140117_3dpf_body_22', '140114_5dpf_upper tail_22', '140315_1dpf_head_22', '140114_5dpf_lower tail_22', '140714_5dpf_head_22', '140117_3dpf_upper tail_22','140117_3dpf_head_22', '140117_3dpf_lower tail_22', '140114_5dpf_body_22']
 
 def normalize_01(img):
+
     return (img-img.min())/(img.max()-img.min())
 
 
 def psnr_per_box(target, rec, box):
 
-    return round(psnr_cv2(target[box[0,0]:box[0,1],box[1,0]:box[1,1]], rec[box[0,0]:box[0,1],box[1,0]:box[1,1]], 1), 2)
+    target_region = target[box[0,0]:box[0,1],box[1,0]:box[1,1]]
+    rec_region = rec[box[0,0]:box[0,1],box[1,0]:box[1,1]] 
+
+    target_region = (target_region-target_region.mean())/target_region.std()
+    rec_region = (rec_region-rec_region.mean())/rec_region.std()
+    im_range = target_region.max()-target_region.min()
+
+    return round(psnr_skimage(target_region, rec_region, data_range = im_range), 2)
+
+def mean_box(image, c, w, h):
+    
+    image = image[c[0]:c[0]+w, c[1]:c[1]+h]
+    image = (image-image.mean())/image.std()
+    
+    return np.round(np.mean(image), 2)
 
 def box_list(c, h, w):
 
-    return [[c[0], c[0]+w], [c[1], c[1]+h]]
+    return np.array([[c[0], c[0]+w], [c[1], c[1]+h]])
+
 
 if __name__ == '__main__':
     
@@ -201,7 +242,13 @@ if __name__ == '__main__':
     filtered_fs_rec_image = normalize_01(filtered_fs_rec[idx,0,...].cpu().numpy())
     modl_reconstructed = normalize_01(model(unfiltered_us_rec.to(device))[idx,0,...].detach().cpu().numpy())
 
-    images = [filtered_fs_rec_image, unfiltered_us_rec_image, filtered_us_rec_image,  modl_reconstructed]
+    alt_input = (unfiltered_us_rec[idx,0,...].cpu().numpy().T - unfiltered_us_rec[idx,0,...].cpu().numpy().T.mean())/unfiltered_us_rec[idx,0,...].cpu().numpy().T.std()
+    alt_true = (filtered_fs_rec[idx,0,...].cpu().numpy().T - filtered_fs_rec[idx,0,...].cpu().numpy().T.mean())/filtered_fs_rec[idx,0,...].cpu().numpy().T.std()
+    
+    twist_rec = normalize_01(model.TwIST(alt_input, alt_true)[0])
+    admm_rec = normalize_01(model.ADMM(alt_input, alt_true)[0])
+
+    images = [filtered_fs_rec_image, unfiltered_us_rec_image, filtered_us_rec_image,  modl_reconstructed, twist_rec.T, admm_rec.T]
 
     # Boxes
     c_green = [0, 0]
@@ -212,31 +259,35 @@ if __name__ == '__main__':
     box_green = box_list(c_green, w_green, h_green)
     box_red = box_list(c_red, w_red, h_red)
 
-    rect_green = patches.Rectangle(c_green, w_green, h_green, linewidth=1, edgecolor='r', facecolor='none')
-    rect_red = patches.Rectangle(c_red, w_red, h_red, linewidth=1, edgecolor='g', facecolor='none')
-
     boxes = [box_green, box_red]
 
     titles = ['Filtered backprojection - \nFully Sampled\n',
               'Unfiltered backprojection - \nUndersampled\n', 
               'Filtered backprojection - \nUndersampled X22\n',
-              'MoDL reconstruction\n']
+              'MoDL reconstruction\n', 'TwIST reconstruction\n', 'ADMM reconstruction\n']
 
-    metrics = ['',
-               'SSIM: {}\n PSNR (Box Green): {} dB\n PSNR (Box Red): {} dB'.format(round(ssim(images[0], images[1]), 2), psnr_per_box(images[0], images[1], box_green), psnr_per_box(images[0], images[1], box_red)),
-               'SSIM: {}\n PSNR (Box Green): {} dB\n PSNR (Box Red): {} dB'.format(round(ssim(images[0], images[2]), 2), psnr_per_box(images[0], images[2], box_green), psnr_per_box(images[0], images[2], box_red)),
-               'SSIM: {}\n PSNR (Box Green): {} dB\n PSNR (Box Red): {} dB'.format(round(ssim(images[0], images[3]), 2), psnr_per_box(images[0], images[3], box_green), psnr_per_box(images[0], images[3], box_red))]
+    metrics = ['']+[
+               'SSIM: {}\n PSNR (Box Green): {} dB\n PSNR (Box Red): {} dB'.format(round(ssim(images[0], image), 2), psnr_per_box(images[0], image, box_green), psnr_per_box(images[0], image, box_red)) for image in images[1:]]
 
-    fig, axs = plt.subplots(2, len(images)//2, figsize = (8,10))
+    fig, axs = plt.subplots(2, len(images)//2, figsize = (12,10))
     axs = axs.flatten()
     
     for (ax, image, title, metric) in zip(axs, images, titles, metrics):
 
+        rect_green = Rectangle(c_green, w_green, h_green, linewidth=1, edgecolor='r', facecolor='none')
+        rect_red = Rectangle(c_red, w_red, h_red, linewidth=1, edgecolor='g', facecolor='none')
+        
         ax.imshow(image)
         ax.set_title(title+metric)
         ax.set_axis_off()
         ax.add_patch(rect_green)
         ax.add_patch(rect_red)
+
+        # Mean value - Green
+        ax.text(c_green[0], c_green[1]+h_green//2, s = 'Mean: {:0.4f}'.format(mean_box(image, c_green, w_green, h_green)), c = 'white', fontsize=12)
+
+        # Mean value - Red
+        ax.text(c_red[0], c_red[1]+h_red//2, s = 'Mean: {:0.4f}'.format(mean_box(image, c_red, w_red, h_red)), c = 'white', fontsize=12)
 
     fig.savefig('./logs/Test_PSNR-11_PerPatch-{}.pdf'.format(part), bbox_inches = 'tight')
 

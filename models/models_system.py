@@ -63,18 +63,48 @@ class MoDLReconstructor(pl.LightningModule):
 
         self.process_kwdictionary(kw_dictionary_model_system)
 
+        self.hR = lambda x: radon(x, angles, circle = False)
+        self.hRT = lambda sino: iradon(sino, angles, circle = False)
+        self.Psi = lambda x,th: altmodels.TVdenoise(x,
+                                            2/th,
+                                            self.tv_iters)
+        self.Phi = lambda x: altmodels.TVnorm(x)
+
         self.model = modl.modl(self.kw_dictionary_modl)
 
         if self.track_alternating_admm == True:
             
             angles = np.linspace(0, 2*180, self.admm_dictionary['number_projections'], endpoint = False)
+            
+            self.ADMM = lambda y, y_true: altmodels.ADMM(y = self.hR(y), 
+                                                        A = self.hR, 
+                                                        AT = self.hRT, 
+                                                        Den = self.Psi, 
+                                                        alpha = self.admm_dictionary['alpha'],
+                                                        delta = self.admm_dictionary['delta'], 
+                                                        max_iter = self.admm_dictionary['max_iter'], 
+                                                        phi = self.Phi, 
+                                                        tol = self.admm_dictionary['tol'], 
+                                                        invert = self.admm_dictionary['use_invert'], 
+                                                        warm = self.admm_dictionary['use_warm_init'],
+                                                        true_img = y_true,
+                                                        verbose = self.admm_dictionary['verbose'])
 
-            self.hR = lambda x: radon(x, angles, circle = False)
-            self.hRT = lambda sino: iradon(sino, angles, circle = False)
-            self.Psi = lambda x,th: altmodels.TVdenoise(x,
-                                                        2/th,
-                                                        self.admm_dictionary['tv_iters'])
-            self.Phi = lambda x: altmodels.TVnorm(x)
+        if self.track_alternating_twist == True:
+            
+            angles = np.linspace(0, 2*180, self.twist_dictionary['number_projections'], endpoint = False)
+            
+            kwarg = {'PSI': self.Psi, 'PHI': self.Phi, 'LAMBDA':self.twist_dictionary['lambda'], 'TOLERANCEA': self.twist_dictionary['tolerance'], 'STOPCRITERION': self.twist_dictionary['stop_criterion'], 'VERBOSE': self.twist_dictionary['verbose'], 'INITIALIZATION': self.twist_dictionary['initialization'], 'MAXITERA':self.twist_dictionary['max_iter'], 'GPU' : self.twist_dictionary['gpu']}
+            
+            self.TwIST = lambda y, y_true: altmodels.TwIST(y = self.hR(y), 
+                                                        A = self.hR, 
+                                                        AT = self.hRT, 
+                                                        tau = self.twist_dictionary['tau'], 
+                                                        kwarg = kwarg,true_img = y_true)
+
+        if self.track_alternating_admm == True:
+            
+            angles = np.linspace(0, 2*180, self.admm_dictionary['number_projections'], endpoint = False)
             
             self.ADMM = lambda y, y_true: altmodels.ADMM(y = self.hR(y), 
                                                         A = self.hR, 
@@ -190,28 +220,38 @@ class MoDLReconstructor(pl.LightningModule):
             - 'fs' stands for fully sampled reconstruction
         '''
 
+        if batch_idx != 30:
+
+            return
+
         unfiltered_us_rec, filtered_us_rec, filtered_fs_rec = batch
 
         modl_rec = self.model(unfiltered_us_rec)
 
         unfiltered_us_rec = self.normalize_image_01(unfiltered_us_rec)
+        unfiltered_us_rec = (unfiltered_us_rec-unfiltered_us_rec.mean())/unfiltered_us_rec.std()
+        
         filtered_us_rec = self.normalize_image_01(filtered_us_rec)
+        filtered_us_rec = (filtered_us_rec-filtered_us_rec.mean())/filtered_us_rec.std()
+        
         filtered_fs_rec = self.normalize_image_01(filtered_fs_rec)
+        filtered_fs_rec = (filtered_fs_rec-filtered_fs_rec.mean())/filtered_fs_rec.std()
 
         if (self.track_test == True) and (batch_idx == 0):
 
             self.log_plot(filtered_fs_rec, modl_rec, 'test')
 
         modl_rec = self.normalize_image_01(modl_rec['dc'+str(self.model.K)])
-                
+        modl_rec = (modl_rec - modl_rec.mean())/modl_rec.std()
+
         psnr_fbp_loss = self.loss_dict['psnr_loss'](filtered_us_rec, filtered_fs_rec)
-        ssim_fbp_loss = 1-self.loss_dict['ssim_loss'](filtered_us_rec, filtered_fs_rec)
+        ssim_fbp_loss = 1-self.loss_dict['ssim_loss'](self.normalize_image_01(filtered_us_rec), self.normalize_image_01(filtered_fs_rec))
 
         self.log("test/psnr_fbp", self.psnr(filtered_us_rec, filtered_fs_rec), on_step = True, prog_bar = True)
         self.log("test/ssim_fbp", (1-ssim_fbp_loss).cpu(), on_step = True, prog_bar = True)
 
         psnr_loss = self.loss_dict['psnr_loss'](modl_rec, filtered_fs_rec)
-        ssim_loss = 1-self.loss_dict['ssim_loss'](modl_rec, filtered_fs_rec)
+        ssim_loss = 1-self.loss_dict['ssim_loss'](self.normalize_image_01(modl_rec), self.normalize_image_01(filtered_fs_rec))
 
         self.log("test/psnr", self.psnr(modl_rec, filtered_fs_rec), on_step = True,prog_bar = True)
         self.log("test/ssim", (1-ssim_loss).cpu(), on_step = True, prog_bar = True)
@@ -230,10 +270,37 @@ class MoDLReconstructor(pl.LightningModule):
                 
                 admm_rec[i,0, ...] = torch.FloatTensor(self.ADMM(filt_us_rec_image.cpu().numpy()[0,...].T, filt_fs_rec_image.cpu().numpy()[0,...].T)[0])
 
-            self.test_metric['test/psnr_admm'].append(self.psnr(admm_rec, 
-            filtered_fs_rec))
-            self.test_metric['test/ssim_admm'].append(self.loss_dict['ssim_loss'](admm_rec, filtered_fs_rec))
+            admm_rec = (admm_rec - admm_rec.mean())/admm_rec.std()
             
+            loss_psnr_admm = self.psnr(admm_rec, filtered_fs_rec)
+            loss_ssim_admm = 1-self.loss_dict['ssim_loss'](self.normalize_image_01(admm_rec), self.normalize_image_01(filtered_fs_rec))
+
+            self.log("test/psnr_admm", loss_psnr_admm, on_step = True,prog_bar = True)
+            self.log("test/ssim_admm", (1-loss_ssim_admm).cpu(), on_step = True, prog_bar = True)
+            
+            self.test_metric['test/psnr_admm'].append(loss_psnr_admm)
+            self.test_metric['test/ssim_admm'].append((1-loss_ssim_admm).cpu())
+
+        if self.track_alternating_twist == True:
+
+            twist_rec = torch.zeros_like(filtered_fs_rec)
+
+            for i, (filt_us_rec_image, filt_fs_rec_image) in enumerate(zip(filtered_us_rec, filtered_fs_rec)):
+                
+                twist_rec[i,0, ...] = torch.FloatTensor(self.TwIST(filt_us_rec_image.cpu().numpy()[0,...].T, filt_fs_rec_image.cpu().numpy()[0,...].T)[0])
+
+            twist_rec = self.normalize_image_01(twist_rec)
+            twist_rec = (twist_rec - twist_rec.mean())/twist_rec.std()
+        
+            loss_psnr_twist = self.psnr(twist_rec, filtered_fs_rec)
+            loss_ssim_twist = 1-self.loss_dict['ssim_loss'](self.normalize_image_01(twist_rec), self.normalize_image_01(filtered_fs_rec))
+
+            self.log("test/psnr_twist", loss_psnr_twist, on_step = True,prog_bar = True)
+            self.log("test/ssim_twist", (1-loss_ssim_twist).cpu(), on_step = True, prog_bar = True)
+            
+            self.test_metric['test/psnr_twist'].append(loss_psnr_twist)
+            self.test_metric['test/ssim_twist'].append((1-loss_ssim_twist).cpu())
+
         if self.loss_dict['loss_name'] == 'psnr':
 
             return psnr_loss
@@ -244,7 +311,7 @@ class MoDLReconstructor(pl.LightningModule):
 
     def create_test_metric(self):
 
-        self.test_metric = {'test/psnr_admm': [], 'test/ssim_admm': [],'test/psnr':[], 'test/ssim':[], 'test/psnr_fbp':[], 'test/ssim_fbp':[]}
+        self.test_metric = {'test/psnr_twist': [], 'test/ssim_twist': [], 'test/psnr_admm': [], 'test/ssim_admm': [],'test/psnr':[], 'test/ssim':[], 'test/psnr_fbp':[], 'test/ssim_fbp':[]}
 
     def configure_optimizers(self):
         '''
@@ -276,12 +343,19 @@ class MoDLReconstructor(pl.LightningModule):
         Params: 
             - kw_dictionary (dict): Dictionary with keywords
         '''
+
         self.track_alternating_admm = kw_dict['track_alternating_admm']
+        self.track_alternating_twist = kw_dict['track_alternating_twist']
 
         if self.track_alternating_admm == True:
 
             self.admm_dictionary = kw_dict['admm_dictionary']
+        
+        if self.track_alternating_twist == True:
 
+            self.twist_dictionary = kw_dict['twist_dictionary']
+
+        self.tv_iters = kw_dict['tv_iters']
         self.optimizer_dict = kw_dict['optimizer_dict']
         self.kw_dictionary_modl = kw_dict['kw_dictionary_modl']
         self.loss_dict = kw_dict['loss_dict']
@@ -301,8 +375,9 @@ class MoDLReconstructor(pl.LightningModule):
         psnr_list = []
 
         for img1, img2 in zip(imgs1, imgs2):
-
-            psnr_list.append(_psnr(img1[0,...].detach().cpu().numpy(), img2[0,...].detach().cpu().numpy())) 
+            
+            img_range = img1[0,...].max() - img1[0,...].min()
+            psnr_list.append(_psnr(img1[0,...].detach().cpu().numpy(), img2[0,...].detach().cpu().numpy(), data_range = img_range.cpu().numpy())) 
         
         return np.array(psnr_list).mean()
     

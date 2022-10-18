@@ -142,7 +142,7 @@ def TwIST(y, A, AT, tau, kwarg, true_img = None):
       alpha = 2/(1+np.sqrt(1-rho0**2))
 
   if  beta == 0:
-      beta  = alpha*2/(lam1+lamN);
+      beta  = alpha*2/(lam1+lamN)
 
   if stopCriterion not in [0, 1, 2, 3]:
     print('Unknown stopping criterion')

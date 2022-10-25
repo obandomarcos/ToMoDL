@@ -255,10 +255,10 @@ class MoDLReconstructor(pl.LightningModule):
         psnr_loss = self.loss_dict['psnr_loss'](modl_rec, filtered_fs_rec)
 
         self.log("test/psnr", self.psnr(modl_rec, filtered_fs_rec), on_step = True,prog_bar = True)
-        self.log("test/ssim", (1-ssim_loss).cpu(), on_step = True, prog_bar = True)
+        self.log("test/ssim", (1-ssim_loss).item(), on_step = True, prog_bar = True)
 
         self.test_metric['test/psnr'].append(self.psnr(modl_rec, filtered_fs_rec))
-        self.test_metric['test/ssim'].append((1-ssim_loss).cpu())
+        self.test_metric['test/ssim'].append((1-ssim_loss).item())
         
         self.test_metric['test/psnr_fbp'].append(self.psnr(filtered_us_rec, filtered_fs_rec))
         self.test_metric['test/ssim_fbp'].append((1-ssim_fbp_loss).cpu())

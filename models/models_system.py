@@ -155,7 +155,7 @@ class MoDLReconstructor(pl.LightningModule):
         self.log("train/ssim_fbp", 1-ssim_fbp_loss, on_step = True, on_epoch = False, prog_bar=True)
 
         psnr_loss = self.loss_dict['psnr_loss'](modl_rec, filtered_fs_rec)
-        ssim_loss = 1-self.loss_dict['ssim_loss'](modl_rec, filtered_fs_rec)
+        ssim_loss = 1-self.loss_dict['ssim_loss'](self.normalize_image_01(modl_rec), filtered_fs_rec)
 
         self.log("train/psnr", self.psnr(psnr_loss), on_step = True, on_epoch = False, prog_bar=True)
         self.log("train/ssim", 1-ssim_loss, on_step = True, on_epoch = False, prog_bar=True)
@@ -227,6 +227,8 @@ class MoDLReconstructor(pl.LightningModule):
         unfiltered_us_rec, filtered_us_rec, filtered_fs_rec = batch
 
         modl_rec = self.model(unfiltered_us_rec)
+        
+        ssim_loss = 1-self.loss_dict['ssim_loss'](self.normalize_image_01(modl_rec['dc'+str(self.model.K)]), self.normalize_image_01(filtered_fs_rec))
 
         unfiltered_us_rec = self.normalize_image_01(unfiltered_us_rec)
         unfiltered_us_rec = (unfiltered_us_rec-unfiltered_us_rec.mean())/unfiltered_us_rec.std()
@@ -251,7 +253,6 @@ class MoDLReconstructor(pl.LightningModule):
         self.log("test/ssim_fbp", (1-ssim_fbp_loss).cpu(), on_step = True, prog_bar = True)
 
         psnr_loss = self.loss_dict['psnr_loss'](modl_rec, filtered_fs_rec)
-        ssim_loss = 1-self.loss_dict['ssim_loss'](self.normalize_image_01(modl_rec), self.normalize_image_01(filtered_fs_rec))
 
         self.log("test/psnr", self.psnr(modl_rec, filtered_fs_rec), on_step = True,prog_bar = True)
         self.log("test/ssim", (1-ssim_loss).cpu(), on_step = True, prog_bar = True)
@@ -377,6 +378,7 @@ class MoDLReconstructor(pl.LightningModule):
         for img1, img2 in zip(imgs1, imgs2):
             
             img_range = img1[0,...].max() - img1[0,...].min()
+            
             psnr_list.append(_psnr(img1[0,...].detach().cpu().numpy(), img2[0,...].detach().cpu().numpy(), data_range = img_range.cpu().numpy())) 
         
         return np.array(psnr_list).mean()

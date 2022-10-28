@@ -6,13 +6,11 @@ import numpy as np
 
 acceleration_factor = 22
 loss = 'PSNR'
-df_pkl_path = 'logs/test_dataframe_x22_normalization.pkl'
-dataframe_x22 = pd.read_pickle(df_pkl_path)
-
-# dataframe_x22['test/ssim_admm'] = pd.Series([[i.cpu().numpy() for i in x]for x in dataframe_x22['test/ssim_admm']])
-
-# dataframe_x22.to_pickle(df_pkl_path)
-# sys.exit(0)
+df_pkl_path = 'logs/20-Dictionary_full.pkl'
+dataframe = pd.read_pickle(df_pkl_path)
+n = 3
+print(np.array(dataframe['psnr']['22']['test/psnr_fbp'][0]).mean())
+sys.exit(0)
 # Subset by part
 
 def plot_boxes(path, plot):
@@ -72,7 +70,7 @@ def plot_histogram_per_parts(path, plot):
             
             for ax, feature in zip(ax_arr, features):
                 
-                dataframe_test = dataframe_x22[[model_metric, feature]]
+                dataframe_test = dataframe[[model_metric, feature]]
         
                 pd_metric = pd.DataFrame()
                         

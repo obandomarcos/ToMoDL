@@ -141,7 +141,7 @@ if use_default_trainer_dict == True:
                     'use_swa' : False,
                     'use_accumulate_batches': False,
                     'k_fold_number_datasets': 3,
-                    'use_logger' : False,
+                    'use_logger' : True,
                     'resume':'allow',
                     'logger_dict': logger_dict,
                     'track_default_checkpoints'  : False,

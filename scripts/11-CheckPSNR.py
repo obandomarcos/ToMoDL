@@ -35,12 +35,11 @@ from matplotlib.patches import Rectangle
 use_default_model_dict = True
 use_default_dataloader_dict = True
 use_default_trainer_dict = True
-acceleration_factor = 22
+acceleration_factor = 26
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 if use_default_model_dict == True:
-
     # ResNet dictionary parameters
     resnet_options_dict = {'number_layers': 8,
                         'kernel_size':3,
@@ -53,10 +52,10 @@ if use_default_model_dict == True:
 
     # Model parameters
     modl_dict = {'use_torch_radon': False,
+                'metric': 'psnr',
                 'number_layers': 8,
                 'K_iterations' : 8,
                 'number_projections_total' : 720,
-                'number_projections_undersampled' : 720//acceleration_factor, 
                 'acceleration_factor': acceleration_factor,
                 'image_size': 100,
                 'lambda': 0.05,
@@ -66,16 +65,16 @@ if use_default_model_dict == True:
                 'in_channels': 1,
                 'out_channels': 1}
     
-    admm_dictionary = {'number_projections': modl_dict['number_projections_undersampled'],
-                    'alpha': 0.01, 
-                    'delta': 1, 
-                    'max_iter': 30, 
+    admm_dictionary = {'number_projections': modl_dict['number_projections_total'],
+                    'alpha': 0.005, 
+                    'delta': 2, 
+                    'max_iter': 10, 
                     'tol': 10e-7, 
                     'use_invert': 0,
                     'use_warm_init' : 1,
                     'verbose': True}
 
-    twist_dictionary = {'number_projections': modl_dict['number_projections_undersampled'], 
+    twist_dictionary = {'number_projections': modl_dict['number_projections_total'], 
                         'lambda': 1e-4, 
                         'tolerance':1e-4,
                         'stop_criterion':1, 
@@ -83,7 +82,15 @@ if use_default_model_dict == True:
                         'initialization':0,
                         'max_iter':10000, 
                         'gpu':0,
-                        'tau': 0.1}
+                        'tau': 0.02}
+    
+    unet_dict = {'n_channels': 1,
+                     'n_classes':1,
+                     'bilinear': True,
+                     'batch_norm': False,
+                     'batch_norm_inconv': False,
+                     'residual': False,
+                     'up_conv': False}
      
     # Training parameters
     loss_dict = {'loss_name': 'psnr',
@@ -96,23 +103,30 @@ if use_default_model_dict == True:
                     'lr': 1e-4}
 
     # System parameters
-    model_system_dict = {'optimizer_dict': optimizer_dict,
+    model_system_dict = {'acc_factor_data':1,
+                        'use_normalize': False,
+                        'optimizer_dict': optimizer_dict,
                         'kw_dictionary_modl': modl_dict,
                         'loss_dict': loss_dict, 
-                        'method':'unet',                       
+                        'method':'modl',                 
                         'track_train': True,
                         'track_val': True,
                         'track_test': True,
                         'max_epochs':40, 
                         'tv_iters': 5,
+                        'metrics_folder': where_am_i('metrics'),
+                        'models_folder': where_am_i('models'),
                         'track_alternating_admm': True,
                         'admm_dictionary': admm_dictionary,
                         'track_alternating_twist': True,
-                        'twist_dictionary': twist_dictionary}
+                        'twist_dictionary': twist_dictionary,
+                        'track_unet': True,
+                        'unet_dictionary':unet_dict}
 
 # PL Trainer and W&B logger dictionaries
 if use_default_trainer_dict == True:
-            
+
+
     logger_dict = {'project':'deepopt',
                     'entity': 'omarcos', 
                     'log_model': True}
@@ -124,7 +138,7 @@ if use_default_trainer_dict == True:
                                 'accelerator' : 'gpu', 
                                 'devices' : 1,
                                 'fast_dev_run' : False,
-                                'default_root_dir': model_folder}
+                                'default_root_dir': where_am_i('metrics')}
 
     profiler = None
     # profiler = SimpleProfiler(dirpath = './logs/', filename = 'Test_training_profile_pytorch')
@@ -156,14 +170,13 @@ if use_default_dataloader_dict == True:
     # data_transform = T.Compose([T.ToTensor()])
     data_transform = None                                    
     
-    dataloader_dict = {'datasets_folder': datasets_folder,
+    dataloader_dict = {'datasets_folder': where_am_i('datasets'),
                         'number_volumes' : 0,
                         'experiment_name': 'Bassi',
                         'img_resize': 100,
                         'load_shifts': True,
                         'save_shifts':False,
                         'number_projections_total': 720,
-                        'number_projections_undersampled': 720//acceleration_factor,
                         'acceleration_factor':acceleration_factor,
                         'train_factor' : 0.8, 
                         'val_factor' : 0.2,
@@ -174,9 +187,9 @@ if use_default_dataloader_dict == True:
                         'data_transform' : data_transform,
                         'num_workers' : 8}
 
-artifact_names_x22_psnr = ['model-3dp1wex6:v0', 'model-2jwf0rwa:v0', 'model-1qtf5f8u:v0', 'model-2nxos558:v0']
+artifact_names_psnr = ['model-3dp1wex6:v0', 'model-2jwf0rwa:v0', 'model-1qtf5f8u:v0', 'model-2nxos558:v0']
 
-dataset_list_x22 = ['140315_3dpf_head_22', '140114_5dpf_head_22', '140519_5dpf_head_22', '140117_3dpf_body_22', '140114_5dpf_upper tail_22', '140315_1dpf_head_22', '140114_5dpf_lower tail_22', '140714_5dpf_head_22', '140117_3dpf_upper tail_22','140117_3dpf_head_22', '140117_3dpf_lower tail_22', '140114_5dpf_body_22']
+dataset_list = ['/home/obanmarcos/Balseiro/DeepOPT/datasets/x26/140114_5dpf_head_26', '/home/obanmarcos/Balseiro/DeepOPT/datasets/x26/140315_3dpf_head_26', '/home/obanmarcos/Balseiro/DeepOPT/datasets/x26/140117_3dpf_head_26', '/home/obanmarcos/Balseiro/DeepOPT/datasets/x26/140519_5dpf_head_26', '/home/obanmarcos/Balseiro/DeepOPT/datasets/x26/140117_3dpf_lower tail_26', '/home/obanmarcos/Balseiro/DeepOPT/datasets/x26/140114_5dpf_upper tail_26', '/home/obanmarcos/Balseiro/DeepOPT/datasets/x26/140714_5dpf_head_26', '/home/obanmarcos/Balseiro/DeepOPT/datasets/x26/140117_3dpf_body_26', '/home/obanmarcos/Balseiro/DeepOPT/datasets/x26/140117_3dpf_upper tail_26', '/home/obanmarcos/Balseiro/DeepOPT/datasets/x26/140315_1dpf_head_26', '/home/obanmarcos/Balseiro/DeepOPT/datasets/x26/140114_5dpf_lower tail_26', '/home/obanmarcos/Balseiro/DeepOPT/datasets/x26/140114_5dpf_body_26']
 
 def normalize_01(img):
 
@@ -208,13 +221,12 @@ def box_list(c, h, w):
 
 if __name__ == '__main__':
     
-    part = dataset_list_x22[-3].split('_')[-2] 
-    artifact_names = artifact_names_x22_psnr
+    part = dataset_list[-3].split('_')[-2] 
+    artifact_names = artifact_names_psnr
     testing_name_group = 'x{}_test-PSNR'.format(acceleration_factor)
 
     run_name = 'test_metrics_kfold_x{}'.format(acceleration_factor)
     metric = 'psnr'
-    dataset_list = dataset_list_x22 
 
     user_project_name = 'omarcos/deepopt/'
 
@@ -223,7 +235,7 @@ if __name__ == '__main__':
     
     train_dataloader, val_dataloader, test_dataloader = trainer_system.generate_K_folding_dataloader()
 
-    artifact_dir = '/home/marcos/DeepOPT/artifacts/model-3dp1wex6:v0'
+    artifact_dir = '/home/obanmarcos/Balseiro/DeepOPT/artifacts/model-2srs5uf0:v0'
     
     model = MoDLReconstructor.load_from_checkpoint(Path(artifact_dir) / "model.ckpt", kw_dictionary_model_system = model_system_dict) 
 
@@ -247,14 +259,14 @@ if __name__ == '__main__':
     
     twist_rec = normalize_01(model.TwIST(alt_input, alt_true)[0])
     admm_rec = normalize_01(model.ADMM(alt_input, alt_true)[0])
-
+    
     images = [filtered_fs_rec_image, unfiltered_us_rec_image, filtered_us_rec_image,  modl_reconstructed, twist_rec.T, admm_rec.T]
 
     # Boxes
     c_green = [0, 0]
     h_green, w_green = (20, 20)
     c_red = [40, 40]
-    h_red, w_red = (20, 20)
+    h_red, w_red = (50, 50)
 
     box_green = box_list(c_green, w_green, h_green)
     box_red = box_list(c_red, w_red, h_red)
@@ -289,5 +301,5 @@ if __name__ == '__main__':
         # Mean value - Red
         ax.text(c_red[0], c_red[1]+h_red//2, s = 'Mean: {:0.4f}'.format(mean_box(image, c_red, w_red, h_red)), c = 'white', fontsize=12)
 
-    fig.savefig('./logs/Test_PSNR-11_PerPatch-{}.pdf'.format(part), bbox_inches = 'tight')
+    fig.savefig('./logs/TestPSNR_PSNR-11_PerPatch-{}.pdf'.format(part), bbox_inches = 'tight')
 

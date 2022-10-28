@@ -218,7 +218,7 @@ class TrainerSystem():
 
     def set_datasets_list(self, dataset_folder):
 
-        self.folders_datasets_list = [self.datasets_folder+'x{}/'.format(self.acceleration_factor)+x for x in dataset_folder]
+        self.folders_datasets_list = [x for x in dataset_folder]
 
         # Saves in the order run for repetivity
         # wandb.log({'datasets_folders_list': dataset_folder})
@@ -326,9 +326,7 @@ class TrainerSystem():
         test_dataloader = DataLoader(test_dataset, 
                                 batch_size = self.batch_size,
                                 shuffle = False,
-                                num_workers = self.num_workers,
-                                pin_memory = True,
-                                persistent_workers = True)
+                                num_workers = self.num_workers)
 
         return train_dataloader, val_dataloader, test_dataloader
     
@@ -349,7 +347,7 @@ class TrainerSystem():
         '''
         Train model based on Pytorch Lightning
         '''
-        self.reinitialize_logger()
+        
         # Create dataloaders
         train_dataloader, val_dataloader, test_dataloader = self.generate_K_folding_dataloader()
 
@@ -362,20 +360,24 @@ class TrainerSystem():
         elif self.model_system_method == 'unet':
             self.model = modsys.UNetReconstructor(self.model_system_dict)
 
-        model.log('k_fold', self.current_fold)
+        self.model.log('k_fold', self.current_fold)
         # W&B logger
-        self.wandb_logger.watch(model)
+        # wandb.watch(self.model)
         
         print(trainer.profiler.summary())
         
         # Train model
-        trainer.fit(model=model, 
+        trainer.fit(model=self.model, 
                     train_dataloaders= train_dataloader,
                     val_dataloaders = val_dataloader)
 
+        self.model.save_model(self.current_fold)
+
+        del train_dataloader, val_dataloader, test_dataloader, self.model, trainer
+        
         self.wandb_logger.finalize('success')
 
-        wandb.finish()
+        # wandb.finish()
 
     def k_folding(self):
         '''
@@ -399,6 +401,9 @@ class TrainerSystem():
                 
             print('{} fold started...'.format(self.current_fold))
             self.train_model()
+
+            #  
+
             print('{} fold finished succesfully!'.format(self.current_fold))
             self.current_fold += 1
         

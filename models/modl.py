@@ -191,8 +191,8 @@ class modl(nn.Module):
 
         torch.cuda.empty_cache()
 
-    self.out['dc'+j] = normalize_images(self.out['dc'+j])    
- 
+    self.out['dc'+j] = normalize_images(self.out['dc'+j]) 
+    
     return self.out
   
   def process_kwdictionary(self, kw_dictionary):
@@ -211,7 +211,7 @@ class modl(nn.Module):
     self.image_size = kw_dictionary['image_size'] 
     
     self.lam = kw_dictionary['lambda']
-    self.lam = torch.nn.Parameter(torch.tensor([self.lam], requires_grad = True, device = device))
+    self.lam = self.lam = torch.nn.Parameter(torch.tensor([self.lam], requires_grad = True, device = device))
     
     self.use_shared_weights = kw_dictionary['use_shared_weights']
     self.denoiser_method = kw_dictionary['denoiser_method']

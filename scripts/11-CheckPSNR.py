@@ -113,6 +113,8 @@ if use_default_model_dict == True:
                         'track_val': True,
                         'track_test': True,
                         'max_epochs':40, 
+                        'load_path': '',
+                        'save_path': '',
                         'tv_iters': 5,
                         'metrics_folder': where_am_i('metrics'),
                         'models_folder': where_am_i('models'),
@@ -189,7 +191,7 @@ if use_default_dataloader_dict == True:
 
 artifact_names_psnr = ['model-3dp1wex6:v0', 'model-2jwf0rwa:v0', 'model-1qtf5f8u:v0', 'model-2nxos558:v0']
 
-dataset_list = ['/home/obanmarcos/Balseiro/DeepOPT/datasets/x26/140114_5dpf_head_26', '/home/obanmarcos/Balseiro/DeepOPT/datasets/x26/140315_3dpf_head_26', '/home/obanmarcos/Balseiro/DeepOPT/datasets/x26/140117_3dpf_head_26', '/home/obanmarcos/Balseiro/DeepOPT/datasets/x26/140519_5dpf_head_26', '/home/obanmarcos/Balseiro/DeepOPT/datasets/x26/140117_3dpf_lower tail_26', '/home/obanmarcos/Balseiro/DeepOPT/datasets/x26/140114_5dpf_upper tail_26', '/home/obanmarcos/Balseiro/DeepOPT/datasets/x26/140714_5dpf_head_26', '/home/obanmarcos/Balseiro/DeepOPT/datasets/x26/140117_3dpf_body_26', '/home/obanmarcos/Balseiro/DeepOPT/datasets/x26/140117_3dpf_upper tail_26', '/home/obanmarcos/Balseiro/DeepOPT/datasets/x26/140315_1dpf_head_26', '/home/obanmarcos/Balseiro/DeepOPT/datasets/x26/140114_5dpf_lower tail_26', '/home/obanmarcos/Balseiro/DeepOPT/datasets/x26/140114_5dpf_body_26']
+dataset_list = ['/home/obanmarcos/Balseiro/DeepOPT/datasets/x26/140114_5dpf_lower tail_26', '/home/obanmarcos/Balseiro/DeepOPT/datasets/x26/140315_1dpf_head_26', '/home/obanmarcos/Balseiro/DeepOPT/datasets/x26/140114_5dpf_body_26', '/home/obanmarcos/Balseiro/DeepOPT/datasets/x26/140114_5dpf_head_26', '/home/obanmarcos/Balseiro/DeepOPT/datasets/x26/140315_3dpf_head_26', '/home/obanmarcos/Balseiro/DeepOPT/datasets/x26/140117_3dpf_head_26', '/home/obanmarcos/Balseiro/DeepOPT/datasets/x26/140519_5dpf_head_26', '/home/obanmarcos/Balseiro/DeepOPT/datasets/x26/140117_3dpf_lower tail_26', '/home/obanmarcos/Balseiro/DeepOPT/datasets/x26/140114_5dpf_upper tail_26', '/home/obanmarcos/Balseiro/DeepOPT/datasets/x26/140714_5dpf_head_26', '/home/obanmarcos/Balseiro/DeepOPT/datasets/x26/140117_3dpf_body_26', '/home/obanmarcos/Balseiro/DeepOPT/datasets/x26/140117_3dpf_upper tail_26']
 
 def normalize_01(img):
 
@@ -235,12 +237,12 @@ if __name__ == '__main__':
     
     train_dataloader, val_dataloader, test_dataloader = trainer_system.generate_K_folding_dataloader()
 
-    artifact_dir = '/home/obanmarcos/Balseiro/DeepOPT/artifacts/model-2srs5uf0:v0'
+    artifact_dir = '/home/obanmarcos/Balseiro/DeepOPT/artifacts/model-2jnmr8t0:v0'
     
     model = MoDLReconstructor.load_from_checkpoint(Path(artifact_dir) / "model.ckpt", kw_dictionary_model_system = model_system_dict) 
 
     idx = 7
-    batch_idx = 40
+    batch_idx = 60
 
     for i, batch in enumerate(test_dataloader):
         

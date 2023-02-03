@@ -6,6 +6,7 @@ This code creates the model described in MoDL: Model-Based Deep Learning Archite
 import torch
 import torch.nn as nn
 import numpy as np
+# from skimage.transform import radon, iradon
 from torch_radon import Radon, RadonFanbeam
 from torch_radon.solvers import cg
 import matplotlib.pyplot as plt 
@@ -176,14 +177,16 @@ class modl(nn.Module):
         - x (torch.Tensor) : Backprojected sinogram, in image space    
     """
     
-    self.out['dc0'] = x
+    self.out['dc0'] = x.clone()
 
     for i in range(1,self.K+1):
     
         j = str(i)
-        
+        # print('Iteration', j)
+        # print('lambda', self.lam)
         self.out['dw'+j] = self.dw.forward(self.out['dc'+str(i-1)])
-        rhs = x/self.lam+self.out['dw'+j]
+        # rhs = normalize_images(x+self.lam*self.out['dw'+j])
+        rhs = x/self.lam+self.out['dw'+j]#
 
         self.out['dc'+j] = self.AtA.inverse(rhs)
         
@@ -191,8 +194,8 @@ class modl(nn.Module):
 
         torch.cuda.empty_cache()
 
-    self.out['dc'+j] = normalize_images(self.out['dc'+j]) 
-    
+    self.out['dc'+j] = normalize_images(self.out['dc'+j])
+
     return self.out
   
   def process_kwdictionary(self, kw_dictionary):
@@ -211,7 +214,7 @@ class modl(nn.Module):
     self.image_size = kw_dictionary['image_size'] 
     
     self.lam = kw_dictionary['lambda']
-    self.lam = self.lam = torch.nn.Parameter(torch.tensor([self.lam], requires_grad = True, device = device))
+    self.lam = torch.nn.Parameter(torch.tensor([self.lam], requires_grad = True, device = device))
     
     self.use_shared_weights = kw_dictionary['use_shared_weights']
     self.denoiser_method = kw_dictionary['denoiser_method']
@@ -266,10 +269,14 @@ class Aclass:
         self.img_size = kw_dictionary['image_size']
         self.number_projections = kw_dictionary['number_projections']
         self.lam = kw_dictionary['lambda']
+        
         self.use_torch_radon = kw_dictionary['use_torch_radon']
         self.angles = np.linspace(0, 2*np.pi, self.number_projections,endpoint = False)
+        self.angles = np.linspace(0, 2*180, self.number_projections,endpoint = False)
         self.det_count = int(np.sqrt(2)*self.img_size+0.5)
         self.radon = Radon(self.img_size, self.angles, clip_to_circle = False, det_count = self.det_count)
+        # self.radon = lambda x: torch.Tensor(radon(x.detach().cpu().numpy(), self.angles)).to(device)
+        # self.iradon = lambda x: torch.Tensor(iradon(x.detach().cpu().numpy(), self.angles, filter_name = None)).to(device)
         
     def forward(self, img):
         """
@@ -278,10 +285,14 @@ class Aclass:
             - img (torch.Tensor): Input tensor
         """
 
-        sinogram = self.radon.forward(img)/self.img_size 
+        sinogram = self.radon.forward(img)/self.img_size
+        # sinogram = self.radon(img)/self.img_size
         iradon = self.radon.backprojection(sinogram)*np.pi/self.number_projections
+        # iradon = self.iradon(sinogram)*np.pi/self.number_projection
+
         del sinogram
-        output = iradon/self.lam+img
+
+        output = img/self.lam+iradon
         
         # print('Term z max {}, min {}'.format((iradon/self.lam).max(), (iradon/self.lam).min()))
         # print('Term input max {}, min {}'.format(img.max(), img.min()))
@@ -315,14 +326,13 @@ class Aclass:
         """
         My implementation of conjugate gradients in PyTorch
         """
-
         i = 0
         x = torch.zeros_like(rhs)
         r = rhs 
         p = rhs 
         rTr = torch.sum(r*r)
-        
-        while((i<10) and torch.ge(rTr, 1e-5)):
+            
+        while((i<10) and torch.ge(rTr, 1e-10)):
             
             Ap = A(p)
             alpha = rTr/torch.sum(p*Ap)
@@ -333,6 +343,8 @@ class Aclass:
             p = r + beta * p
             i += 1
             rTr = rTrNew
+
+        torch.cuda.empty_cache()
 
         return x
 
@@ -347,98 +359,133 @@ def normalize_images(images):
 
     for i, image in enumerate(images):
          
-        image_norm[i,...] = 2*((image - image.min())/(image.max()-image.min())-0.5)
+        image_norm[i,...] = ((image - image.min())/(image.max()-image.min()))
 
     return image_norm
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+#CNN denoiser ======================
+def conv_block(in_channels, out_channels):
+    return nn.Sequential(
+        nn.Conv2d(in_channels, out_channels, 3, padding=1),
+        nn.BatchNorm2d(out_channels),
+        nn.ReLU()
+    )
+
+class cnn_denoiser(nn.Module):
+    def __init__(self, n_layers):
+        super().__init__()
+        layers = []
+        layers += conv_block(1, 64)
+
+        for _ in range(n_layers-2):
+            layers += conv_block(64, 64)
+
+        layers += nn.Sequential(
+            nn.Conv2d(64, 1, 3, padding=1),
+            nn.BatchNorm2d(1)
+        )
+
+        self.nw = nn.Sequential(*layers)
+    
+    def forward(self, x):
+        idt = x # (1, nrow, ncol)
+        dw = self.nw(x) + idt # (1, nrow, ncol)
+        return dw
+
+#CG algorithm ======================
+class myAtA(nn.Module):
+    """
+    performs DC step
+    """
+    def __init__(self, lam):
+        super(myAtA, self).__init__()
+        self.lam = lam 
+        self.img_size = 100
+        self.number_projections = 720
+        
+        self.angles = np.linspace(0, 2*180, self.number_projections,endpoint = False)
+        self.det_count = int(np.sqrt(2)*self.img_size+0.5)
+        self.radon = lambda x: radon(x.cpu(), self.angles)
+        self.iradon = lambda x: iradon(x.cpu(), self.angles, filter_name = None)
+        # self.radon = Radon(self.img_size, self.angles, clip_to_circle = False, det_count = self.det_count)
+
+    def forward(self, img): #step for batch image
+        """
+        :im: complex image (B x nrow x nrol)
+        """
+        
+        sinogram = self.radon.forward(img)/self.img_size
+        # iradon = self.radon.backprojection(self.radon.filter_sinogram(sinogram))*np.pi/self.number_projections
+        iradon = self.radon.backward(sinogram)*np.pi/self.number_projections
+        del sinogram
+
+        output = iradon+self.lam*img
+        # output = (output - output.min())/(output.max()-output.min())
+        return output
+
+def myCG(AtA, rhs):
+    """
+    performs CG algorithm
+    :AtA: a class object that contains csm, mask and lambda and operates forward model
+    """
+    rhs = rhs
+    x = torch.zeros_like(rhs)
+    i, r, p = 0, rhs, rhs
+    rTr = torch.sum(r*r)
+
+    # print('img', rhs.max(), rhs.min())
+    
+    while i < 10 and rTr > 1e-10:
+        Ap = AtA(p)
+        alpha = rTr / torch.sum(p*Ap)
+        alpha = alpha
+        x = x + alpha * p
+        r = r - alpha * Ap
+        rTrNew = torch.sum(r*r)
+        beta = rTrNew / rTr
+        beta = beta
+        p = r + beta * p
+        i += 1
+        rTr = rTrNew
+        torch.cuda.empty_cache()
+
+    return x
+
+class data_consistency(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.lam = nn.Parameter(torch.tensor(0.05), requires_grad=True)
+
+    def forward(self, z_k, x0):
+        rhs = x0+self.lam*z_k # (2, nrow, ncol)
+        AtA = myAtA(self.lam)
+        rec = myCG(AtA, rhs)
+        return rec
+
+#model =======================    
+class MoDL(nn.Module):
+    def __init__(self, n_layers, k_iters):
+        """
+        :n_layers: number of layers
+        :k_iters: number of iterations
+        """
+        super().__init__()
+        self.K = k_iters
+        self.dw = cnn_denoiser(n_layers)
+        self.dc = data_consistency()
+
+    def forward(self, x0):
+        """
+        :x0: zero-filled reconstruction (B, 2, nrow, ncol) - float32
+        :csm: coil sensitivity map (B, ncoil, nrow, ncol) - complex64
+        :mask: sampling mask (B, nrow, ncol) - int8
+        """
+        
+        x_k = x0.clone()
+        for k in range(self.K):
+            #dw 
+            z_k = self.dw(x_k) # (2, nrow, ncol)
+            #dc
+            x_k = self.dc(z_k, x0)# (2, nrow, ncol)
+        
+        return x_k

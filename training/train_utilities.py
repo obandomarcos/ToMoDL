@@ -57,8 +57,9 @@ class TrainerSystem():
             self.current_fold = 0 
         
         self.restore_fold = kwdict['restore_fold']
-        self.fold_number_restore = kwdict['fold_number_restore']
-        self.acc_factor_restore = kwdict['acc_factor_restore']
+        if self.restore_fold == True:
+            self.fold_number_restore = kwdict['fold_number_restore']
+            self.acc_factor_restore = kwdict['acc_factor_restore']
 
         self.use_logger = kwdict['use_logger']
         self.lightning_trainer_dict = kwdict['lightning_trainer_dict']
@@ -157,6 +158,8 @@ class TrainerSystem():
         self.acceleration_factor = kwdict['acceleration_factor']
         self.number_projections_undersampled = self.number_projections_total//self.acceleration_factor
 
+        self.use_subset_by_part = kwdict['use_subset_by_part']
+
         # Dataset splitting (fraction)
         self.train_factor = kwdict['train_factor']
         self.val_factor = kwdict['val_factor']
@@ -176,7 +179,12 @@ class TrainerSystem():
         self.folders_datasets_list = [self.datasets_folder+'x{}/'.format(self.acceleration_factor)+x for x in os.listdir(self.datasets_folder+'x{}'.format(self.acceleration_factor))]
 
         # wandb.log({'datasets_folders_list': [x.split('/') for x in self.folders_datasets_list]})
-        
+        if self.use_subset_by_part == True:
+            
+            self.subset_part = kwdict['subset_part']
+            self.folders_datasets_list = [x for x in self.folders_datasets_list if self.subset_part in x]
+            print(self.folders_datasets_list)
+
         if self.number_volumes != 0:
 
             self.folders_datasets_list = self.folders_datasets_list[:self.number_volumes]
@@ -398,12 +406,12 @@ class TrainerSystem():
                 self.wandb_logger.finalize('success')
 
                 continue
-                
+            
+            self.reinitialize_logger()
             print('{} fold started...'.format(self.current_fold))
             self.train_model()
 
-            #  
-
+            self.wandb_logger.finalize('success')
             print('{} fold finished succesfully!'.format(self.current_fold))
             self.current_fold += 1
         

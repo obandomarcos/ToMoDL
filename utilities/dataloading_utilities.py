@@ -747,4 +747,4 @@ class ReconstructionDataset(Dataset):
     '''
     Normalizes image to 
     '''
-    return 2*((image - image.min())/(image.max()-image.min())-0.5)
+    return (((image - image.min())/(image.max()-image.min())))

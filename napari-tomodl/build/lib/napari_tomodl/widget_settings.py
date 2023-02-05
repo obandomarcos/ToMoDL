@@ -7,7 +7,7 @@ from qtpy.QtWidgets import QLabel, QFormLayout, QSpinBox, QDoubleSpinBox, QCheck
 from qtpy.QtCore import Qt
 from enum import Enum, EnumMeta
 
-class Settings():
+class Setting():
     '''
     Auxiliary class to create an numerical or boolean attribute 
     with a corresponding Qwidget (QSpinBox, QDoubleSpinBox or QCheckBox),

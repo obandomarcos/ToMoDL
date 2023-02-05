@@ -208,7 +208,6 @@ class Combo_box():
         # combo.setFixedWidth(width)
         self.combo = combo
 
-
 class BaseEnum(Enum):
     
     @classmethod

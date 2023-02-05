@@ -62,19 +62,20 @@ class ReconstructionWidget(QWidget):
         layout.addLayout(settings_layout)
         self.create_Settings(settings_layout)
 
-
-
     def create_Settings(self, slayout):
         
-        self.resizebox = Settings('Reconstruction size', dtype=int, initial=100, layout=slayout, 
-                              write_function = self.reset_processor)
+        self.resizebox = Settings('Reconstruction size',
+                                  dtype=int, 
+                                  initial=100, 
+                                  layout=slayout, 
+                                  write_function = self.reset_processor)
         
         #create combobox for reconstruction method
-        reconbox = QComboBox()
-        reconbox.addItems(["FBP (CPU)", "FBP (GPU)"])
-        reconLayout = QFormLayout()
-        reconLayout.addRow('Reconstruction method', reconbox)
-        slayout.addLayout(reconLayout)
+        reconbox = Combo_box(name ='Reconstruction method',
+                             initial = 'FBP (CPU)',
+                             choices = ["FBP (CPU)", "FBP (GPU)"],
+                             layout = slayout,
+                             write_function = self.set_opt_processor)
         self.reconbox = reconbox
 
         # add calculate psf button
@@ -82,39 +83,34 @@ class ReconstructionWidget(QWidget):
         calculate_btn.clicked.connect(self.reconstruct)
         slayout.addWidget(calculate_btn)
     
+    def reconstruct(self):
+
+        pass
+
     def select_index(self, val = 0):
         pass
-    
-    def reconstruct(self):
-        '''
-        Reconstructs images with a certain method chosen from the window list
-        '''
-        self.generate_angles()
-
-        reconstruct = np.rand.random(20, 100, 100)
-        self.viewer.add_image(reconstruct,
-                         name='Reconstruction',
-                         colormap='twilight')
     
     def select_layer(self, image: Image):
         
         if image.data.ndim == 3:
             self.imageRaw_name = image.name
             sz,sy,sx = image.data.shape
-            assert sy == sx, 'Non-square images are not supported'
             if not hasattr(self, 'h'): 
                 self.start_opt_processor()
             print(f'Selected image layer: {image.name}')
 
-    def generate_angles(self):
-        '''
-        Generate according angles for reconstruction
-        '''
-
-        self.angles = np.linspace(0., 180., 100, endpoint=False)
-
-        pass
     
+    
+    def set_opt_processor(self, *args):
+        '''
+        Sets OPT reconstruction arguments
+        '''
+
+        if hasattr(self, 'h'):
+            
+            self.h.resizeVal = self.resizebox.val
+            self.h.recProcess = self.reconbox.current_data 
+
     def start_opt_processor(self):     
         self.isCalibrated = False
         

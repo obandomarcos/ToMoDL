@@ -6,7 +6,7 @@ Created on Tue Feb 2 16:34:41 2023
 import os 
 os.chdir('.')
 
-from processors import OPTProcessor
+from processors.OPTProcessor import OPTProcessor
 from widget_settings import Settings, Combo_box
 #import processors
 import napari
@@ -60,15 +60,28 @@ class ReconstructionWidget(QWidget):
         settings_layout = QVBoxLayout()
         add_section(settings_layout,'Settings')
         layout.addLayout(settings_layout)
-        self.create_Settings(settings_layout)
+        self.createSettings(settings_layout)
 
-    def create_Settings(self, slayout):
+    def createSettings(self, slayout):
         
+        self.registerbox = Settings('Align axis',
+                                  dtype=bool, 
+                                  layout=slayout, 
+                                  write_function = self.set_opt_processor)
+        
+
+        self.reshapebox = Settings('Reshape volume',
+                                  dtype=bool,
+                                  initial = True, 
+                                  layout=slayout, 
+                                  write_function = self.set_opt_processor)        
+
+
         self.resizebox = Settings('Reconstruction size',
                                   dtype=int, 
                                   initial=100, 
                                   layout=slayout, 
-                                  write_function = self.reset_processor)
+                                  write_function = self.set_opt_processor)
         
         #create combobox for reconstruction method
         reconbox = Combo_box(name ='Reconstruction method',
@@ -80,26 +93,83 @@ class ReconstructionWidget(QWidget):
 
         # add calculate psf button
         calculate_btn = QPushButton('Reconstruct')
-        calculate_btn.clicked.connect(self.reconstruct)
+        calculate_btn.clicked.connect(self.stack_reconstruction)
         slayout.addWidget(calculate_btn)
-    
-    def reconstruct(self):
 
-        pass
-
-    def select_index(self, val = 0):
-        pass
-    
-    def select_layer(self, image: Image):
+    def show_image(self, image_values, fullname, **kwargs):
         
-        if image.data.ndim == 3:
-            self.imageRaw_name = image.name
-            sz,sy,sx = image.data.shape
+        if 'scale' in kwargs.keys():    
+            scale = kwargs['scale']
+        else:
+            scale = [1.]*image_values.ndim
+        
+        if 'hold' in kwargs.keys() and fullname in self.viewer.layers:
+            
+            self.viewer.layers[fullname].data = image_values
+            self.viewer.layers[fullname].scale = scale
+        
+        else:  
+            layer = self.viewer.add_image(image_values,
+                                            name = fullname,
+                                            scale = scale,
+                                            interpolation = 'bilinear')
+            return layer
+
+    def select_layer(self, sinos:Image):
+        
+        
+        sinos = self.choose_layer_widget.image.value
+        if sinos.data.ndim == 3:
+            
+            self.imageRaw_name = sinos.name
+            sz,sy,sx = sinos.data.shape
+            print(sz, sy, sx)
             if not hasattr(self, 'h'): 
                 self.start_opt_processor()
-            print(f'Selected image layer: {image.name}')
+            print(f'Selected image layer: {sinos.name}')
+        
+    def stack_reconstruction(self):
+        
+        def update_opt_image(stack):
+            
+            imname = 'stack_' + self.imageRaw_name
+            self.show_image(stack, fullname=imname)
+                
+            
+            print('Stack reconstruction completed')
+            
+        
+        @thread_worker(connect={'returned':update_opt_image})
+        def _reconstruct():
+            
+            sinos = np.float32(self.get_sinos())
+        
+            theta, Q, Z = sinos.shape
 
+            if self.reshapebox.val == True:
+                
+                optVolume = np.zeros([
+                    self.resizebox.val, self.resizebox.val, Z], np.float32)
+
+            else:
+                
+                optVolume = np.zeros([
+                    np.int(Q//np.sqrt(2)), np.int(Q//np.sqrt(2)), Z], np.float32)
+
+            for zidx in range(Z):
+                
+                optVolume[:,:, zidx] = self.h.reconstruct(sinos[:,:,zidx])
+            
+            return np.rollaxis(optVolume, 0, 2)
+
+        _reconstruct()
     
+    def get_sinos(self):
+        try:
+            print(self.imageRaw_name)
+            return self.viewer.layers[self.imageRaw_name].data
+        except:
+             raise(KeyError('Please select a valid 3D image (z,y,x)'))
     
     def set_opt_processor(self, *args):
         '''
@@ -109,8 +179,10 @@ class ReconstructionWidget(QWidget):
         if hasattr(self, 'h'):
             
             self.h.resizeVal = self.resizebox.val
+            self.h.resizeBool = self.reshapebox.val
+            self.h.registerBool = self.registerbox.val
             self.h.recProcess = self.reconbox.current_data 
-
+            
     def start_opt_processor(self):     
         self.isCalibrated = False
         
@@ -146,9 +218,9 @@ def choose_layer(image: Image):
 if __name__ == '__main__':
    
     viewer = napari.Viewer()
+
     opt_widget = ReconstructionWidget(viewer)
-    selection = magicgui(opt_widget.select_layer)
 
     viewer.window.add_dock_widget(opt_widget, name = 'OPT reconstruction')
 
-    napari.run() 
+    napari.run()

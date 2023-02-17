@@ -65,7 +65,8 @@ class ReconstructionWidget(QWidget):
     def createSettings(self, slayout):
         
         self.registerbox = Settings('Align axis',
-                                  dtype=bool, 
+                                  dtype=bool,
+                                  initial=True, 
                                   layout=slayout, 
                                   write_function = self.set_opt_processor)
         
@@ -154,13 +155,18 @@ class ReconstructionWidget(QWidget):
             else:
                 
                 optVolume = np.zeros([
-                    np.int(Q//np.sqrt(2)), np.int(Q//np.sqrt(2)), Z], np.float32)
+                    np.int(np.ceil(Q/np.sqrt(2))), np.int(np.ceil(Q/np.sqrt(2))), Z], np.float32)
 
-            for zidx in range(Z):
+            for zidx in range(20):
+                print(zidx)
+                if self.registerbox.val == True:
+
+                    optVolume[:,:,zidx] = self.h.correct_and_reconstruct(sinos[:,:,zidx])
                 
-                optVolume[:,:, zidx] = self.h.reconstruct(sinos[:,:,zidx])
+                else:
+                    optVolume[:,:, zidx] = self.h.reconstruct(sinos[:,:,zidx])
             
-            return np.rollaxis(optVolume, 0, 2)
+            return np.rollaxis(optVolume, -1)
 
         _reconstruct()
     
@@ -178,11 +184,19 @@ class ReconstructionWidget(QWidget):
 
         if hasattr(self, 'h'):
             
-            self.h.resizeVal = self.resizebox.val
-            self.h.resizeBool = self.reshapebox.val
-            self.h.registerBool = self.registerbox.val
-            self.h.recProcess = self.reconbox.current_data 
-            
+            self.h.resize_val = self.resizebox.val
+            self.h.resize_bool = self.reshapebox.val
+            self.h.register_bool = self.registerbox.val
+            self.h.rec_process = self.reconbox.current_data
+
+            if self.h.rec_process == 'FBP (CPU)':
+                
+                self.h.angles_gen = lambda num_angles:np.linspace(0, 2*180, num_angles,endpoint = False)
+
+            elif self.h.rec_process == 'FBP (GPU)':
+                
+                self.h.angles_gen = lambda num_angles:np.linspace(0, 2*np.pi, num_angles,endpoint = False)
+             
     def start_opt_processor(self):     
         self.isCalibrated = False
         

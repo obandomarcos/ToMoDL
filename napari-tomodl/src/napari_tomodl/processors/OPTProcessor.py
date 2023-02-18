@@ -2,7 +2,12 @@
 Process sinograms in 2D
 '''
 
-from skimage.transform import radon, iradon
+from skimage.transform import radon as radon_scikit 
+from skimage.transform import iradon as iradon_scikit
+
+from torch_radon import Radon as radon_thrad
+
+import torch
 import numpy as np
 from napari.layers import Image
 import scipy.ndimage as ndi
@@ -11,12 +16,15 @@ import scipy.ndimage as ndi
 import os
 import matplotlib.pyplot as plt 
 import cv2
+from enum  import Enum
 
 for k, v in os.environ.items():
     if k.startswith("QT_") and "cv2" in v:
         del os.environ[k]
 
-
+class Rec_modes(Enum):
+    FBP_CPU = 0
+    FBP_GPU = 1
 
 class OPTProcessor:
 
@@ -26,22 +34,33 @@ class OPTProcessor:
         '''
 
         self.resize_val = 100
-        self.rec_process = 'FBP (CPU)'
+        self.rec_process = Rec_modes.FBP_CPU.value
         
         self.resize_bool = True
         self.register_bool = True
         self.max_shift = 50
         self.shift_step = 10
         self.center_shift = 0
-        
-        # This should change depending on the method
-        if self.rec_process == 'FBP (CPU)':
-            
-            self.angles_gen = lambda num_angles:np.linspace(0, 2*180, num_angles,endpoint = False)
-        
-        elif self.rec_process == 'FBP (GPU)':
 
-            self.angles_gen = lambda num_angles: np.linspace(0, 2*np.pi, num_angles,endpoint = False)
+        self.set_reconstruction_process()
+    
+    def set_reconstruction_process(self):
+
+        print(self.rec_process)
+        # This should change depending on the method
+        if self.rec_process == Rec_modes.FBP_CPU.value:
+            
+            self.angles_gen = lambda num_angles: np.linspace(0, 2*180, num_angles, endpoint = False)
+            self.iradon_function = lambda sino, num_angles: iradon_scikit(sino, self.angles_gen(num_angles), circle = False)
+        
+        elif self.rec_process == Rec_modes.FBP_GPU.value:
+
+            self.angles_gen = lambda num_angles: np.linspace(0, 2*np.pi, num_angles, endpoint = False)
+
+            self.iradon_functor = lambda num_angles: radon_thrad(self.resize_val, self.angles_gen(num_angles))
+            print(self.angles)
+
+            self.iradon_function = lambda sino, num_angles: self.iradon_functor(num_angles).backward(self.iradon_functor(num_angles).filter_sinogram(torch.tensor(sino))).numpy()
 
 
     def reshape_input(self, sinogram:np.ndarray):
@@ -86,7 +105,7 @@ class OPTProcessor:
         self.max_shift = 5
         self.shift_step = 0.5
 
-        print(self.center_shift, image_std[np.argmax(image_std)])
+    
         return self.reconstruct(ndi.shift(sinogram, (self.center_shift, 0), mode = 'nearest'))
 
 
@@ -95,12 +114,10 @@ class OPTProcessor:
         Reconstruct with specific method
         TODO: Include other methods
         '''
-
-
         if self.resize_bool == True:
             
             sinogram_resize = cv2.resize(sinogram, (sinogram.shape[0], int(np.ceil(self.resize_val*np.sqrt(2)))), interpolation = cv2.INTER_AREA)
 
-        return iradon(sinogram_resize, self.angles, circle = False)
+        return self.iradon_function(sinogram_resize, sinogram.shape[0])
         
     

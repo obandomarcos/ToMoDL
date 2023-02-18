@@ -22,6 +22,10 @@ import time
 from superqt.utils import qthrottled
 from enum  import Enum
 
+class Rec_modes(Enum):
+    FBP_CPU = 0
+    FBP_GPU = 1
+
 
 class ReconstructionWidget(QWidget):
     
@@ -85,12 +89,11 @@ class ReconstructionWidget(QWidget):
                                   write_function = self.set_opt_processor)
         
         #create combobox for reconstruction method
-        reconbox = Combo_box(name ='Reconstruction method',
+        self.reconbox = Combo_box(name ='Reconstruction method',
                              initial = 'FBP (CPU)',
-                             choices = ["FBP (CPU)", "FBP (GPU)"],
+                             choices = Rec_modes,
                              layout = slayout,
                              write_function = self.set_opt_processor)
-        self.reconbox = reconbox
 
         # add calculate psf button
         calculate_btn = QPushButton('Reconstruct')
@@ -136,7 +139,6 @@ class ReconstructionWidget(QWidget):
             imname = 'stack_' + self.imageRaw_name
             self.show_image(stack, fullname=imname)
                 
-            
             print('Stack reconstruction completed')
             
         
@@ -188,15 +190,11 @@ class ReconstructionWidget(QWidget):
             self.h.resize_bool = self.reshapebox.val
             self.h.register_bool = self.registerbox.val
             self.h.rec_process = self.reconbox.current_data
+            print(self.h.rec_process)
 
-            if self.h.rec_process == 'FBP (CPU)':
-                
-                self.h.angles_gen = lambda num_angles:np.linspace(0, 2*180, num_angles,endpoint = False)
+            self.h.set_reconstruction_process()
+            print(self.h.iradon_function)
 
-            elif self.h.rec_process == 'FBP (GPU)':
-                
-                self.h.angles_gen = lambda num_angles:np.linspace(0, 2*np.pi, num_angles,endpoint = False)
-             
     def start_opt_processor(self):     
         self.isCalibrated = False
         

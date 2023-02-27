@@ -266,7 +266,7 @@ class Aclass:
         self.lam = kw_dictionary['lambda']
         self.use_torch_radon = kw_dictionary['use_torch_radon']
         self.angles = np.linspace(0, 2*np.pi, self.number_projections,endpoint = False)
-        self.det_count = int(np.sqrt(2)*self.img_size+0.5)
+        self.det_count = int(np.ceil(np.sqrt(2)*self.img_size))
         self.radon = Radon(self.img_size, self.angles, clip_to_circle = False, det_count = self.det_count)
         
     def forward(self, img):

@@ -1,0 +1,2 @@
+[napari.manifest]
+napari-tomodl = napari_tomodl:napari.yaml

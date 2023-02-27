@@ -22,6 +22,8 @@ for k, v in os.environ.items():
     if k.startswith("QT_") and "cv2" in v:
         del os.environ[k]
 
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+
 class Rec_modes(Enum):
     FBP_CPU = 0
     FBP_GPU = 1
@@ -46,35 +48,20 @@ class OPTProcessor:
     
     def set_reconstruction_process(self):
 
-        print(self.rec_process)
+        self.init_volume_rec = False
+        self.iradon_functor = None
         # This should change depending on the method
         if self.rec_process == Rec_modes.FBP_CPU.value:
             
             self.angles_gen = lambda num_angles: np.linspace(0, 2*180, num_angles, endpoint = False)
-            self.iradon_function = lambda sino, num_angles: iradon_scikit(sino, self.angles_gen(num_angles), circle = False)
+            self.iradon_function = lambda sino, num_angles: iradon_scikit(sino.T, self.angles_gen(num_angles), circle = False)
         
         elif self.rec_process == Rec_modes.FBP_GPU.value:
+            
+            assert(torch.cuda.is_available() == True)
 
             self.angles_gen = lambda num_angles: np.linspace(0, 2*np.pi, num_angles, endpoint = False)
-
-            self.iradon_functor = lambda num_angles: radon_thrad(self.resize_val, self.angles_gen(num_angles))
-            print(self.angles)
-
-            self.iradon_function = lambda sino, num_angles: self.iradon_functor(num_angles).backward(self.iradon_functor(num_angles).filter_sinogram(torch.tensor(sino))).numpy()
-
-
-    def reshape_input(self, sinogram:np.ndarray):
-        '''
-        Reshape stack volume for output visualization
-        '''
-        self.volume = self.layer.data
-
-        for layer in self.viewer.layers:
-            if isinstance(layer, Image):
-                if layer.ndim >2:
-                    scale = layer.scale 
-                    scale[-3] = self.zscaling
-                    layer.scale = scale
+            
 
     def correct_and_reconstruct(self, sinogram: np.ndarray):
         '''
@@ -84,8 +71,6 @@ class OPTProcessor:
 
         Params:
         '''
-
-        self.angles = self.angles_gen(sinogram.shape[0])
 
         shifts = np.arange(-self.max_shift, self.max_shift, self.shift_step)+self.center_shift
         image_std = []
@@ -108,16 +93,44 @@ class OPTProcessor:
     
         return self.reconstruct(ndi.shift(sinogram, (self.center_shift, 0), mode = 'nearest'))
 
+    def resize(self, sinogram_volume: np.ndarray):
 
+        if self.resize_bool == True:
+            
+            sinogram_resize = np.zeros((sinogram_volume.shape[0], int(np.ceil(self.resize_val*np.sqrt(2))), sinogram_volume.shape[2]), dtype = np.float32)
+
+            for idx in range(sinogram_volume.shape[2]):
+                
+                sinogram_resize[:,:,idx] = cv2.resize(sinogram_volume[:,:,idx], (sinogram_volume.shape[0], int(np.ceil(self.resize_val*np.sqrt(2)))), interpolation = cv2.INTER_AREA).T
+
+        return sinogram_resize
+    
     def reconstruct(self, sinogram: np.ndarray):
         '''
         Reconstruct with specific method
         TODO: Include other methods
         '''
-        if self.resize_bool == True:
-            
-            sinogram_resize = cv2.resize(sinogram, (sinogram.shape[0], int(np.ceil(self.resize_val*np.sqrt(2)))), interpolation = cv2.INTER_AREA)
 
-        return self.iradon_function(sinogram_resize, sinogram.shape[0])
+        if self.init_volume_rec == False:
+
+            self.angles = self.angles_gen(sinogram.shape[0])   
+
+        if self.iradon_functor == None:
+            
+            self.iradon_functor = radon_thrad(self.resize_val, self.angles, clip_to_circle = False, det_count = int(np.ceil(np.sqrt(2)*self.resize_val)))         
+
+        if self.rec_process == Rec_modes.FBP_GPU.value:
+
+            self.iradon_function = lambda sino: self.iradon_functor.backprojection((torch.Tensor(sino).to(device))).cpu().numpy()
+
+        else:
+            
+            self.iradon_function = lambda sino: iradon_scikit(sino.T, self.angles, circle = False, filter_name = None)
+        
+        print(sinogram.shape)
+        print(self.angles)            
+        reconstruction = self.iradon_function(sinogram)
+
+        return reconstruction
         
     

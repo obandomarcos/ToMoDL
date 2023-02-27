@@ -18,9 +18,10 @@ from napari.qt.threading import thread_worker
 from magicgui.widgets import FunctionGui
 from magicgui import magic_factory, magicgui
 import warnings
-import time
+from time import time
 from superqt.utils import qthrottled
 from enum  import Enum
+import cv2 
 
 class Rec_modes(Enum):
     FBP_CPU = 0
@@ -153,21 +154,30 @@ class ReconstructionWidget(QWidget):
                 
                 optVolume = np.zeros([
                     self.resizebox.val, self.resizebox.val, Z], np.float32)
+                sinos = self.h.resize(sinos)
 
             else:
                 
                 optVolume = np.zeros([
-                    np.int(np.ceil(Q/np.sqrt(2))), np.int(np.ceil(Q/np.sqrt(2))), Z], np.float32)
+                    int(np.ceil(Q/np.sqrt(2))), int(np.ceil(Q/np.sqrt(2))), Z], np.float32)
 
-            for zidx in range(20):
-                print(zidx)
+            time_in = time()
+
+            for zidx in range(1):
+                
                 if self.registerbox.val == True:
-
+        
                     optVolume[:,:,zidx] = self.h.correct_and_reconstruct(sinos[:,:,zidx])
+                    optVolume[:,:,zidx] = cv2.normalize(optVolume[:,:,zidx], None, alpha=0, beta=1, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F)
                 
                 else:
+                    
                     optVolume[:,:, zidx] = self.h.reconstruct(sinos[:,:,zidx])
-            
+                    optVolume[:,:,zidx] = cv2.normalize(optVolume[:,:,zidx], None, alpha=0, beta=1, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F)
+
+            print('Min: ', optVolume[:,:, zidx].min(), )
+            print('Max: ', optVolume[:,:, zidx].max())
+            print('Tiempo de cómputo total: {} s'.format(round(time()-time_in, 3)))
             return np.rollaxis(optVolume, -1)
 
         _reconstruct()
@@ -177,7 +187,7 @@ class ReconstructionWidget(QWidget):
             print(self.imageRaw_name)
             return self.viewer.layers[self.imageRaw_name].data
         except:
-             raise(KeyError('Please select a valid 3D image (z,y,x)'))
+             raise(KeyError(r'Please select a valid 3D image ($\theta$, q, z)'))
     
     def set_opt_processor(self, *args):
         '''

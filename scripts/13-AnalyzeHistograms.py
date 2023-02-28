@@ -40,19 +40,19 @@ def adjacent_values(vals, q1, q3):
     
 def add_label(violin, color, positions, data, label, ax):
     
-    for patch in zip(violin["boxes"]):
+    for patch in violin["boxes"]:
         
-        patch[0].set_facecolor(color)
+        patch.set_facecolor(color)
     
-    # data = data.astype(object)
-    # positions = positions.astype(object)
+    data = data.astype(object)
+    positions = positions.astype(object)
     
-    # for dat, pos in zip(data, positions):
+    for dat, pos in zip(data, positions):
         
-    #     quartile1, medians, quartile3 = np.percentile(dat, [25, 50, 75], axis = 0)
+        quartile1, medians, quartile3 = np.percentile(dat, [25, 50, 75], axis = 0)
 
-    #     ax.scatter(pos, medians, marker='o', color='white', s=30, zorder=3)
-    #     ax.vlines(pos, quartile1, quartile3, color=color, linestyle='-', lw=5)
+        # ax.scatter(pos, medians, marker='o', color='white', s=30, zorder=3)
+        ax.vlines(pos, quartile1, quartile3, color=color, linestyle='-', lw=5)
 
 def add_label_violin(violin, color, positions, data, label, ax):
     
@@ -74,7 +74,7 @@ def add_label_violin(violin, color, positions, data, label, ax):
         
         quartile1, medians, quartile3 = np.percentile(dat, [25, 50, 75], axis = 0)
 
-        ax.scatter(pos, medians, marker='o', color='white', s=30, zorder=3)
+        # ax.scatter(pos, medians, marker='o', color='white', s=30, zorder=3)
         ax.vlines(pos, quartile1, quartile3, color=color, linestyle='-', lw=5)
 
 def plot_boxes_projection(path):
@@ -116,20 +116,19 @@ def plot_boxes_projection(path):
             pd_metric = pd_metric.append(row, ignore_index=True)
 
 
-        colors = ['lightgreen', 'orange', 'pink', 'lightblue']
+        colors = [ 'lightblue', 'pink', 'orange', 'lightgreen']
         boxes = []
 
         for color, model, pos, model_label in zip(colors, model_metric_spec, np.linspace(-1, 1, len(model_metric_spec)), model_metric_labels):
-            
+            print(color)
             xticks = np.array(pd_metric['acc_factor'])+pos
             
-            bxplt = ax.violinplot(pd_metric[model], positions = xticks)#, showfliers =True)
+            bxplt = ax.boxplot(pd_metric[model], patch_artist= True, positions = xticks, showfliers = False)
             
-            # boxes.append(bxplt['boxes'][0])
-            # add_label(bxplt, color, xticks, np.array(pd_metric[model]), model_label, ax)
-            # ax.boxplot(pd_metric[model], sym = '', positions = xticks, whis = 0)
-            
-            
+            add_label(bxplt, color, xticks, np.array(pd_metric[model]), model_label, ax)
+            ax.boxplot(pd_metric[model], sym = '', positions = xticks, whis = 0)
+            boxes.append(bxplt['boxes'][0])
+
             ax.tick_params(axis='both', which='major', labelsize=20)
             # ax.set_xlabel('Factor de aceleración')
             
@@ -145,7 +144,7 @@ def plot_boxes_projection(path):
             ax.legend(boxes, model_metric_labels, loc=3, fontsize = 20)
             ax.set_xticks(pd_metric['acc_factor'].to_numpy().astype(float))
             ax.set_xticklabels(pd_metric['acc_factor'].to_numpy())
-            ax.set_xlabel('Factor de aceleración', fontsize = 20)
+            ax.set_xlabel('Acceleration factor', fontsize = 20)
         sns.despine()
         
         # ax.set_xticks([])

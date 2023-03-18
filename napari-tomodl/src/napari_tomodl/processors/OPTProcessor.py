@@ -6,6 +6,7 @@ from skimage.transform import radon as radon_scikit
 from skimage.transform import iradon as iradon_scikit
 
 from torch_radon import Radon as radon_thrad
+from .alternating import TwIST, TVdenoise, TVnorm
 from .modl import ToMoDL
 import torch
 import numpy as np
@@ -25,7 +26,10 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 class Rec_modes(Enum):
     FBP_CPU = 0
     FBP_GPU = 1
-    MODL_GPU = 2
+    TWIST_CPU = 2
+    UNET_GPU = 3
+    MODL_GPU = 4
+
 
 class OPTProcessor:
 
@@ -127,11 +131,11 @@ class OPTProcessor:
 
             self.iradon_function = lambda sino: self.iradon_functor.backprojection((torch.Tensor(sino).to(device))).cpu().numpy()
 
-        else:
+        elif self.rec_process == Rec_modes.FBP_CPU.value:
             
             self.iradon_function = lambda sino: iradon_scikit(sino.T, self.angles, circle = False, filter_name = None)
         
-        if self.rec_process == Rec_modes.MODL_GPU.value:
+        elif self.rec_process == Rec_modes.MODL_GPU.value:
             
             resnet_options_dict = {'number_layers': 5,
                                     'kernel_size':3,
@@ -159,6 +163,33 @@ class OPTProcessor:
     
             self.iradon_function = lambda sino: self.iradon_functor(torch.Tensor(iradon_scikit(sino.T, self.angles, circle = False, filter_name = None)).to(device).unsqueeze(0).unsqueeze(1))['dc'+str(self.tomodl_dictionary['K_iterations'])].detach().cpu().numpy()
 
+        elif self.rec_process == Rec_modes.TWIST_CPU.value:
+
+            Psi = lambda x,th: TVdenoise(x,2/th, 3)
+            #  set the penalty function, to compute the objective
+            Phi = lambda x: TVnorm(x)
+
+            twist_dictionary = {'LAMBDA': 1e-4, 
+                                'TOLERANCEA':1e-4,
+                                'STOPCRITERION':1, 
+                                'VERBOSE':0,
+                                'INITIALIZATION':0,
+                                'MAXITERA':10000, 
+                                'GPU':0,
+                                'PSI': Psi,
+                                'PHI': Phi,
+
+                                }
+            
+            A = lambda x: radon_scikit(x, self.angles, circle = False)
+            AT = lambda sino: iradon_scikit(sino, self.angles, circle = False)
+            self.iradon_function = lambda sino: TwIST(sino.T, A, AT, 0.01, twist_dictionary, true_img = AT(sino.T))[0]
+            
+        elif self.rec_process == Rec_modes.UNET_GPU.value:    
+
+            pass
+
+            
         reconstruction = self.iradon_function(sinogram)
 
         return reconstruction

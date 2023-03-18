@@ -4,8 +4,8 @@ Created on Tue Feb 2 16:34:41 2023
 """
 #%%
 import os 
-from .processors.OPTProcessor import OPTProcessor
-from .widget_settings import Settings, Combo_box
+from processors.OPTProcessor import OPTProcessor
+from widget_settings import Settings, Combo_box
 #import processors
 import napari
 from qtpy.QtWidgets import QVBoxLayout, QSplitter, QHBoxLayout, QWidget, QPushButton, QLineEdit, QSpinBox, QDoubleSpinBox, QFormLayout, QComboBox, QLabel
@@ -24,8 +24,9 @@ import cv2
 class Rec_modes(Enum):
     FBP_CPU = 0
     FBP_GPU = 1
-    MODL_GPU = 2
-
+    TWIST_CPU = 2
+    UNET_GPU = 3
+    MODL_GPU = 4
 
 class ReconstructionWidget(QWidget):
     

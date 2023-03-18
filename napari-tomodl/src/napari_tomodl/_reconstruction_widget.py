@@ -4,10 +4,8 @@ Created on Tue Feb 2 16:34:41 2023
 """
 #%%
 import os 
-os.chdir('.')
-
-from processors.OPTProcessor import OPTProcessor
-from widget_settings import Settings, Combo_box
+from .processors.OPTProcessor import OPTProcessor
+from .widget_settings import Settings, Combo_box
 #import processors
 import napari
 from qtpy.QtWidgets import QVBoxLayout, QSplitter, QHBoxLayout, QWidget, QPushButton, QLineEdit, QSpinBox, QDoubleSpinBox, QFormLayout, QComboBox, QLabel
@@ -26,6 +24,7 @@ import cv2
 class Rec_modes(Enum):
     FBP_CPU = 0
     FBP_GPU = 1
+    MODL_GPU = 2
 
 
 class ReconstructionWidget(QWidget):
@@ -145,8 +144,10 @@ class ReconstructionWidget(QWidget):
         
         @thread_worker(connect={'returned':update_opt_image})
         def _reconstruct():
-            
-            sinos = np.float32(self.get_sinos())
+            '''
+            ToDO: Link projections
+            '''
+            sinos = np.moveaxis(np.float32(self.get_sinos()), 1, 2)
         
             theta, Q, Z = sinos.shape
 
@@ -163,7 +164,7 @@ class ReconstructionWidget(QWidget):
 
             time_in = time()
 
-            for zidx in range(1):
+            for zidx in range(Z):
                 
                 if self.registerbox.val == True:
         

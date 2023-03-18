@@ -6,13 +6,11 @@ from skimage.transform import radon as radon_scikit
 from skimage.transform import iradon as iradon_scikit
 
 from torch_radon import Radon as radon_thrad
-
+from .modl import ToMoDL
 import torch
 import numpy as np
 from napari.layers import Image
 import scipy.ndimage as ndi
-# from torch_radon import Radon, RadonFanbeam
-# from torch_radon.solvers import cg
 import os
 import matplotlib.pyplot as plt 
 import cv2
@@ -27,6 +25,7 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 class Rec_modes(Enum):
     FBP_CPU = 0
     FBP_GPU = 1
+    MODL_GPU = 2
 
 class OPTProcessor:
 
@@ -51,17 +50,16 @@ class OPTProcessor:
         self.init_volume_rec = False
         self.iradon_functor = None
         # This should change depending on the method
-        if self.rec_process == Rec_modes.FBP_CPU.value:
+        if (self.rec_process == Rec_modes.FBP_CPU.value) or (self.rec_process == Rec_modes.MODL_GPU.value):
             
             self.angles_gen = lambda num_angles: np.linspace(0, 2*180, num_angles, endpoint = False)
             self.iradon_function = lambda sino, num_angles: iradon_scikit(sino.T, self.angles_gen(num_angles), circle = False)
         
-        elif self.rec_process == Rec_modes.FBP_GPU.value:
+        elif (self.rec_process == Rec_modes.FBP_GPU.value):
             
             assert(torch.cuda.is_available() == True)
-
             self.angles_gen = lambda num_angles: np.linspace(0, 2*np.pi, num_angles, endpoint = False)
-            
+
 
     def correct_and_reconstruct(self, sinogram: np.ndarray):
         '''
@@ -75,9 +73,10 @@ class OPTProcessor:
         shifts = np.arange(-self.max_shift, self.max_shift, self.shift_step)+self.center_shift
         image_std = []
 
+        print(sinogram.shape)
         for i, shift in enumerate(shifts):
 
-            sino_shift = ndi.shift(sinogram, (shift, 0), mode = 'nearest')
+            sino_shift = ndi.shift(sinogram, (0, shift), mode = 'nearest')
 
             # Get image reconstruction
             shift_iradon = self.reconstruct(sino_shift)
@@ -90,8 +89,9 @@ class OPTProcessor:
         self.max_shift = 5
         self.shift_step = 0.5
 
-    
-        return self.reconstruct(ndi.shift(sinogram, (self.center_shift, 0), mode = 'nearest'))
+        print(self.max_shift, self.shift_step, self.center_shift)
+
+        return np.fliplr(self.reconstruct(ndi.shift(sinogram, (0, self.center_shift), mode = 'nearest')))
 
     def resize(self, sinogram_volume: np.ndarray):
 
@@ -108,9 +108,13 @@ class OPTProcessor:
     def reconstruct(self, sinogram: np.ndarray):
         '''
         Reconstruct with specific method
-        TODO: Include other methods
+        TODO: 
+            * Include methods ToMODL
+            * Optimize GPU usage with tensors
+
         '''
 
+        ## Es un enriedo, pero inicializa los generadores de ángulos. Poco claro
         if self.init_volume_rec == False:
 
             self.angles = self.angles_gen(sinogram.shape[0])   
@@ -127,8 +131,34 @@ class OPTProcessor:
             
             self.iradon_function = lambda sino: iradon_scikit(sino.T, self.angles, circle = False, filter_name = None)
         
-        print(sinogram.shape)
-        print(self.angles)            
+        if self.rec_process == Rec_modes.MODL_GPU.value:
+            
+            resnet_options_dict = {'number_layers': 5,
+                                    'kernel_size':3,
+                                    'features':64,
+                                    'in_channels':1,
+                                    'out_channels':1,
+                                    'stride':1, 
+                                    'use_batch_norm': True,
+                                    'init_method': 'xavier'}
+            
+            self.tomodl_dictionary = {'use_torch_radon': False,
+                                    'metric': 'psnr',
+                                    'K_iterations' : 2,
+                                    'number_projections_total' : sinogram.shape[0],
+                                    'acceleration_factor': 10,
+                                    'image_size': 100,
+                                    'lambda': 0.00001,
+                                    'use_shared_weights': True,
+                                    'denoiser_method': 'resnet',
+                                    'resnet_options': resnet_options_dict,
+                                    'in_channels': 1,
+                                    'out_channels': 1}
+                            
+            self.iradon_functor = ToMoDL(self.tomodl_dictionary)
+    
+            self.iradon_function = lambda sino: self.iradon_functor(torch.Tensor(iradon_scikit(sino.T, self.angles, circle = False, filter_name = None)).to(device).unsqueeze(0).unsqueeze(1))['dc'+str(self.tomodl_dictionary['K_iterations'])].detach().cpu().numpy()
+
         reconstruction = self.iradon_function(sinogram)
 
         return reconstruction

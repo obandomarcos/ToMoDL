@@ -148,7 +148,7 @@ class dw(nn.Module):
         'is_last_layer': False,
         'init_method':self.init_method}
 
-class modl(nn.Module):
+class ToMoDL(nn.Module):
   
   def __init__(self, kw_dictionary):
     """
@@ -163,8 +163,8 @@ class modl(nn.Module):
         - 
 
     """
-    super(modl, self).__init__()
-
+    super(ToMoDL, self).__init__()
+    
     self.process_kwdictionary(kw_dictionary)
     self.define_denoiser()
     
@@ -316,7 +316,7 @@ class Aclass:
             
         while((i<10) and torch.ge(rTr, 1e-6)):
             
-            Ap = A.myAtA(p)
+            Ap = A.forward(p)
             alpha = rTr/torch.sum(p*Ap)
             x = x + alpha*p
             r = r - alpha*Ap

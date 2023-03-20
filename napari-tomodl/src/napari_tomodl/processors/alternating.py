@@ -162,7 +162,7 @@ def TwIST(y, A, AT, tau, kwarg, true_img = None):
   
   # Precompute A'*y since it'll be used a lot
   Aty = AT(y)
-  print('ATy', Aty.shape)
+  # print('ATy', Aty.shape)
   
   # if phi was given, check to see if it is a handle (callable) and that it 
   # accepts two arguments

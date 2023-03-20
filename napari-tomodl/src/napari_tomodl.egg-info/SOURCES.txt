@@ -20,4 +20,6 @@ src/napari_tomodl/_tests/test_widget.py
 src/napari_tomodl/_tests/test_writer.py
 src/napari_tomodl/processors/OPTProcessor.py
 src/napari_tomodl/processors/__init__.py
+src/napari_tomodl/processors/alternating.py
 src/napari_tomodl/processors/modl.py
+src/napari_tomodl/processors/unet.py

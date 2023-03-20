@@ -8,6 +8,7 @@ from skimage.transform import iradon as iradon_scikit
 from torch_radon import Radon as radon_thrad
 from .alternating import TwIST, TVdenoise, TVnorm
 from .modl import ToMoDL
+from .unet import UNet
 import torch
 import numpy as np
 from napari.layers import Image
@@ -187,9 +188,11 @@ class OPTProcessor:
             
         elif self.rec_process == Rec_modes.UNET_GPU.value:    
 
-            pass
-
+            self.iradon_functor = UNet(n_channels = 1,    n_classes= 1, residual = True, up_conv = True, batch_norm = True, batch_norm_inconv = True).to(device)
+            AT_tensor = lambda sino: torch.Tensor(iradon_scikit(sino, self.angles, circle = False, filter_name = None)).to(device).unsqueeze(0).unsqueeze(1)
             
+            self.iradon_function = lambda sino: self.iradon_functor(AT_tensor(sino.T)).detach().cpu().numpy()
+
         reconstruction = self.iradon_function(sinogram)
 
         return reconstruction

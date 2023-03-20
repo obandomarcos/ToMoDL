@@ -1,6 +1,6 @@
 Metadata-Version: 2.1
 Name: napari-tomodl
-Version: 0.0.4
+Version: 0.0.6
 Summary: A plugin for optical projection tomography reconstruction with model-based neural networks.
 Author: Marcos Antonio Obando
 Author-email: marcos.obando@ib.edu.ar

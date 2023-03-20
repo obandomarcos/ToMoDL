@@ -124,7 +124,7 @@ class UNet(nn.Module):
         
         self.residual = residual
         if self.residual is True:
-            self.lam = torch.nn.Parameter(torch.tensor([0.1], requires_grad = True, device = dev))
+            self.lam = torch.nn.Parameter(torch.tensor([0.1], requires_grad = True, device = device))
         self.inc = inconv(n_channels, 64, batch_norm = batch_norm_inconv)
         self.down1 = down(64, 128, batch_norm = batch_norm)
         self.down2 = down(128, 256, batch_norm = batch_norm)

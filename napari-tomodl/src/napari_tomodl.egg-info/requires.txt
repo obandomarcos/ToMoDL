@@ -1,6 +1,11 @@
-numpy
 magicgui
 qtpy
+napari[all]
+pyqt5
+phantominator
+monai
+opencv-python
+scikit-image
 
 [testing]
 tox

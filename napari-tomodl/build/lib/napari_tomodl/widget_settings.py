@@ -7,7 +7,7 @@ from qtpy.QtWidgets import QLabel, QFormLayout, QSpinBox, QDoubleSpinBox, QCheck
 from qtpy.QtCore import Qt
 from enum import Enum, EnumMeta
 
-class Setting():
+class Settings():
     '''
     Auxiliary class to create an numerical or boolean attribute 
     with a corresponding Qwidget (QSpinBox, QDoubleSpinBox or QCheckBox),
@@ -207,7 +207,6 @@ class Combo_box():
             combo.currentIndexChanged.connect(self.write_function)
         # combo.setFixedWidth(width)
         self.combo = combo
-
 
 class BaseEnum(Enum):
     

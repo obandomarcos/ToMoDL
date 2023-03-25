@@ -14,10 +14,6 @@ src/napari_tomodl.egg-info/entry_points.txt
 src/napari_tomodl.egg-info/requires.txt
 src/napari_tomodl.egg-info/top_level.txt
 src/napari_tomodl/_tests/__init__.py
-src/napari_tomodl/_tests/test_reader.py
-src/napari_tomodl/_tests/test_sample_data.py
-src/napari_tomodl/_tests/test_widget.py
-src/napari_tomodl/_tests/test_writer.py
 src/napari_tomodl/processors/OPTProcessor.py
 src/napari_tomodl/processors/__init__.py
 src/napari_tomodl/processors/alternating.py

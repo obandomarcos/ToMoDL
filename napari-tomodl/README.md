@@ -23,6 +23,14 @@ https://napari.org/stable/plugins/index.html
 
 ## Installation
 
+This package requires [torch-radon] for optimized GPU tomographic reconstruction:
+
+    pip install 'torch-radon @ https://rosh-public.s3-eu-west-1.amazonaws.com/radon-v2/cuda-11.1/torch-1.8/torch_radon-2.0.0-cp38-cp38-linux_x86_64.whl'
+
+and `PyTorch == 1.8.0` via wheel, whica can be downloaded and installed with: 
+
+    pip install 'torch @ https://download.pytorch.org/whl/cu111/torch-1.8.0%%2Bcu111-cp38-cp38-linux_x86_64.whl'
+
 You can install `napari-tomodl` via [pip]:
 
     pip install napari-tomodl
@@ -56,6 +64,7 @@ If you encounter any problems, please [file an issue] along with a detailed desc
 [cookiecutter-napari-plugin]: https://github.com/napari/cookiecutter-napari-plugin
 
 [napari]: https://github.com/napari/napari
+[torch-radon]: https://github.com/matteo-ronchetti/torch-radon
 [tox]: https://tox.readthedocs.io/en/latest/
 [pip]: https://pypi.org/project/pip/
 [PyPI]: https://pypi.org/

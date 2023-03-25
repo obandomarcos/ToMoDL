@@ -4,8 +4,8 @@ Created on Tue Feb 2 16:34:41 2023
 """
 #%%
 import os 
-from processors.OPTProcessor import OPTProcessor
-from widget_settings import Settings, Combo_box
+from .processors.OPTProcessor import OPTProcessor
+from .widget_settings import Settings, Combo_box
 #import processors
 import napari
 from qtpy.QtWidgets import QVBoxLayout, QSplitter, QHBoxLayout, QWidget, QPushButton, QLineEdit, QSpinBox, QDoubleSpinBox, QFormLayout, QComboBox, QLabel
@@ -117,7 +117,7 @@ class ReconstructionWidget(QWidget):
             layer = self.viewer.add_image(image_values,
                                             name = fullname,
                                             scale = scale,
-                                            interpolation = 'bilinear')
+                                            interpolation = 'linear')
             return layer
 
     def select_layer(self, sinos:Image):
@@ -165,7 +165,7 @@ class ReconstructionWidget(QWidget):
 
             time_in = time()
 
-            for zidx in range(Z):
+            for zidx in range(1):
                 
                 if self.registerbox.val == True:
         

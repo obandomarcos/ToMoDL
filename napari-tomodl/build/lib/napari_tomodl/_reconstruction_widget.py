@@ -2,110 +2,239 @@
 Created on Tue Feb 2 16:34:41 2023
 @authors: Marcos Obando
 """
-from .widget_settings import Setting, Combo_box
+#%%
+import os 
+from .processors.OPTProcessor import OPTProcessor
+from .widget_settings import Settings, Combo_box
 #import processors
 import napari
-from qtpy.QtWidgets import QVBoxLayout, QSplitter, QHBoxLayout, QWidget, QPushButton, QLineEdit
+from qtpy.QtWidgets import QVBoxLayout, QSplitter, QHBoxLayout, QWidget, QPushButton, QLineEdit, QSpinBox, QDoubleSpinBox, QFormLayout, QComboBox, QLabel
 from qtpy.QtCore import Qt
 from napari.layers import Image
 import numpy as np
 from napari.qt.threading import thread_worker
 from magicgui.widgets import FunctionGui
-from magicgui import magic_factory
+from magicgui import magic_factory, magicgui
 import warnings
-import time
+from time import time
 from superqt.utils import qthrottled
 from enum  import Enum
+import cv2 
 
+class Rec_modes(Enum):
+    FBP_CPU = 0
+    FBP_GPU = 1
+    TWIST_CPU = 2
+    UNET_GPU = 3
+    MODL_GPU = 4
 
 class ReconstructionWidget(QWidget):
     
-    dr = 0.1
+    name = 'Reconstructor'
     
     def __init__(self, viewer:napari.Viewer):
         self.viewer = viewer
         super().__init__()
-        self.create_ui()
-        
-    def create_ui(self):
-        
+        self.setup_ui()
+        # self.viewer.dims.events.current_step.connect(self.select_index)
+    
+    def setup_ui(self):
+
         # initialize layout
         layout = QVBoxLayout()
         self.setLayout(layout)
 
-        # self.angles_number = Setting('angles', dtype=int, initial=1, layout=left_layout, write_function = self.reset_processor)
+        def add_section(_layout,_title):
+            from qtpy.QtCore import Qt
+            splitter = QSplitter(Qt.Vertical)
+            _layout.addWidget(splitter)
+            # _layout.addWidget(QLabel(_title))
+        
 
+        image_layout = QVBoxLayout()
+        add_section(image_layout,'Image selection')
+        layout.addLayout(image_layout)
+        
         self.choose_layer_widget = choose_layer()
         self.choose_layer_widget.call_button.visible = False
-        self.add_magic_function(self.choose_layer_widget, layout)
+        self.add_magic_function(self.choose_layer_widget, image_layout)
         select_button = QPushButton('Select image layer')
         select_button.clicked.connect(self.select_layer)
-        layout.addWidget(select_button)        
-        #create spiboxes for size
+        image_layout.addWidget(select_button)
+
+        settings_layout = QVBoxLayout()
+        add_section(settings_layout,'Settings')
+        layout.addLayout(settings_layout)
+        self.createSettings(settings_layout)
+
+    def createSettings(self, slayout):
         
-        resizebox = QSpinBox()
-        resizeLayout = QFormLayout()
-        resizeLayout.addRow('Reconstruction size', resizebox)
-        layout.addLayout(resizeLayout)
-        self.resizebox = resizebox
+        self.registerbox = Settings('Align axis',
+                                  dtype=bool,
+                                  initial=True, 
+                                  layout=slayout, 
+                                  write_function = self.set_opt_processor)
+        
+
+        self.reshapebox = Settings('Reshape volume',
+                                  dtype=bool,
+                                  initial = True, 
+                                  layout=slayout, 
+                                  write_function = self.set_opt_processor)        
+
+
+        self.resizebox = Settings('Reconstruction size',
+                                  dtype=int, 
+                                  initial=100, 
+                                  layout=slayout, 
+                                  write_function = self.set_opt_processor)
         
         #create combobox for reconstruction method
-        reconbox = QComboBox()
-        
-        reconbox.addItem("FBP (CPU)")
-        reconbox.addItem("FBP (GPU)")
-        reconLayout = QFormLayout()
-        reconLayout.addRow('Reconstruction method', reconbox)
-        layout.addLayout(reconLayout)
-        self.reconbox = reconbox
+        self.reconbox = Combo_box(name ='Reconstruction method',
+                             initial = 'FBP (CPU)',
+                             choices = Rec_modes,
+                             layout = slayout,
+                             write_function = self.set_opt_processor)
 
         # add calculate psf button
         calculate_btn = QPushButton('Reconstruct')
-        calculate_btn.clicked.connect(self.reconstruct)
-        layout.addWidget(calculate_btn)
+        calculate_btn.clicked.connect(self.stack_reconstruction)
+        slayout.addWidget(calculate_btn)
+
+    def show_image(self, image_values, fullname, **kwargs):
         
-    def reconstruct(self):
-        '''
-        Reconstructs images with a certain method chosen from the window list
-        '''
-        self.generate_angles()
+        if 'scale' in kwargs.keys():    
+            scale = kwargs['scale']
+        else:
+            scale = [1.]*image_values.ndim
+        
+        if 'hold' in kwargs.keys() and fullname in self.viewer.layers:
+            
+            self.viewer.layers[fullname].data = image_values
+            self.viewer.layers[fullname].scale = scale
+        
+        else:  
+            layer = self.viewer.add_image(image_values,
+                                            name = fullname,
+                                            scale = scale,
+                                            interpolation = 'linear')
+            return layer
 
-        reconstruct = np.rand.random(20, 100, 100)
-        self.viewer.add_image(reconstruct,
-                         name='Reconstruction',
-                         colormap='twilight')
+    def select_layer(self, sinos:Image):
+        
+        
+        sinos = self.choose_layer_widget.image.value
+        if sinos.data.ndim == 3:
+            
+            self.imageRaw_name = sinos.name
+            sz,sy,sx = sinos.data.shape
+            print(sz, sy, sx)
+            if not hasattr(self, 'h'): 
+                self.start_opt_processor()
+            print(f'Selected image layer: {sinos.name}')
+        
+    def stack_reconstruction(self):
+        
+        def update_opt_image(stack):
+            
+            imname = 'stack_' + self.imageRaw_name
+            self.show_image(stack, fullname=imname)
+                
+            print('Stack reconstruction completed')
+            
+        
+        @thread_worker(connect={'returned':update_opt_image})
+        def _reconstruct():
+            '''
+            ToDO: Link projections
+            '''
+            sinos = np.moveaxis(np.float32(self.get_sinos()), 1, 2)
+        
+            theta, Q, Z = sinos.shape
+
+            if self.reshapebox.val == True:
+                
+                optVolume = np.zeros([
+                    self.resizebox.val, self.resizebox.val, Z], np.float32)
+                sinos = self.h.resize(sinos)
+
+            else:
+                
+                optVolume = np.zeros([
+                    int(np.ceil(Q/np.sqrt(2))), int(np.ceil(Q/np.sqrt(2))), Z], np.float32)
+
+            time_in = time()
+
+            for zidx in range(1):
+                
+                if self.registerbox.val == True:
+        
+                    optVolume[:,:,zidx] = self.h.correct_and_reconstruct(sinos[:,:,zidx])
+                    optVolume[:,:,zidx] = cv2.normalize(optVolume[:,:,zidx], None, alpha=0, beta=1, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F)
+                
+                else:
+                    
+                    optVolume[:,:, zidx] = self.h.reconstruct(sinos[:,:,zidx])
+                    optVolume[:,:,zidx] = cv2.normalize(optVolume[:,:,zidx], None, alpha=0, beta=1, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F)
+
+            print('Min: ', optVolume[:,:, zidx].min(), )
+            print('Max: ', optVolume[:,:, zidx].max())
+            print('Tiempo de cómputo total: {} s'.format(round(time()-time_in, 3)))
+            return np.rollaxis(optVolume, -1)
+
+        _reconstruct()
     
-    def select_layer(self, image: Image):
+    def get_sinos(self):
+        try:
+            print(self.imageRaw_name)
+            return self.viewer.layers[self.imageRaw_name].data
+        except:
+             raise(KeyError(r'Please select a valid 3D image ($\theta$, q, z)'))
+    
+    def set_opt_processor(self, *args):
         '''
-        Selects a Image layer after checking that it contains raw projectrions
-        as a 3D stack (angle,q,z).
-        Stores the name of the image in self.imageRaw_name, which is used frequently in the other methods.
-        Parameters
-        ----------
-        image : napari.layers.Image
-            The image layer to process, it contains the raw data 
-        '''
-
-        image = self.choose_layer_widget.image.value
-        if not isinstance(image, Image):
-            raise(KeyError('Please select a image stack'))
-        if hasattr(self,'imageRaw_name'):
-            delattr(self,'imageRaw_name')
-        data = image.data
-        if data.ndim != 3:
-            raise(KeyError('Please select a 3D image'))
-
-    def generate_angles(self):
-        '''
-        Generate according angles for reconstruction
+        Sets OPT reconstruction arguments
         '''
 
-        self.angles = np.linspace(0., 180., 100, endpoint=False)
+        if hasattr(self, 'h'):
+            
+            self.h.resize_val = self.resizebox.val
+            self.h.resize_bool = self.reshapebox.val
+            self.h.register_bool = self.registerbox.val
+            self.h.rec_process = self.reconbox.current_data
+            print(self.h.rec_process)
 
-        pass
+            self.h.set_reconstruction_process()
+            print(self.h.iradon_function)
+
+    def start_opt_processor(self):     
+        self.isCalibrated = False
+        
+        if hasattr(self, 'h'):
+            self.stop_opt_processor()
+            self.start_opt_processor()
+        else:
+            
+            self.h = OPTProcessor() 
+
+    def stop_opt_processor(self):
+        if hasattr(self, 'h'):
+            delattr(self, 'h')
+
+    def reset_processor(self,*args):
+        
+        self.isCalibrated = False
+        self.stop_opt_processor()
+        self.start_opt_processor() 
 
     def add_magic_function(self, widget, _layout):
 
         self.viewer.layers.events.inserted.connect(widget.reset_choices)
         self.viewer.layers.events.removed.connect(widget.reset_choices)
         _layout.addWidget(widget.native)
+
+@magic_factory
+def choose_layer(image: Image):
+        pass #TODO: substitute with a qtwidget without magic functions
+
+

@@ -114,7 +114,7 @@ if use_default_model_dict == True:
                         'track_test': True,
                         'max_epochs':40, 
                         'load_path': '',
-                        'save_path': '',
+                        'save_path': 'MoDL_FA{}'.format(1),
                         'tv_iters': 5,
                         'metrics_folder': where_am_i('metrics'),
                         'models_folder': where_am_i('models'),
@@ -187,9 +187,10 @@ if use_default_dataloader_dict == True:
                         'sampling_method' : 'equispaced-linear',
                         'shuffle_data' : True,
                         'data_transform' : data_transform,
-                        'num_workers' : 8}
+                        'num_workers' : 8,
+                        'use_subset_by_part' :False}
 
-artifact_names_psnr = ['model-3dp1wex6:v0', 'model-2jwf0rwa:v0', 'model-1qtf5f8u:v0', 'model-2nxos558:v0']
+artifact_names_psnr = ['model-3dp1wex6:v0']
 
 dataset_list = ['/home/obanmarcos/Balseiro/DeepOPT/datasets/x26/140114_5dpf_lower tail_26', '/home/obanmarcos/Balseiro/DeepOPT/datasets/x26/140315_1dpf_head_26', '/home/obanmarcos/Balseiro/DeepOPT/datasets/x26/140114_5dpf_body_26', '/home/obanmarcos/Balseiro/DeepOPT/datasets/x26/140114_5dpf_head_26', '/home/obanmarcos/Balseiro/DeepOPT/datasets/x26/140315_3dpf_head_26', '/home/obanmarcos/Balseiro/DeepOPT/datasets/x26/140117_3dpf_head_26', '/home/obanmarcos/Balseiro/DeepOPT/datasets/x26/140519_5dpf_head_26', '/home/obanmarcos/Balseiro/DeepOPT/datasets/x26/140117_3dpf_lower tail_26', '/home/obanmarcos/Balseiro/DeepOPT/datasets/x26/140114_5dpf_upper tail_26', '/home/obanmarcos/Balseiro/DeepOPT/datasets/x26/140714_5dpf_head_26', '/home/obanmarcos/Balseiro/DeepOPT/datasets/x26/140117_3dpf_body_26', '/home/obanmarcos/Balseiro/DeepOPT/datasets/x26/140117_3dpf_upper tail_26']
 
@@ -250,19 +251,17 @@ if __name__ == '__main__':
         
         if i == batch_idx:
             break
-
+    
     unfiltered_us_rec_image = normalize_01(unfiltered_us_rec[idx,0,...].cpu().numpy())
     filtered_us_rec_image = normalize_01(filtered_us_rec[idx,0,...].cpu().numpy())
     filtered_fs_rec_image = normalize_01(filtered_fs_rec[idx,0,...].cpu().numpy())
-    modl_reconstructed = normalize_01(model(unfiltered_us_rec.to(device))[idx,0,...].detach().cpu().numpy())
+    modl_reconstructed = normalize_01(model(unfiltered_us_rec.to(device))['dc'+str(model.model.K)][idx,0,...].detach().cpu().numpy())
 
     alt_input = (unfiltered_us_rec[idx,0,...].cpu().numpy().T - unfiltered_us_rec[idx,0,...].cpu().numpy().T.mean())/unfiltered_us_rec[idx,0,...].cpu().numpy().T.std()
     alt_true = (filtered_fs_rec[idx,0,...].cpu().numpy().T - filtered_fs_rec[idx,0,...].cpu().numpy().T.mean())/filtered_fs_rec[idx,0,...].cpu().numpy().T.std()
     
-    twist_rec = normalize_01(model.TwIST(alt_input, alt_true)[0])
-    admm_rec = normalize_01(model.ADMM(alt_input, alt_true)[0])
     
-    images = [filtered_fs_rec_image, unfiltered_us_rec_image, filtered_us_rec_image,  modl_reconstructed, twist_rec.T, admm_rec.T]
+    images = [filtered_fs_rec_image, unfiltered_us_rec_image, filtered_us_rec_image,  modl_reconstructed]
 
     # Boxes
     c_green = [0, 0]
@@ -278,7 +277,7 @@ if __name__ == '__main__':
     titles = ['Filtered backprojection - \nFully Sampled\n',
               'Unfiltered backprojection - \nUndersampled\n', 
               'Filtered backprojection - \nUndersampled X22\n',
-              'MoDL reconstruction\n', 'TwIST reconstruction\n', 'ADMM reconstruction\n']
+              'MoDL reconstruction\n']
 
     metrics = ['']+[
                'SSIM: {}\n PSNR (Box Green): {} dB\n PSNR (Box Red): {} dB'.format(round(ssim(images[0], image), 2), psnr_per_box(images[0], image, box_green), psnr_per_box(images[0], image, box_red)) for image in images[1:]]

@@ -1,0 +1,14 @@
+method: bayes
+metric:
+  goal: maximize
+  name: val/loss_mean
+parameters:
+  K_iterations:
+    distribution: int_uniform
+    max: 10
+    min: 4
+  number_layers:
+    distribution: int_uniform
+    max: 10
+    min: 4
+program: scripts/0-HyperParams.py

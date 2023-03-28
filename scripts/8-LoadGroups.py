@@ -38,7 +38,7 @@ use_default_model_dict = True
 use_default_dataloader_dict = True
 use_default_trainer_dict = True
 
-acceleration_factor = 22
+acceleration_factor = 2
 
 if use_default_model_dict == True:
     # ResNet dictionary parameters
@@ -48,18 +48,17 @@ if use_default_model_dict == True:
                         'in_channels':1,
                         'out_channels':1,
                         'stride':1, 
-                        'use_batch_norm': False,
+                        'use_batch_norm': True,
                         'init_method': 'xavier'}
 
     # Model parameters
     modl_dict = {'use_torch_radon': False,
-                'number_layers': 8,
+                'metric': 'psnr',
                 'K_iterations' : 8,
                 'number_projections_total' : 720,
-                'number_projections_undersampled' : 720//acceleration_factor, 
                 'acceleration_factor': acceleration_factor,
                 'image_size': 100,
-                'lambda': 0.05,
+                'lambda': 0.025,
                 'use_shared_weights': True,
                 'denoiser_method': 'resnet',
                 'resnet_options': resnet_options_dict,
@@ -77,14 +76,27 @@ if use_default_model_dict == True:
                     'lr': 1e-4}
 
     # System parameters
-    model_system_dict = {'optimizer_dict': optimizer_dict,
-                        'kw_dictionary_modl': modl_dict,
-                        'loss_dict': loss_dict, 
-                        'method':'unet',                       
-                        'track_train': True,
-                        'track_val': True,
-                        'track_test': True,
-                        'max_epochs':40}
+    model_system_dict = {'acc_factor_data': 1,
+                    'use_normalize': True,
+                    'optimizer_dict': optimizer_dict,
+                    'kw_dictionary_modl': modl_dict,
+                    'loss_dict': loss_dict, 
+                    'method':'modl',                       
+                    'track_train': True,
+                    'track_val': True,
+                    'track_test': True,
+                    'max_epochs': 20, 
+                    'save_model':True,
+                    'load_path': '',
+                    'save_path': 'MoDL_K_fold_{}',
+                    'track_alternating_admm':False,
+                    'tv_iters': 40,
+                    'title': 'HyperParams_Search',
+                    'metrics_folder': where_am_i('metrics'),
+                    'models_folder': where_am_i('models'),
+                    'track_alternating_admm': False,         
+                    'track_alternating_twist': False,
+                    'track_unet': False}
 
 # PL Trainer and W&B logger dictionaries
 if use_default_trainer_dict == True:
@@ -93,14 +105,14 @@ if use_default_trainer_dict == True:
                     'entity': 'omarcos', 
                     'log_model': True}
 
-    lightning_trainer_dict = {'max_epochs': 40,
+    lightning_trainer_dict = {'max_epochs': 25,
                                 'log_every_n_steps': 10,
                                 'check_val_every_n_epoch': 1,
-                                'gradient_clip_val' : 0.5,
+                                'gradient_clip_val' : 1,
                                 'accelerator' : 'gpu', 
                                 'devices' : 1,
                                 'fast_dev_run' : False,
-                                'default_root_dir': model_folder}
+                                'default_root_dir': where_am_i('models')}
 
     profiler = None
     # profiler = SimpleProfiler(dirpath = './logs/', filename = 'Test_training_profile_pytorch')
@@ -108,23 +120,21 @@ if use_default_trainer_dict == True:
 
     trainer_dict = {'lightning_trainer_dict': lightning_trainer_dict,
                     'use_k_folding': True, 
-                    'track_checkpoints': False,
+                    'track_checkpoints': True,
                     'epoch_number_checkpoint': 10,
                     'use_swa' : False,
                     'use_accumulate_batches': False,
-                    'k_fold_number_datasets': 3,
-                    'use_logger' : False,
-                    'resume':'allow',
+                    'k_fold_number_datasets': 2,
+                    'use_logger' : True,
                     'logger_dict': logger_dict,
-                    'track_default_checkpoints'  : False,
+                    'track_default_checkpoints'  : True,
                     'use_auto_lr_find': False,
                     'batch_accumulate_number': 3,
                     'use_mixed_precision': False,
                     'batch_accumulation_start_epoch': 0, 
-                    'profiler': profiler,
+                    'profiler': profiler, 
                     'restore_fold': False,
-                    'fold_number_restore': 2,
-                    'acc_factor_restore': 22}
+                    'resume': False}
 
 # Dataloader dictionary
 if use_default_dataloader_dict == True:
@@ -132,14 +142,14 @@ if use_default_dataloader_dict == True:
     # data_transform = T.Compose([T.ToTensor()])
     data_transform = None                                    
     
-    dataloader_dict = {'datasets_folder': datasets_folder,
+    dataloader_dict = {'datasets_folder': where_am_i('datasets'),
                         'number_volumes' : 0,
                         'experiment_name': 'Bassi',
                         'img_resize': 100,
                         'load_shifts': True,
                         'save_shifts':False,
                         'number_projections_total': 720,
-                        'number_projections_undersampled': 720//acceleration_factor,
+                        'number_projections_undersampled': 72,
                         'acceleration_factor':acceleration_factor,
                         'train_factor' : 0.8, 
                         'val_factor' : 0.2,
@@ -148,13 +158,12 @@ if use_default_dataloader_dict == True:
                         'sampling_method' : 'equispaced-linear',
                         'shuffle_data' : True,
                         'data_transform' : data_transform,
-                        'num_workers' : 8}
+                        'num_workers':16,
+                        'use_subset_by_part': False}
 
-artifact_names_x26_psnr = [
-'model-32wj43mf:v0', 'model-3kmtjdm4:v0' ,'model-3l028zex:v0', 'model-2jnmr8t0:v0']
-artifact_names_x22_psnr = ['model-3dp1wex6:v0', 'model-2jwf0rwa:v0', 'model-1qtf5f8u:v0', 'model-2nxos558:v0']
+artifact_names_x22_psnr = ['model-14cjgco7:v0']
 
-dataset_list_x22 = ['140315_3dpf_head_22', '140114_5dpf_head_22', '140519_5dpf_head_22', '140117_3dpf_body_22', '140114_5dpf_upper tail_22', '140315_1dpf_head_22', '140114_5dpf_lower tail_22', '140714_5dpf_head_22', '140117_3dpf_head_22', '140117_3dpf_lower tail_22', '140117_3dpf_upper tail_22', '140114_5dpf_body_22']
+dataset_list_x22 = ['140315_3dpf_head_{}', '140114_5dpf_head_{}', '140519_5dpf_head_{}', '140117_3dpf_body_{}', '140114_5dpf_upper tail_{}', '140315_1dpf_head_{}', '140114_5dpf_lower tail_{}', '140714_5dpf_head_{}', '140117_3dpf_head_{}', '140117_3dpf_lower tail_{}', '140117_3dpf_upper tail_{}', '140114_5dpf_body_{}']
 
 if __name__ == '__main__':
     
@@ -164,6 +173,7 @@ if __name__ == '__main__':
     run_name = 'test_metrics_kfold_x{}'.format(acceleration_factor)
     metric = 'psnr'
     dataset_list = dataset_list_x22 
+    dataset_list = [where_am_i('datasets')+'x{}/'.format(acceleration_factor)+dataset.format(acceleration_factor) for dataset in dataset_list]
 
     user_project_name = 'omarcos/deepopt/'
 
@@ -183,9 +193,9 @@ if __name__ == '__main__':
 
         trainer = trainer_system.create_trainer()
 
-        test_dict = trainer.test(model = model, dataloaders = test_dataloader)[0]    
+        test_dict = trainer.test(model = model, dataloaders = test_dataloader, verbose = True)    
         
-        # # print(test_dict)
+        print(test_dict)
         # # TO-DO: Agregar U-Net y métodos alternantes
 
         for (key, number) in trainer_system.kfold_monitor_dict[trainer_system.current_fold]['test']['fish_part'].items():

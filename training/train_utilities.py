@@ -188,7 +188,9 @@ class TrainerSystem():
         if self.number_volumes != 0:
 
             self.folders_datasets_list = self.folders_datasets_list[:self.number_volumes]
-            
+        
+        else:
+            self.number_volumes = len(self.folders_datasets_list)
         # Number of datasets defines splitting number between train/val and test datasets
         if self.use_k_folding == True:
             
@@ -236,8 +238,9 @@ class TrainerSystem():
         Monitor K-Fold datasets, parsing its structure
         '''
         
-        self.kfold_monitor_dict[self.current_fold] = {'k_fold':self.current_fold, 'train/val' : self.__parse_dataset_list(train_val_datasets),
-                                                 'test' : self.__parse_dataset_list(test_datasets)}
+        self.kfold_monitor_dict[self.current_fold] = {'k_fold':self.current_fold, 
+                                                      'train/val' : self.__parse_dataset_list(train_val_datasets),
+                                                      'test' : self.__parse_dataset_list(test_datasets)}
 
         # print(self.kfold_monitor_dict[self.current_fold])
         # wandb.log({'dataset_monitor': self.kfold_monitor_dict[self.current_fold]})
@@ -275,9 +278,17 @@ class TrainerSystem():
             # Rotate datasets
             self.rotate_list(self.folders_datasets_list, self.k_fold_number_datasets)
 
-        # Load each dataset in Dataset class (torch.utils.data.Dataset)
-        train_val_datasets_folders = self.folders_datasets_list[:self.datasets_number-self.k_fold_number_datasets].copy()
-        test_datasets_folders = self.folders_datasets_list[self.datasets_number-self.k_fold_number_datasets:].copy()
+        if self.number_volumes*self.test_factor > 1:
+            # Load each dataset in Dataset class (torch.utils.data.Dataset)
+            print('Using independent datasets...')
+            train_val_datasets_folders = self.folders_datasets_list[:self.datasets_number-self.k_fold_number_datasets].copy()
+            test_datasets_folders = self.folders_datasets_list[self.datasets_number-self.k_fold_number_datasets:].copy()
+
+        else:
+            # Load each dataset in Dataset class (torch.utils.data.Dataset)
+            print('Using same datasets (error checking)...')
+            train_val_datasets_folders = self.folders_datasets_list[:self.datasets_number].copy()
+            test_datasets_folders = self.folders_datasets_list[:self.datasets_number].copy()
 
         print('Train/Val folders in use...')
         print(train_val_datasets_folders)

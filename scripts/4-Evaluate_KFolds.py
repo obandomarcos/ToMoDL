@@ -144,7 +144,7 @@ def eval_models(testing_options):
         test_model = MoDLReconstructor.load_from_checkpoint(checkpoint_path, kw_dictionary_model_system = model_system_dict)
         print(test_model)
 
-    return
+        
 
 if __name__ == '__main__':
 

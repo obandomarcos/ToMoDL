@@ -138,7 +138,7 @@ class OPTProcessor:
         
         elif self.rec_process == Rec_modes.MODL_GPU.value:
             
-            resnet_options_dict = {'number_layers': 5,
+            resnet_options_dict = {'number_layers': 8,
                                     'kernel_size':3,
                                     'features':64,
                                     'in_channels':1,

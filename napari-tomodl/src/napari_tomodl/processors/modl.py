@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-# from . import unet
+from . import unet
 
 # Modify for multi-gpu
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -98,7 +98,8 @@ class dw(nn.Module):
             
             self.dw_layer_dict['weights_size'] = self.weights_size[i]
 
-            if i == self.number_layers:
+            if i == self.number_layers-1:
+                print('last layer')
                 self.dw_layer_dict['is_last_layer']= True
 
             self.nw['c'+str(i)] = dwLayer(self.dw_layer_dict)
@@ -124,7 +125,7 @@ class dw(nn.Module):
 
     def process_kwdictionary(self, kw_dictionary):
         '''
-            Process keyword dictionary.
+        Process keyword dictionary.
         Params: 
             - kw_dictionary (dict): Dictionary with keywords
         '''
@@ -148,7 +149,7 @@ class dw(nn.Module):
         'is_last_layer': False,
         'init_method':self.init_method}
 
-class ToMoDL(nn.Module):
+class modl(nn.Module):
   
   def __init__(self, kw_dictionary):
     """
@@ -163,8 +164,8 @@ class ToMoDL(nn.Module):
         - 
 
     """
-    super(ToMoDL, self).__init__()
-    
+    super(modl, self).__init__()
+
     self.process_kwdictionary(kw_dictionary)
     self.define_denoiser()
     
@@ -176,22 +177,21 @@ class ToMoDL(nn.Module):
     """
     
     self.out['dc0'] = x
-    j = str(0)
-    
+
     for i in range(1,self.K+1):
     
         j = str(i)
         
-        self.out['dw'+j] = self.dw.forward(self.out['dc'+str(i-1)])
-        rhs = x+self.lam*self.out['dw'+j]
+        self.out['dw'+j] = normalize_images(self.dw.forward(self.out['dc'+str(i-1)]))
+        # print('output dw forward: {} {}'.format(self.out['dw'+j].max(), self.out['dw'+j].min()))
+        rhs = x/self.lam+self.out['dw'+j]
 
-        self.out['dc'+j] = self.AtA.inverse(rhs)
+        self.out['dc'+j] = normalize_images(self.AtA.inverse(rhs))
         
-        torch.cuda.empty_cache()
         del rhs
 
-    self.out['dc'+j] = normalize_images(self.out['dc'+j])    
- 
+        torch.cuda.empty_cache()
+
     return self.out
   
   def process_kwdictionary(self, kw_dictionary):
@@ -205,10 +205,12 @@ class ToMoDL(nn.Module):
     self.use_torch_radon = kw_dictionary['use_torch_radon']
     self.K = kw_dictionary['K_iterations']
     self.number_projections_total = kw_dictionary['number_projections_total']
+    self.acceleration_factor = kw_dictionary['acceleration_factor']
+    self.number_projections_undersampled = self.number_projections_total//self.acceleration_factor
     self.image_size = kw_dictionary['image_size'] 
     
     self.lam = kw_dictionary['lambda']
-    self.lam = self.lam = torch.nn.Parameter(torch.tensor([self.lam], requires_grad = True, device = device))
+    self.lam = torch.nn.Parameter(torch.tensor([self.lam], requires_grad = True, device = device))
     
     self.use_shared_weights = kw_dictionary['use_shared_weights']
     self.denoiser_method = kw_dictionary['denoiser_method']
@@ -265,7 +267,7 @@ class Aclass:
         self.lam = kw_dictionary['lambda']
         self.use_torch_radon = kw_dictionary['use_torch_radon']
         self.angles = np.linspace(0, 2*np.pi, self.number_projections,endpoint = False)
-        self.det_count = int(np.ceil(np.sqrt(2)*self.img_size))
+        self.det_count = int(np.sqrt(2)*self.img_size+0.5)
         self.radon = Radon(self.img_size, self.angles, clip_to_circle = False, det_count = self.det_count)
         
     def forward(self, img):
@@ -278,8 +280,11 @@ class Aclass:
         sinogram = self.radon.forward(img)/self.img_size 
         iradon = self.radon.backprojection(sinogram)*np.pi/self.number_projections
         del sinogram
-        output = iradon/self.lam+img
-        
+        output = iradon+self.lam*img
+        # print('output forward: {} {}'.format(output.max(), output.min()))
+        # print('Term z max {}, min {}'.format((iradon/self.lam).max(), (iradon/self.lam).min()))
+        # print('Term input max {}, min {}'.format(img.max(), img.min()))
+        # print('Term output max {}, min {}'.format(output.max(), output.min()))
         return output
     
     def inverse(self, rhs):
@@ -288,17 +293,19 @@ class Aclass:
         Params: 
             - rhs (torch.Tensor): Right-hand side tensor for applying inversion of (A^H A + lam*I) operator
         """
-    
+
         y = torch.zeros_like(rhs)
 
         for i in range(rhs.shape[0]):
 
             if self.use_torch_radon == False:
+                
                 y[i,0,:,:] = self.conjugate_gradients(self.forward, rhs[i,0,:,:]) # This indexing may fail
-            
+             
             else:
+                
                 y[i,0,:,:] = cg(self.forward, torch.zeros_like(rhs[i,0,:,:]), rhs[i, 0, :,:])
-
+        
         return y
     
     @staticmethod
@@ -307,13 +314,14 @@ class Aclass:
         """
         My implementation of conjugate gradients in PyTorch
         """
+
         i = 0
         x = torch.zeros_like(rhs)
         r = rhs 
         p = rhs 
         rTr = torch.sum(r*r)
-            
-        while((i<10) and torch.ge(rTr, 1e-6)):
+        
+        while((i<10) and torch.ge(rTr, 1e-5)):
             
             Ap = A(p)
             alpha = rTr/torch.sum(p*Ap)
@@ -325,8 +333,7 @@ class Aclass:
             i += 1
             rTr = rTrNew
 
-        torch.cuda.empty_cache()
-
+        # print('output CG: {} {}'.format(x.max(), x.min()))
         return x
 
 def normalize_images(images):
@@ -338,8 +345,11 @@ def normalize_images(images):
     
     image_norm = torch.zeros_like(images)
 
-    for i, img in enumerate(images):
-         
-        image_norm[i,...] = (img - img.min())/(img.max()-img.min())
+
+    for i, image in enumerate(images):
+
+        # print(image.max())
+        image = (image-image.mean())/image.std()
+        image_norm[i,...] = ((image - image.min())/(image.max()-image.min()))
 
     return image_norm

@@ -20,13 +20,14 @@ from time import time
 from superqt.utils import qthrottled
 from enum  import Enum
 import cv2 
+import matplotlib.pyplot as plt
 
 class Rec_modes(Enum):
     FBP_CPU = 0
     FBP_GPU = 1
     TWIST_CPU = 2
     UNET_GPU = 3
-    MODL_GPU = 4
+    TOMODL = 4
 
 class ReconstructionWidget(QWidget):
     
@@ -148,10 +149,11 @@ class ReconstructionWidget(QWidget):
             '''
             ToDO: Link projections
             '''
-            sinos = np.moveaxis(np.float32(self.get_sinos()), 1, 2)
+            sinos = np.float32(self.get_sinos())
         
             theta, Q, Z = sinos.shape
 
+            print(sinos.shape)
             if self.reshapebox.val == True:
                 
                 optVolume = np.zeros([
@@ -168,12 +170,13 @@ class ReconstructionWidget(QWidget):
             for zidx in range(1):
                 
                 if self.registerbox.val == True:
-        
+                    
                     optVolume[:,:,zidx] = self.h.correct_and_reconstruct(sinos[:,:,zidx])
                     optVolume[:,:,zidx] = cv2.normalize(optVolume[:,:,zidx], None, alpha=0, beta=1, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F)
                 
                 else:
                     
+                    cv2.imwrite('sinossss.jpg', sinos[:,:,zidx])
                     optVolume[:,:, zidx] = self.h.reconstruct(sinos[:,:,zidx])
                     optVolume[:,:,zidx] = cv2.normalize(optVolume[:,:,zidx], None, alpha=0, beta=1, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F)
 

@@ -6,7 +6,13 @@ This code creates the model described in MoDL: Model-Based Deep Learning Archite
 import torch
 import torch.nn as nn
 import numpy as np
-from torch_radon import Radon, RadonFanbeam
+try:
+    from torch_radon import Radon, RadonFanbeam
+except ImportError:
+    pass
+
+from skimage.transform import radon, iradon
+
 from torch_radon.solvers import cg
 import matplotlib.pyplot as plt 
 import torch
@@ -15,7 +21,7 @@ import torch.nn.functional as F
 from . import unet
 
 # Modify for multi-gpu
-device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+device = torch.device("cpu")
 
 class dwLayer(nn.Module):
     """
@@ -103,7 +109,6 @@ class dw(nn.Module):
                 self.dw_layer_dict['is_last_layer']= True
 
             self.nw['c'+str(i)] = dwLayer(self.dw_layer_dict)
-            self.nw['c'+str(i)].cuda(device)
 
         self.nw = nn.ModuleDict(self.nw)
           
@@ -149,7 +154,7 @@ class dw(nn.Module):
         'is_last_layer': False,
         'init_method':self.init_method}
 
-class modl(nn.Module):
+class ToMoDL(nn.Module):
   
   def __init__(self, kw_dictionary):
     """
@@ -164,7 +169,7 @@ class modl(nn.Module):
         - 
 
     """
-    super(modl, self).__init__()
+    super(ToMoDL, self).__init__()
 
     self.process_kwdictionary(kw_dictionary)
     self.define_denoiser()
@@ -246,10 +251,6 @@ class modl(nn.Module):
             self.dw = dw(self.resnet_options)
         else:
             self.dw = nn.ModuleList([dw(self.resnet_options) for _ in range(self.K)])
-    
-    # Move to device
-    if torch.cuda.is_available():
-        self.dw.cuda(device)
 
 class Aclass:
     """
@@ -268,8 +269,31 @@ class Aclass:
         self.use_torch_radon = kw_dictionary['use_torch_radon']
         self.angles = np.linspace(0, 2*np.pi, self.number_projections,endpoint = False)
         self.det_count = int(np.sqrt(2)*self.img_size+0.5)
-        self.radon = Radon(self.img_size, self.angles, clip_to_circle = False, det_count = self.det_count)
         
+        if self.use_torch_radon == True:
+            self.radon = Radon(self.img_size, self.angles, clip_to_circle = False, det_count = self.det_count)
+        else:
+            class Radon:
+                def __init__(self, num_angles, circle=True):
+                    self.num_angles = num_angles
+                    self.circle = circle
+                
+                def forward(self, image):
+                    # Compute the Radon transform of the image
+                    image = image.detach().cpu().numpy()
+                    sinogram = radon(image, theta=np.linspace(0, 180, self.num_angles), circle=self.circle)
+                    sinogram = torch.tensor(sinogram)
+                    return sinogram
+                
+                def backprojection(self, sinogram):
+                    # Compute the backprojection of the sinogram
+                    sinogram = sinogram.detach().cpu().numpy()
+                    reconstruction = iradon(sinogram, theta=np.linspace(0, 2*180, self.num_angles), circle=self.circle, filter_name=None)
+                    reconstruction = torch.tensor(reconstruction)
+                    return reconstruction
+            
+            self.radon = Radon(self.number_projections, circle=False)
+
     def forward(self, img):
         """
         Applies the operator (A^H A + lam*I) to image, where A is the forward Radon transform.
@@ -297,14 +321,8 @@ class Aclass:
         y = torch.zeros_like(rhs)
 
         for i in range(rhs.shape[0]):
-
-            if self.use_torch_radon == False:
                 
-                y[i,0,:,:] = self.conjugate_gradients(self.forward, rhs[i,0,:,:]) # This indexing may fail
-             
-            else:
-                
-                y[i,0,:,:] = cg(self.forward, torch.zeros_like(rhs[i,0,:,:]), rhs[i, 0, :,:])
+            y[i,0,:,:] = self.conjugate_gradients(self.forward, rhs[i,0,:,:]) # This indexing may fail
         
         return y
     

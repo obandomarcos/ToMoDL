@@ -22,14 +22,16 @@ for k, v in os.environ.items():
     if k.startswith("QT_") and "cv2" in v:
         del os.environ[k]
 
-device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+device = torch.device("cpu")
+
+CKPT_PATH = '/home/obanmarcos/Balseiro/DeepOPT/napari-tomodl/src/napari_tomodl/models/d6e28ea476841c414f091b2abc282067'
 
 class Rec_modes(Enum):
     FBP_CPU = 0
     FBP_GPU = 1
     TWIST_CPU = 2
     UNET_GPU = 3
-    MODL_GPU = 4
+    TOMODL = 4
 
 
 class OPTProcessor:
@@ -119,6 +121,7 @@ class OPTProcessor:
 
         '''
 
+        print(sinogram.shape)
         ## Es un enriedo, pero inicializa los generadores de ángulos. Poco claro
         if self.init_volume_rec == False:
 
@@ -134,9 +137,9 @@ class OPTProcessor:
 
         elif self.rec_process == Rec_modes.FBP_CPU.value:
             
-            self.iradon_function = lambda sino: iradon_scikit(sino.T, self.angles, circle = False, filter_name = None)
+            self.iradon_function = lambda sino: iradon_scikit(sino.T, self.angles, circle = False)
         
-        elif self.rec_process == Rec_modes.MODL_GPU.value:
+        elif self.rec_process == Rec_modes.TOMODL.value:
             
             resnet_options_dict = {'number_layers': 8,
                                     'kernel_size':3,
@@ -149,18 +152,21 @@ class OPTProcessor:
             
             self.tomodl_dictionary = {'use_torch_radon': False,
                                     'metric': 'psnr',
-                                    'K_iterations' : 2,
+                                    'K_iterations' : 8,
                                     'number_projections_total' : sinogram.shape[0],
-                                    'acceleration_factor': 10,
-                                    'image_size': 100,
-                                    'lambda': 0.00001,
+                                    'acceleration_factor': 22,
+                                    'image_size': self.resize_val,
+                                    'lambda': 0.05,
                                     'use_shared_weights': True,
                                     'denoiser_method': 'resnet',
                                     'resnet_options': resnet_options_dict,
                                     'in_channels': 1,
                                     'out_channels': 1}
-                            
+            
+            checkpoint = torch.load(CKPT_PATH)
+
             self.iradon_functor = ToMoDL(self.tomodl_dictionary)
+            self.iradon_functor.load_state_dict(checkpoint['state_dict'], strict=False)
     
             self.iradon_function = lambda sino: self.iradon_functor(torch.Tensor(iradon_scikit(sino.T, self.angles, circle = False, filter_name = None)).to(device).unsqueeze(0).unsqueeze(1))['dc'+str(self.tomodl_dictionary['K_iterations'])].detach().cpu().numpy()
 

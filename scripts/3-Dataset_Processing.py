@@ -22,7 +22,7 @@ def process_datasets(args_options):
     
     folder_paths = [f140115_1dpf, f140315_3dpf, f140419_5dpf, f140714_5dpf, f140117_3dpf, f140114_5dpf]
 
-    zebra_dataset_dict = {'dataset_folder':datasets_folder,
+    zebra_dataset_dict = {'dataset_folder':'/data/marcos/datasets',
                           'experiment_name':'Bassi',
                           'img_resize' :100,
                           'load_shifts':True,

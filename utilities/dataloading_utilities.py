@@ -280,10 +280,6 @@ class DatasetProcessor:
     reconstructed_dataset_folder = self.dataset_folder+'/x'+str(self.acceleration_factor)+'/'+self.folder_name+'_'+sample+'_'+str(self.acceleration_factor)+'/'
 
     # Try to build datafolder if it doesn't exist, otherwise assume that it is already available.
-    try:
-      Path(reconstructed_dataset_folder).mkdir(parents=True)
-    except FileExistsError:
-      return 
 
     us_unfiltered_dataset_folder = reconstructed_dataset_folder+'us_{}_unfiltered/'.format(self.acceleration_factor)
     fs_filtered_dataset_folder = reconstructed_dataset_folder+'fs_filtered/'
@@ -297,6 +293,7 @@ class DatasetProcessor:
     write_fs_filtered = os.path.isdir(fs_filtered_dataset_folder)
     write_us_filtered = os.path.isdir(us_filtered_dataset_folder)
     
+    print(write_us_filtered, us_filtered_dataset_folder)
     # Grab full sinogram
     full_sinogram = self.registered_volume[sample].astype(float)
 
@@ -317,6 +314,7 @@ class DatasetProcessor:
         if write_us_filtered == True:
           # Undersampled filtered reconstructed image path
           us_filtered_img_path = us_filtered_dataset_folder+sinogram_slice+'.jpg'
+          us_filtered_img_torch_path = us_filtered_dataset_folder+sinogram_slice+'.pt'
           
           # Normalization of input sinogram - Undersampled
           us_filtered_img = self.radon.backward(self.radon.filter_sinogram(us_sinogram))
@@ -324,12 +322,15 @@ class DatasetProcessor:
           
           # Write undersampled filtered
           thumbs =cv2.imwrite(us_filtered_img_path, 255.0*us_filtered_img.cpu().detach().numpy())
+          
+          torch.save(us_filtered_img.unsqueeze(0), us_filtered_img_torch_path)
           print(thumbs)
-        
+          
         if write_us_unfiltered == True: 
           print('Slice {sinogram_slice} escrita\n') 
           # Undersampled unfiltered reconstructed image path
           us_unfiltered_img_path = us_unfiltered_dataset_folder+sinogram_slice+'.jpg'
+          us_unfiltered_img_torch_path = us_unfiltered_dataset_folder+sinogram_slice+'.pt'
 
           # Normalize 0-1 under sampled sinogram
           us_sinogram = self.normalize_image(us_sinogram)
@@ -339,6 +340,8 @@ class DatasetProcessor:
 
           # Write undersampled filtered
           thumbs = cv2.imwrite(us_unfiltered_img_path,255.0*us_unfiltered_img.cpu().detach().numpy())
+          
+          torch.save(us_unfiltered_img.unsqueeze(0), us_unfiltered_img_torch_path)
           print(thumbs)
         
         if write_fs_filtered == True:
@@ -346,11 +349,15 @@ class DatasetProcessor:
           print('Slice {sinogram_slice} escrita\n')
           # Fully sampled filtered reconstructed image path
           fs_filtered_img_path = fs_filtered_dataset_folder+sinogram_slice+'.jpg'
+          fs_filtered_img_torch_path = fs_filtered_dataset_folder+sinogram_slice+'.pt'
+          
           # Normalization of output sinogram - Fully sampled
           fs_filtered_img = self.radon.backward(self.radon.filter_sinogram(full_sinogram))
           fs_filtered_img = self.normalize_image(fs_filtered_img)
           # Write fully sampled filtered
           thumbs = cv2.imwrite(fs_filtered_img_path, 255.0*fs_filtered_img.cpu().detach().numpy())
+          
+          torch.save(fs_filtered_img.unsqueeze(0), fs_filtered_img_torch_path)
           print(thumbs)
 
   def _grab_image_indexes(self, threshold = 50):
@@ -735,7 +742,6 @@ class ReconstructionDataset(Dataset):
     '''
     Retrieves undersampled unfiltered reconstruction (unfiltered_us_rec), undersampled filtered reconstruction (filtered_us_rec) and fully sampled filtered reconstruction (filtered_fs_rec), used as Input, FBP benchmark and Output respectively. 
     '''
-
     unfiltered_us_rec = self.normalize_image(self.unfiltered_us_recs[index, ...])
     filtered_us_rec = self.normalize_image(self.filtered_us_recs[index, ...])
     filtered_fs_rec = self.normalize_image(self.filtered_fs_recs[index, ...])

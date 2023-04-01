@@ -155,7 +155,7 @@ def runs(testing_options):
                            'sampling_method' : 'equispaced-linear',
                            'shuffle_data' : True,
                            'data_transform' : data_transform,
-                           'num_workers':16,
+                           'num_workers':8,
                            'use_subset_by_part': False}
     
     acc_factor = 20

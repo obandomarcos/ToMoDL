@@ -8,11 +8,11 @@ def normalize_image(image):
 
     return (image - image.min())/(image.max()-image.min())
 
-acceleration_factors = np.arange(12, 34, 2).astype(int)
+acceleration_factors = np.arange(2, 30, 2).astype(int)
 
 for acc_factor in acceleration_factors:
     
-    path_dir = where_am_i(path = 'datasets')+'/datasets/x{}'.format(acc_factor)
+    path_dir = where_am_i(path = 'datasets')+'x{}'.format(acc_factor)
     if os.path.isdir(path_dir) == True:
         
         print('Trainsforming {} factor to tensor format...'.format(acc_factor))

@@ -20,6 +20,7 @@ from training import train_utilities as trutils
 
 from models.models_system import MoDLReconstructor
 import torch
+import wandb
 
 from pytorch_lightning.callbacks import ModelCheckpoint
 from pytorch_lightning.loggers import WandbLogger
@@ -68,7 +69,7 @@ def runs(testing_options):
                     'msssim_loss': MSSSIM(kernel_size = 1)}
 
         # Optimizer parameters
-        optimizer_dict = {'optimizer_name': 'Adam+Tanh',
+        optimizer_dict = {'optimizer_name': 'Adam',
                         'lr': 1e-4}
 
         # System parameters
@@ -81,7 +82,7 @@ def runs(testing_options):
                         'track_train': True,
                         'track_val': True,
                         'track_test': True,
-                        'max_epochs': 20, 
+                        'max_epochs': 25, 
                         'save_model':True,
                         'load_path': '',
                         'save_path': 'MoDL_K_fold_{}',
@@ -120,7 +121,7 @@ def runs(testing_options):
                         'epoch_number_checkpoint': 10,
                         'use_swa' : False,
                         'use_accumulate_batches': False,
-                        'k_fold_number_datasets': 2,
+                        'k_fold_number_datasets': 3,
                         'use_logger' : True,
                         'logger_dict': logger_dict,
                         'track_default_checkpoints'  : True,
@@ -154,10 +155,10 @@ def runs(testing_options):
                            'sampling_method' : 'equispaced-linear',
                            'shuffle_data' : True,
                            'data_transform' : data_transform,
-                           'num_workers':16,
+                           'num_workers':0,
                            'use_subset_by_part': False}
     
-    acceleration_factors = np.arange(2, 30, 4).astype(int)[::-1]
+    acceleration_factors = np.arange(2, 30, 2).astype(int)[::-1]
 
     # Create Custom trainer
     if 'train_projections_kfold_ssim' in testing_options:
@@ -165,12 +166,14 @@ def runs(testing_options):
         model_system_dict['loss_dict']['loss_name'] = 'ssim'
         
         for acc_factor in acceleration_factors:
-
+            
+            wandb.init(project = f'PSNR - X{acc_factor}', save_code = True, )
             dataloader_dict['acceleration_factor'] = acc_factor
             model_system_dict['kw_dictionary_modl']['acceleration_factor'] = acc_factor
 
             trainer = trutils.TrainerSystem(trainer_dict, dataloader_dict, model_system_dict)
             trainer.k_folding()
+            wandb.finalize()
 
     if 'train_projections_kfold_psnr' in testing_options:
         

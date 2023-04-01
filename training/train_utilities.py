@@ -118,10 +118,12 @@ class TrainerSystem():
         '''
         if self.use_logger == True:              
             
-            if self.use_k_folding == True:
+            self.logger_dict['project'] = 'deepopt'
 
+            if self.use_k_folding == True:
+                
                 self.logger_dict['group'] = self.run_base_name
-                self.logger_dict['name'] = 'K-Fold {}/{}'.format(self.current_fold, self.k_fold_max-1) 
+                self.logger_dict['name'] = f'x{self.acceleration_factor} - {self.loss_method} - K-Fold {self.current_fold}/{self.k_fold_max-1}'
 
             id_ = wandb.util.generate_id()
             self.logger_dict['id'] = id_
@@ -177,6 +179,8 @@ class TrainerSystem():
         
         # To-Do: Option for non-available acceleration factors (RUN ProcessDatasets)
         self.folders_datasets_list = [self.datasets_folder+'x{}/'.format(self.acceleration_factor)+x for x in os.listdir(self.datasets_folder+'x{}'.format(self.acceleration_factor))]
+        # Same for all acc factors
+        self.folders_datasets_list.sort()
 
         # wandb.log({'datasets_folders_list': [x.split('/') for x in self.folders_datasets_list]})
         if self.use_subset_by_part == True:
@@ -207,7 +211,8 @@ class TrainerSystem():
         self.model_system_method = kwdict['method']
         self.model_system_dict = kwdict
         self.model_system_dict['max_epochs'] = self.lightning_trainer_dict['max_epochs']
-    
+        self.loss_method = kwdict['loss_dict']['loss_name']
+
     def print_check_datasets(self):
 
         if self.current_fold != 0:
@@ -396,7 +401,7 @@ class TrainerSystem():
         
         self.wandb_logger.finalize('success')
 
-        # wandb.finish()
+        wandb.finish()
 
     def k_folding(self):
         '''

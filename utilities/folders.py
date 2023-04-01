@@ -3,7 +3,7 @@ Folders to be used in data processing
 author: obanmarcos
 """
 
-main_folder = '/home/marcos/DeepOPT/DataOPT/'
+main_folder = '/data/marcos/DataOPT/'
 
 
 f140114_5dpf = main_folder+'140114_5dpf'  # 5 days post-fertilization

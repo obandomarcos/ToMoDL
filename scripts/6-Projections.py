@@ -9,6 +9,7 @@ from config import *
 sys.path.append(where_am_i())
 
 import pytorch_lightning as pl
+from pytorch_lightning.profiler import SimpleProfiler
 import argparse
 import numpy as np
 import matplotlib.pyplot as plt
@@ -66,19 +67,29 @@ def runs(testing_options):
         loss_dict = {'loss_name': 'psnr',
                     'psnr_loss': torch.nn.MSELoss(reduction = 'mean'),
                     'ssim_loss': SSIM(data_range=1, size_average=True, channel=1),
-                    'msssim_loss': MSSSIM(kernel_size = 1)}
+                    'msssim_loss': MSSSIM(kernel_size = 1),
+                    'l1_loss' : torch.nn.L1Loss(reduction = 'mean')}
 
         # Optimizer parameters
         optimizer_dict = {'optimizer_name': 'Adam',
                         'lr': 1e-4}
+        
+        unet_dict = {'n_channels': 1,
+                     'n_classes':1,
+                     'bilinear': True,
+                     'batch_norm': True,
+                     'batch_norm_inconv':True,
+                     'residual': False,
+                     'up_conv': False}
 
         # System parameters
         model_system_dict = {'acc_factor_data': 1,
                         'use_normalize': True,
                         'optimizer_dict': optimizer_dict,
                         'kw_dictionary_modl': modl_dict,
+                        'kw_dictionary_unet': unet_dict,
                         'loss_dict': loss_dict, 
-                        'method':'modl',                       
+                        'method':'unet',                       
                         'track_train': True,
                         'track_val': True,
                         'track_test': True,
@@ -158,7 +169,7 @@ def runs(testing_options):
                            'num_workers':0,
                            'use_subset_by_part': False}
     
-    acceleration_factors = np.arange(2, 26, 2).astype(int)[::-1]
+    acceleration_factors = np.arange(2, 14, 2).astype(int)[::-1]
 
     # Create Custom trainer
     if 'train_projections_kfold_ssim' in testing_options:
@@ -173,7 +184,6 @@ def runs(testing_options):
 
             trainer = trutils.TrainerSystem(trainer_dict, dataloader_dict, model_system_dict)
             trainer.k_folding()
-            wandb.finalize()
 
     if 'train_projections_kfold_psnr' in testing_options:
         
@@ -186,6 +196,7 @@ def runs(testing_options):
 
             trainer = trutils.TrainerSystem(trainer_dict, dataloader_dict, model_system_dict)
             trainer.k_folding()
+            
 
 if __name__ == '__main__':
 
@@ -200,12 +211,12 @@ if __name__ == '__main__':
 
     if args.train_projections_kfold_ssim:
 
-        print('Training MODL with ssim loss for different projections...')
+        print('Training with ssim loss for different projections...')
         projection_options.append('train_projections_kfold_ssim')
     
     if args.train_projections_kfold_psnr:
 
-        print('Training MODL with psnr loss for different projections...')
+        print('Training with psnr loss for different projections...')
         projection_options.append('train_projections_kfold_psnr')
     
     runs(projection_options)

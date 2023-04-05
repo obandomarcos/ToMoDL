@@ -158,7 +158,7 @@ def runs(testing_options):
                            'num_workers':0,
                            'use_subset_by_part': False}
     
-    acceleration_factors = np.arange(2, 30, 2).astype(int)[::-1]
+    acceleration_factors = np.arange(2, 26, 2).astype(int)[::-1]
 
     # Create Custom trainer
     if 'train_projections_kfold_ssim' in testing_options:

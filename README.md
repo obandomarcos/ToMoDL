@@ -1,5 +1,4 @@
-# <center>✨🔬 **ToMoDL </center>
-# <center> Model-Based Deep Learning Architecture for Optical Tomography Projection 3D Reconstruction** 🔬✨ </center>
+<h1 align="center"><ins>ToMoDL 🔬</ins><br>Model-Based Deep Learning Architecture for Optical Tomography Projection 3D Reconstruction*</h1>
 <p align="center">
   <a href="">Marcos Obando</a>
   ·

@@ -1,8 +1,8 @@
-<h1 align="center"><ins>ToMoDL 🔬</ins><br>Model-Based Deep Learning Architecture for Optical Tomography Projection 3D Reconstruction*</h1>
+<h1 align="center"><ins>ToMoDL🔬</ins><br>Model-Based Deep Learning Architecture for Optical Tomography Projection 3D Reconstruction*</h1>
 <p align="center">
-  <a href="">Marcos Obando</a>
+  <a href="https://www.linkedin.com/in/marcos-obando-22a816170">Marcos Obando</a>
   ·
-  <a href="">Nicolas Ducros</a>
+  <a href="https://www.creatis.insa-lyon.fr/~ducros/WebPage/">Nicolas Ducros</a>
   ·
   <a href="https://scholar.google.com/citations?user=8ZHx3j8AAAAJ&hl=fr">Andrea Bassi</a>
   ·

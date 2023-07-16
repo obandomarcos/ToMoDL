@@ -6,9 +6,8 @@ Welcome to the ToMoDL GitHub repository! This repository contains code that impl
 
 This code is based on the MoDL architecture developed in [1]. It provides a powerful method to reconstruct OPT images by solving the following optimization problem:
 
-```
-argmin_x ||Ax-b||_2^2 + ||x-Dw(x)||^2_2
-```
+
+$$ argmin_x ||Ax-b||_2^2 + ||x-Dw(x)||^2_2 $$
 
 Here, 'A' can be any measurement operator, and in our case, we considered the Radon transform operator combined with an undersampling mask. 'Dw(x)' represents the denoiser, which uses a residual learning CNN.
 

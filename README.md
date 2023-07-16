@@ -9,7 +9,8 @@ This code is based on the MoDL architecture developed in [1]. It provides a powe
 
 $$ \mathbf{x_{rec}} = \arg\min_{\mathbf{x}} ||\mathbf{A}\mathbf{x} - \mathbf{b}||^2_2 + \lambda ||\mathbf{x}-\mathcal{D}_{\mathbf{\theta}}(\mathbf{x})||^2_2 $$
 
-Here, $\mathbf{A}$ can be any measurement operator, and in our case, we considered the Radon transform operator combined with an undersampling mask. '$\mathcal{D}_{\mathbf{\theta}}(\mathbf{x})$' represents the denoiser, which uses a residual learning CNN.
+Here, $\mathbf{A}$ can be any measurement operator, and in our case, we considered the Radon transform operator combined with an undersampling mask. $\mathcal{D}_{\mathbf{\theta}}(\mathbf{x})$ represents the denoiser, which uses a residual learning CNN.
+
 
 ### 📦 Dependencies
 

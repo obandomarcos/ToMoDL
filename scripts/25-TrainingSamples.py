@@ -9,7 +9,6 @@ from config import *
 sys.path.append(where_am_i())
 
 import pytorch_lightning as pl
-from pytorch_lightning.profiler import SimpleProfiler
 import argparse
 import numpy as np
 import matplotlib.pyplot as plt
@@ -36,7 +35,7 @@ use_default_model_dict = True
 use_default_dataloader_dict = True
 use_default_trainer_dict = True
 
-def runs(testing_options):
+def runs():
     
     if use_default_model_dict == True:
         # ResNet dictionary parameters
@@ -56,7 +55,7 @@ def runs(testing_options):
                     'number_projections_total' : 720,
                     'acceleration_factor': 10,
                     'image_size': 100,
-                    'lambda': 0.25,
+                    'lambda': 0.025,
                     'use_shared_weights': True,
                     'denoiser_method': 'resnet',
                     'resnet_options': resnet_options_dict,
@@ -64,7 +63,7 @@ def runs(testing_options):
                     'out_channels': 1}
 
         # Training parameters
-        loss_dict = {'loss_name': 'l1',
+        loss_dict = {'loss_name': 'psnr',
                     'psnr_loss': torch.nn.MSELoss(reduction = 'mean'),
                     'ssim_loss': SSIM(data_range=1, size_average=True, channel=1),
                     'msssim_loss': MSSSIM(kernel_size = 1),
@@ -89,7 +88,7 @@ def runs(testing_options):
                         'kw_dictionary_modl': modl_dict,
                         'kw_dictionary_unet': unet_dict,
                         'loss_dict': loss_dict, 
-                        'method':'unet',                       
+                        'method':'modl',                       
                         'track_train': True,
                         'track_val': True,
                         'track_test': True,
@@ -110,7 +109,7 @@ def runs(testing_options):
     # PL Trainer and W&B logger dictionaries
     if use_default_trainer_dict == True:
                 
-        logger_dict = {'project':'deepopt',
+        logger_dict = {'project': f'PSNR - Training Samples',
                         'entity': 'omarcos', 
                         'log_model': True}
 
@@ -163,64 +162,34 @@ def runs(testing_options):
                            'train_factor' : 0.8, 
                            'val_factor' : 0.2,
                            'test_factor' : 0.2, 
-                           'batch_size' : 16, 
+                           'batch_size' : 8, 
                            'sampling_method' : 'equispaced-linear',
                            'shuffle_data' : True,
                            'data_transform' : data_transform,
                            'num_workers':0,
-                           'use_number_samples': False,
+                           'use_number_samples' : True,
                            'number_samples_factor' : 0.1,
                            'use_subset_by_part': False}
     
-    acceleration_factors = np.arange(2, 30, 2).astype(int)[::-1]
-
+    
     # Create Custom trainer
-    if 'train_projections_kfold_ssim' in testing_options:
-        
-        model_system_dict['loss_dict']['loss_name'] = 'ssim'
-        
-        for acc_factor in acceleration_factors:
-            
-            wandb.init(project = f'UNET Res - X{acc_factor}', save_code = True, )
-            dataloader_dict['acceleration_factor'] = acc_factor
-            model_system_dict['kw_dictionary_modl']['acceleration_factor'] = acc_factor
+    model_system_dict['loss_dict']['loss_name'] = 'psnr'
+    number_samples_factors = [1]
 
-            trainer = trutils.TrainerSystem(trainer_dict, dataloader_dict, model_system_dict)
-            trainer.k_folding()
+    for number_samples_factor in number_samples_factors:
+    
+        acc_factor = 20
+        # wandb.init(project = f'PSNR - Training Samples- X{acc_factor}', save_code = True)
+        dataloader_dict['acceleration_factor'] = acc_factor
+        dataloader_dict['number_samples_factor'] = number_samples_factor
+        model_system_dict['kw_dictionary_modl']['acceleration_factor'] = acc_factor
 
-    if 'train_projections_kfold_psnr' in testing_options:
-        
-        model_system_dict['loss_dict']['loss_name'] = 'l1'
+        trainer = trutils.TrainerSystem(trainer_dict, dataloader_dict, model_system_dict)
+        trainer.k_folding()
 
-        for acc_factor in acceleration_factors:
+    wandb.finalize()
 
-            wandb.init(project = f'UNET Res', save_code = True, )
-            dataloader_dict['acceleration_factor'] = acc_factor
-            model_system_dict['kw_dictionary_modl']['acceleration_factor'] = acc_factor
-
-            trainer = trutils.TrainerSystem(trainer_dict, dataloader_dict, model_system_dict)
-            trainer.k_folding()
-            
 
 if __name__ == '__main__':
 
-    projection_options = []
-
-    parser = argparse.ArgumentParser(description='Do K-folding with different networks')
-
-    parser.add_argument('--train_projections_kfold_ssim', help = 'Train w/SSIM loss with optimal hyperparameters', action="store_true")
-    parser.add_argument('--train_projections_kfold_psnr', help = 'Train w/PSNR loss with optimal hyperparameters', action="store_true")
-    
-    args = parser.parse_args()
-
-    if args.train_projections_kfold_ssim:
-
-        print('Training with ssim loss for different projections...')
-        projection_options.append('train_projections_kfold_ssim')
-    
-    if args.train_projections_kfold_psnr:
-
-        print('Training with psnr loss for different projections...')
-        projection_options.append('train_projections_kfold_psnr')
-    
-    runs(projection_options)
+    runs()

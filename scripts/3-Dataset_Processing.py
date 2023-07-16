@@ -20,13 +20,13 @@ from torch.utils.data import DataLoader, ConcatDataset
 
 def process_datasets(args_options):
     
-    folder_paths = [f140115_1dpf, f140315_3dpf, f140419_5dpf, f140714_5dpf, f140117_3dpf, f140114_5dpf]
+    folder_paths = ['/home/obanmarcos/Balseiro/DeepOPT/DataOPT/140415_5dpf_4X']
 
-    zebra_dataset_dict = {'dataset_folder':'/data/marcos/datasets',
+    zebra_dataset_dict = {'dataset_folder':'/home/obanmarcos/Balseiro/DeepOPT/datasets/full_fish',
                           'experiment_name':'Bassi',
                           'img_resize' :100,
-                          'load_shifts':True,
-                          'save_shifts':False,
+                          'load_shifts':False,
+                          'save_shifts': True,
                           'number_projections_total':720,
                           'number_projections_undersampled': 72,
                           'batch_size': 5,
@@ -53,6 +53,6 @@ if __name__ == '__main__':
     To-Do: ArgParsing
     '''
     args_options = {}
-    args_options['acc_factors'] = np.arange(2, 30, 2).astype(int)
+    args_options['acc_factors'] = [20]
 
     process_datasets(args_options)

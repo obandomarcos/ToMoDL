@@ -23,9 +23,15 @@ acceleration_factor = 22
 loss = 'PSNR'
 df_pkl_path = 'logs/20-Dictionary_full.pkl'
 dataframe = pd.read_pickle(df_pkl_path)
-n = 3
+dataframe_tomodl = pd.read_pickle('/home/obanmarcos/Balseiro/DeepOPT/results/dataframe_out_final_tomodl.pkl')
+dataframe_unet = pd.read_pickle('/home/obanmarcos/Balseiro/DeepOPT/results/dataframe_out_final_unet_2.pkl')
+dataframe_twist = pd.read_pickle('/home/obanmarcos/Balseiro/DeepOPT/results/dataframe_out_final_twist.pkl')
+dataframe_fbp = pd.read_pickle('/home/obanmarcos/Balseiro/DeepOPT/results/dataframe_out_final_fbp.pkl')
+# dataframe_tomodl = dataframe_tomodl.drop(labels = ['test/psnr_tomodl', 'test/ssim_tomodl'], axis = 1)
 
-print(dataframe['psnr']['22'].columns)
+# dataframe_tomodl.rename(columns = {'test/psnr_unet':'test/psnr_tomodl', 'test/ssim_unet':'test/ssim_tomodl'}, inplace = True)
+print(dataframe_fbp['test/psnr_fbp'])
+n = 3
 
 # Subset by part
 labels = []
@@ -83,8 +89,9 @@ def plot_boxes_projection(path):
     dataframe = pd.read_pickle(df_pkl_path)
     dataframe = dataframe['psnr']
 
-    acceleration_factors = np.arange(2, 30, 4).astype(int)[::-1]
-    model_metrics = [ 'test/{}_fbp', 'test/{}_admm', 'test/{}_unet', 'test/{}']
+    # print(dataframe_tomodl[dataframe_tomodl['acceleration_factor']==18])
+    acceleration_factors = np.arange(4, 30, 4).astype(int)[::-1]
+    model_metrics = [ 'test/{}_fbp', 'test/{}_twist', 'test/{}_unet', 'test/{}_tomodl']
     model_metric_labels = ['FBP', 'TwIST', 'U-Net','ToMoDL']
     metrics = ['psnr', 'ssim']
     
@@ -99,34 +106,57 @@ def plot_boxes_projection(path):
 
             row = {}
             # dataframe[str(acc_factor)] = dataframe[str(acc_factor)][dataframe[str(acc_factor)]['fish_part'] =='head']
-
-            for column in dataframe[str(acc_factor)]:
+            for column in [ 'test/{}_fbp', 'test/{}_twist', 'test/{}_unet', 'test/{}_tomodl'] :
+                
+                column = column.format(metric)
                 # Me armo mi dataframe especial con metricas+acceleration factor
-                if ('test' in column) and (metric in column):
-                        
-                    dataframe[str(acc_factor)][column] = dataframe[str(acc_factor)][column].apply(lambda x: np.array(x))
-                    row[column] = dataframe[str(acc_factor)][column].apply(pd.Series).astype(np.float64).stack().to_numpy()
+                if ('unet' in column):
 
-                    if ('fbp' not in column) and metric == 'psnr':
-                        
-                        row[column] = row[column]-29+34
-                        
+                    column_data = column
+                    dataframe_unet[dataframe_unet['acceleration_factor'] == acc_factor][column_data] = dataframe_unet[dataframe_unet['acceleration_factor'] == acc_factor][column_data].apply(lambda x: np.array(x))
+                    # print(dataframe_tomodl[dataframe_tomodl['acceleration_factor'] == acc_factor][column_data].apply(lambda x: np.array(x)))
+                    row[column_data] = dataframe_unet[dataframe_unet['acceleration_factor'] == acc_factor][column_data].apply(pd.Series).astype(np.float64).stack().to_numpy()
+                if ('twist' in column):
+                    
+                    column_data = column
+                    dataframe_twist[dataframe_twist['acceleration_factor'] == acc_factor][column_data] = dataframe_twist[dataframe_twist['acceleration_factor'] == acc_factor][column_data].apply(lambda x: np.array(x))
+                    # print(dataframe_tomodl[dataframe_tomodl['acceleration_factor'] == acc_factor][column_data].apply(lambda x: np.array(x)))
+                    row[column_data] = dataframe_twist[dataframe_twist['acceleration_factor'] == acc_factor][column_data].apply(pd.Series).astype(np.float64).stack().to_numpy()
+                    # print(row[column_data])
+                    # sys.exit(0)
+                
+                elif 'tomodl' in column:
+                    # print(dataframe_tomodl)
+                    
+                    column_data = column
+                    dataframe_tomodl[dataframe_tomodl['acceleration_factor'] == acc_factor][column_data] = dataframe_tomodl[dataframe_tomodl['acceleration_factor'] == acc_factor][column_data].apply(lambda x: np.array(x))
+                    # print(dataframe_tomodl[dataframe_tomodl['acceleration_factor'] == acc_factor][column_data].apply(lambda x: np.array(x)))
+                    row[column_data] = dataframe_tomodl[dataframe_tomodl['acceleration_factor'] == acc_factor][column_data].apply(pd.Series).astype(np.float64).stack().to_numpy()
+
+                elif 'fbp' in column:
+
+                    column_data = column
+                    dataframe_fbp[dataframe_fbp['acceleration_factor'] == acc_factor][column_data] = dataframe_fbp[dataframe_fbp['acceleration_factor'] == acc_factor][column_data].apply(lambda x: np.array(x))
+                    # print(dataframe_tomodl[dataframe_tomodl['acceleration_factor'] == acc_factor][column_data].apply(lambda x: np.array(x)))
+                    row[column_data] = dataframe_fbp[dataframe_fbp['acceleration_factor'] == acc_factor][column_data].apply(pd.Series).astype(np.float64).stack().to_numpy()
+
             row['acc_factor'] = acc_factor
             
             pd_metric = pd_metric.append(row, ignore_index=True)
 
-
-        colors = [ 'lightblue', 'pink', 'orange', 'lightgreen']
+        print(pd_metric)
+        colors = [ 'orange', 'pink', 'lightgreen', 'lightblue']
         boxes = []
 
         for color, model, pos, model_label in zip(colors, model_metric_spec, np.linspace(-1, 1, len(model_metric_spec)), model_metric_labels):
-            print(color)
+            
+            print(pd_metric[model])
             xticks = np.array(pd_metric['acc_factor'])+pos
             
-            bxplt = ax.boxplot(pd_metric[model], patch_artist= True, positions = xticks, showfliers = False)
+            bxplt = ax.boxplot(pd_metric[model], patch_artist= True, positions = xticks, showfliers = False, notch = True)
             
             add_label(bxplt, color, xticks, np.array(pd_metric[model]), model_label, ax)
-            ax.boxplot(pd_metric[model], sym = '', positions = xticks, whis = 0)
+            ax.boxplot(pd_metric[model], sym = '', positions = xticks)
             boxes.append(bxplt['boxes'][0])
 
             ax.tick_params(axis='both', which='major', labelsize=20)
@@ -266,9 +296,9 @@ def plot_boxes_per_feature(path, feature = 'fish_dpf', feature_name = 'Días pos
 
 def plot_boxes(path, plot):
 
-    acceleration_factors = np.arange(18, 26, 4).astype(int)[::-1]
+    acceleration_factors = np.arange(2, 30, 2).astype(int)[::-1]
     metrics = ['psnr']
-    model_metrics = ['test/{}', 'test/{}_fbp',  'test/{}_admm', 'test/{}_unet']
+    model_metrics = ['test/{}_tomodl', 'test/{}_fbp',  'test/{}_admm', 'test/{}_unet']
     model_metric_labels = ['ToMoDL - {}', 'FBP - {}', 'ADMM - {}', 'U-Net - {}']
 
     metric_limits = [(5, 45), (0.2, 1.1)]
@@ -285,8 +315,12 @@ def plot_boxes(path, plot):
 
                 model_metric = model_metric.format(metric)
                 model_metric_label = model_metric_label.format(metric.upper())
+                if 'tomodl' in model_metric:
+
+                    dataframe_extract = dataframe_tomodl[[model_metric]]
+                else:
+                    dataframe_extract = dataframe[[model_metric]]
                 
-                dataframe_extract = dataframe[[model_metric]]
                 pd_metric[model_metric] = dataframe_extract[model_metric].apply(pd.Series).astype(np.float64).stack().reset_index(drop=True)
             
             if plot == 'violin':
@@ -298,7 +332,7 @@ def plot_boxes(path, plot):
                 hist = sns.boxplot(data = pd_metric, ax = axs)
 
             hist.set(xlabel = 'Reconstruction Method', ylabel = metric)
-            hist.set_ylim(metric_min, metric_max)
+            # hist.set_ylim(metric_min, metric_max)
             sns.despine()
 
             fig.savefig(path.format(metric, acceleration_factor, loss), bbox_inches = 'tight')
@@ -393,7 +427,7 @@ if __name__ == '__main__':
     violin_path = 'logs/13-'+plot+'plot_PerParts_normalization_metric-{}-acc_factor_{}-loss_{}.pdf'
     box_path = 'logs/13-'+plot+'plot_normalization_metric-{}-acc_factor_{}-loss_{}.pdf'
     
-    path_full = 'logs/13-'+plot+'plot_all_metric_{}_outliers_violin.pdf'
+    path_full = 'logs/13-'+plot+'plot_all_metric_{}_outliers_violin_prueba.pdf'
     path_feature = 'logs/13-'+plot+'plot_all_metric_{}_feat_{}_prueba.pdf'
 
     # plot_histogram_per_parts(violin_path, 'box')

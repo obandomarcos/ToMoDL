@@ -247,7 +247,6 @@ if __name__ == '__main__':
             dataframe = dataframe.append(row, ignore_index=True)
         # Rotate
         trainer_system.rotate_list(dataset_list, 3)
-
     
     dataframe.to_pickle(df_path)
         

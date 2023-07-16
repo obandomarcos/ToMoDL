@@ -33,8 +33,10 @@ from pytorch_msssim import SSIM
 from torchmetrics import MultiScaleStructuralSimilarityIndexMeasure as MSSSIM
 import wandb
 from pathlib import Path
+import cv2
 
 group_name = ''
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 use_default_model_dict = True
 use_default_dataloader_dict = True
@@ -221,6 +223,11 @@ def load_runs(user_project_name, models_methods, acceleration_factors):
                         dict_runs[method][run.name[:3].replace(' ', '')][run.name[-3:]] = run 
 
     return dict_runs
+def normalize_image(image):
+
+    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
+    image = (image-image.min())/(image.max()-image.min())
+    return clahe.apply((255.0*image).astype(np.uint8))
 
 if __name__ == '__main__':
     
@@ -230,94 +237,79 @@ if __name__ == '__main__':
     '140315_1dpf_head_{}', '140114_5dpf_lower tail_{}', '140714_5dpf_head_{}', '140117_3dpf_head_{}', '140117_3dpf_lower tail_{}', '140117_3dpf_upper tail_{}', '140114_5dpf_body_{}']
     
     models_methods = ['tomodl', 'unet']
-    min_acceleration, max_acceleration, step_acceleration = (2, 30, 2)
-    acceleration_factors = np.arange(min_acceleration, max_acceleration, step_acceleration)[::-1]
+    min_acceleration, max_acceleration, step_acceleration = (12, 30, 4)
+    acceleration_factors = np.arange(min_acceleration, max_acceleration, step_acceleration)
     user_project_name = 'omarcos/deepopt'
-    folds_quantity = 4
+    model_types = ['fbp', 'twist', 'unet', 'tomodl', 'fbp_ground_truth', 'tomodl_denoiser']
 
-    # dict_runs = load_runs(user_project_name, models_methods, acceleration_factors)
 
-    dataframe = pd.DataFrame(columns = ['test/psnr_tomodl', 'test/ssim_tomodl','test/psnr_unet', 'test/ssim_unet', 'test/psnr_fbp', 'test/ssim_fbp', 'fish_part', 'fish_dpf', 'datacode', 'acceleration_factor'])
-
-    # print(dict_runs)
-    wandb.init()
-    dataframe_path = '/home/obanmarcos/Balseiro/DeepOPT/results/dataframe_out_final_fbp.pkl'
+    fig, axs = plt.subplots(len(model_types), len(acceleration_factors), figsize = (12,9))
     
-    model_type = 'fbp'
-
-    for acceleration_factor in acceleration_factors:
+    for acceleration_factor_idx, acceleration_factor in enumerate(acceleration_factors):
+        
         # Form trainer
         trainer_dict, dataloader_dict, model_system_dict = load_dicts(acceleration_factor)
         dataset_list = [where_am_i('datasets')+'x{}/'.format(acceleration_factor)+dataset.format(acceleration_factor) for dataset in dataset_list_generic]
 
         trainer_system = trutils.TrainerSystem(trainer_dict, dataloader_dict, model_system_dict)
 
-        # Get Model
-        if model_type in ['tomodl', 'unet']:
-            runs = dict_runs[model_type][f'x{acceleration_factor}'].items()
-            artifacts = {}
-
-            for fold, run in runs:
-                
-                artifacts[fold] = [artifact for artifact in run.logged_artifacts() if artifact.type == 'model']
-
-            for fold, model in artifacts.items():
-                print(model)
-                if model:
-                    model_dir = model[0].download()
-                    break
-                
-        if model_type == 'tomodl':
-            model = MoDLReconstructor.load_from_checkpoint(Path(model_dir) / "model.ckpt", kw_dictionary_model_system = model_system_dict) 
-        if model_type == 'unet':
-            
-            run = wandb.init()
-            artifact = run.use_artifact('omarcos/deepopt/model-yuk1krcc:v0', type = 'model')
-            artifact_dir = artifact.download()
-            model = UNetReconstructor.load_from_checkpoint(Path(artifact_dir) / "model.ckpt", kw_dictionary_model_system = model_system_dict) 
+        # Load image    
+        dataset_dict = {'root_folder' : dataset_list[1], 
+            'acceleration_factor' : acceleration_factor,
+            'transform' : None}
         
-        if model_type == 'twist':
+        test_dataset = dlutils.ReconstructionDataset(**dataset_dict)  
 
-            model = TwISTReconstructor(model_system_dict)
-
-        if model_type == 'fbp':
-            model = FBPReconstructor(model_system_dict)
-
-        trainer = trainer_system.create_trainer()
+        test_dataloader = DataLoader(test_dataset, 
+                                    batch_size = 1,
+                                    shuffle = False,
+                                    num_workers = 8)
+        N = 100
         
-        # fold_dataset_list = dataset_list[int(fold[0])*len(dataset_list)//4:(int(fold[0])+1%len(dataset_list))*len(dataset_list)//4]
-
-        for i, test_dataset_folder in enumerate(dataset_list):
+        for _ in range(N):
+            us_unfil_im, us_fil_im, fs_fil_im = next(iter(test_dataloader))
+        
+        
+        for model_type_idx, model_type in enumerate(model_types):
+            # Get Model
+        
+            if model_type == 'tomodl':
+                # TODO call model
+                artifact_tomodl = run.use_artifact('omarcos/PSNR - Training Samples/model-uqb3ptp0:v0', type='model')
+                artifact_tomodl_dir = artifact_tomodl.download()
+                model = MoDLReconstructor.load_from_checkpoint(Path(artifact_tomodl_dir) / "model.ckpt", kw_dictionary_model_system = model_system_dict) 
             
-            print(test_dataset_folder)
-            datacode = test_dataset_folder.split('_')[-4].split('/')[-1]
-            fish_part = test_dataset_folder.split('_')[-2]
-            fish_dpf = test_dataset_folder.split('_')[-3]
-            
-            dataset_dict = {'root_folder' : test_dataset_folder, 
-                            'acceleration_factor' : acceleration_factor,
-                            'transform' : None}
-
-            test_dataset = dlutils.ReconstructionDataset(**dataset_dict)  
-            evens = list(range(0, len(test_dataset), 10))
-            test_dataset = torch.utils.data.Subset(test_dataset, evens)
-
-            test_dataloader = DataLoader(test_dataset, 
-                                        batch_size = 1,
-                                        shuffle = False,
-                                        num_workers = 8)
-            
-            model.create_metrics() # Creo el logger para cada dataset
-            metric_dict_modl = model.test_metric.copy()
-            
-            trainer.test(model = model, dataloaders = test_dataloader)
-
-            row = {f'test/psnr_{model_type}':metric_dict_modl['test/psnr_{}'.format(model_type)], f'test/ssim_{model_type}':metric_dict_modl['test/ssim_{}'.format(model_type)], 'fish_part': fish_part, 'fish_dpf': fish_dpf, 'datacode':datacode, 'acceleration_factor': acceleration_factor}
-            print(row)
-            dataframe = dataframe.append(row.copy(), ignore_index=True)
-
-            dataframe.to_pickle(dataframe_path)
-
-
-            
+            if model_type == 'unet':
                 
+                run = wandb.init()
+                artifact = run.use_artifact('omarcos/deepopt/model-yuk1krcc:v0', type = 'model')
+                artifact_dir = artifact.download()
+                model = UNetReconstructor.load_from_checkpoint(Path(artifact_dir) / "model.ckpt", kw_dictionary_model_system = model_system_dict) 
+            
+            if model_type == 'twist':
+
+                model = TwISTReconstructor(model_system_dict)
+
+            if model_type == 'fbp':
+                model = FBPReconstructor(model_system_dict)
+                
+            if model_type == 'tomodl':
+                axs[model_type_idx, acceleration_factor_idx].imshow(normalize_image(model.forward(us_unfil_im.to(device))['dc'+str(model.model.K)][0,0,...].detach().cpu().numpy()) , cmap = 'magma')
+            elif model_type == 'unet':
+                axs[model_type_idx, acceleration_factor_idx].imshow(normalize_image(model.forward(us_fil_im.to(device))[0,0,...].detach().cpu().numpy()), cmap = 'magma')
+            elif model_type == 'twist':
+                axs[model_type_idx, acceleration_factor_idx].imshow(normalize_image(model.forward(us_fil_im, fs_fil_im)[0]), cmap = 'magma')
+            elif model_type == 'fbp':
+                axs[model_type_idx, acceleration_factor_idx].imshow(normalize_image(us_fil_im[0,0,...].detach().cpu().numpy()), cmap = 'magma')
+            elif model_type == 'tomodl_denoiser':
+                axs[model_type_idx, acceleration_factor_idx].imshow(normalize_image(model.forward(us_unfil_im.to(device))['dc'+str(model.model.K-1)][0,0,...].detach().cpu().numpy()-model.forward(us_unfil_im.to(device))['dw'+str(model.model.K)][0,0,...].detach().cpu().numpy()), cmap = 'magma')
+            elif model_type == 'fbp_ground_truth':
+                axs[model_type_idx, acceleration_factor_idx].imshow(normalize_image(fs_fil_im[0,0,...].detach().cpu().numpy()), cmap = 'magma')
+
+            plt.setp(axs[model_type_idx, acceleration_factor_idx].spines.values(), visible=False)
+            axs[model_type_idx, acceleration_factor_idx].tick_params(left=False, bottom = False, labelbottom=False, labelleft=False)
+        
+
+            
+    fig.savefig('/home/obanmarcos/Balseiro/DeepOPT/results/29-AccelerationFactorImages_denoiser.pdf', bbox_inches = 'tight')
+

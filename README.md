@@ -1,49 +1,51 @@
-# DeepOPT
-Model Based Deep Learning Architecture for Optical Tomography Projection 3D reconstruction
+✨🔬 **ToMoDL - Model Based Deep Learning Architecture for Optical Tomography Projection 3D Reconstruction** 🔬✨
 
-### What does this code do:
+Welcome to the ToMoDL GitHub repository! This repository contains code that implements a technique for reconstructing OPT (Optical Tomography) images by solving an optimization problem using a Model-Based Deep Learning (MoDL) architecture. 🌟
 
-Based in MoDL architecture developed in [1], this code provides a technique to reconstruct OPT images solving an optimization problem.
+### 📝 Description
 
-As in [[1]], this code solves the optimization problem 
+This code is based on the MoDL architecture developed in [1]. It provides a powerful method to reconstruct OPT images by solving the following optimization problem:
 
-    argmin_x ||Ax-b||_2^2 + ||x-Dw(x)||^2_2
+```
+argmin_x ||Ax-b||_2^2 + ||x-Dw(x)||^2_2
+```
 
-Where 'A' can be any measurement operator, and in our case we considered the Radon transform operator, combined with an undersampling mask. 'Dw(x)' represents the denoiser using a residual learning CNN.
+Here, 'A' can be any measurement operator, and in our case, we considered the Radon transform operator combined with an undersampling mask. 'Dw(x)' represents the denoiser, which uses a residual learning CNN.
 
-### Dependencies
+### 📦 Dependencies
 
-Radon forward and backward operators used for this code are implemented on Torch Radon library, written by Matteo Ronchetti [2]. It can be installed using:
+The code relies on the Torch Radon library, developed by Matteo Ronchetti [2], for implementing the Radon forward and backward operators. To install it, you can use the following command:
 
-́́́́`shell script
-wget -qO- https://raw.githubusercontent.com/matteo-ronchetti/torch-radon/master/auto_install.py  | python -`
+```shell script
+wget -qO- https://raw.githubusercontent.com/matteo-ronchetti/torch-radon/master/auto_install.py  | python -
+```
 
-Torch Radon has some compatibility issues with PyTorch above 1.7, so we recommend having a virtual environment with a version between 1.5 and 1.7. It should work with Python 3.8
+Please note that Torch Radon has some compatibility issues with PyTorch versions above 1.7. We recommend creating a virtual environment with PyTorch version between 1.5 and 1.7. Python 3.8 should work fine.
 
-The training code requires tqdm library in order to track the training progress. 
+Additionally, the training code requires the `tqdm` library to track the training progress.
 
-### OPT datasets
+### 📚 OPT Datasets
 
-The DeepOPT architecture can be trained using the OPT datasets stored at folder DataOPT. The datasets used along the work correspond to transmitted projection images of live zebrafish at different days post fertilization (dpf). Each dataset consist of a series of 888 sinograms $y \in \mathbb{R}^{D\times\theta}$, sampled at 720 angle steps (0.5 degrees per step) with a detector of 880 pixels, each one evenly spaced by 1.3 $\mu m$.
+The ToMoDL architecture can be trained using the OPT datasets stored in the `DataOPT` folder. These datasets consist of transmitted projection images of live zebrafish at different days post fertilization (dpf). Each dataset comprises a series of 888 sinograms `y` of shape `D x θ`, sampled at 720 angle steps (0.5 degrees per step) with an 880-pixel detector, where each pixel is evenly spaced by 1.3 μm.
 
-In order to keep images compatible with Torch Radon operators, sinograms are resized to 640 angle steps so we have a multiple of 16 projections. Image preprocessing involves the registration of opposite pairs to correct the axis of rotation's shift respect to the detector. 
+To ensure compatibility with Torch Radon operators, sinograms are resized to 640 angle steps, making them a multiple of 16 projections. The image preprocessing involves registering opposite pairs to correct the axis of rotation's shift with respect to the detector.
 
-The full dataset can be downloaded from the following link:
+You can download the full dataset from the following link:
 
-### Download Link : https://drive.google.com/drive/folders/1KCs__sLQTN4PclU1ehfbLATKUkBWt7cT?usp=sharing
+🔗 Download Link: [ToMoDL Datasets](https://drive.google.com/drive/folders/1KCs__sLQTN4PclU1ehfbLATKUkBWt7cT?usp=sharing)
 
-## Files description
+## 📂 File Descriptions
 
-The file `ModelUtilities.py`, inside the folder `Utilities` ,contains the main functions needed to preprocess the dataset, train the model and calculate PSNR. 
+- The file `ModelUtilities.py` inside the `Utilities` folder contains the main functions required to preprocess the dataset, train the model, and calculate the Peak Signal-to-Noise Ratio (PSNR).
 
-Different training functions to evaluate the variation of model parameters are contained in `Training`. 
+- Different training functions to evaluate variations in model parameters are located in the `Training` folder.
 
-Inside the folder`OPTmodl`, MODL architecture for OPT is contained in `model_torch.py`, which contains a PyTorch adaptation of original MODL code, in `model.py`.
+- The `OPTmodl` folder includes the MODL architecture for OPT. The PyTorch adaptation of the original MODL code can be found in `model_torch.py`, while the original code is in `model.py`.
 
+## 📚 References
 
-## References
-<a id="1">[1]</a>
-MoDL: Model Based Deep Learning Architecture for Inverse Problems  by H.K. Aggarwal, M.P Mani, and Mathews Jacob in IEEE Transactions on Medical Imaging, 2018 
+[1] MoDL: Model-Based Deep Learning Architecture for Inverse Problems by H.K. Aggarwal, M.P Mani, and Mathews Jacob in IEEE Transactions on Medical Imaging, 2018.
 
-<a id="2">[2]</a>
-Ronchetti, M. (2020). Torchradon: Fast differentiable routines for computed tomography. arXiv preprint arXiv:2009.14788.
+[2] Ronchetti, M. (2020). Torchradon: Fast differentiable routines for computed tomography. arXiv preprint arXiv:2009.14788.
+
+Explore the code and have fun reconstructing optical tomography projections with ToMoDL! If you have any questions or suggestions, feel free to reach out. 🤗🚀

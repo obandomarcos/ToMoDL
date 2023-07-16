@@ -1,4 +1,4 @@
-✨🔬 **ToMoDL - Model Based Deep Learning Architecture for Optical Tomography Projection 3D Reconstruction** 🔬✨
+# ✨🔬 **ToMoDL - Model-Based Deep Learning Architecture for Optical Tomography Projection 3D Reconstruction** 🔬✨
 
 Welcome to the ToMoDL GitHub repository! This repository contains code that implements a technique for reconstructing OPT (Optical Tomography) images by solving an optimization problem using a Model-Based Deep Learning (MoDL) architecture. 🌟
 

@@ -7,9 +7,9 @@ Welcome to the ToMoDL GitHub repository! This repository contains code that impl
 This code is based on the MoDL architecture developed in [1]. It provides a powerful method to reconstruct OPT images by solving the following optimization problem:
 
 
-$$ argmin_x ||Ax-b||_2^2 + ||x-Dw(x)||^2_2 $$
+$$ \mathbf{x_{rec}} = \arg\min_{\mathbf{x}} ||\mathbf{A}\mathbf{x} - \mathbf{b}||^2_2 + \lambda ||\mathbf{x}-\mathcal{D}_{\mathbf{\theta}}(\mathbf{x})||^2_2 $$
 
-Here, 'A' can be any measurement operator, and in our case, we considered the Radon transform operator combined with an undersampling mask. 'Dw(x)' represents the denoiser, which uses a residual learning CNN.
+Here, $\mathbf{A}$ can be any measurement operator, and in our case, we considered the Radon transform operator combined with an undersampling mask. '$\mathcal{D}_{\mathbf{\theta}}(\mathbf{x})$' represents the denoiser, which uses a residual learning CNN.
 
 ### 📦 Dependencies
 
@@ -35,11 +35,7 @@ You can download the full dataset from the following link:
 
 ## 📂 File Descriptions
 
-- The file `ModelUtilities.py` inside the `Utilities` folder contains the main functions required to preprocess the dataset, train the model, and calculate the Peak Signal-to-Noise Ratio (PSNR).
 
-- Different training functions to evaluate variations in model parameters are located in the `Training` folder.
-
-- The `OPTmodl` folder includes the MODL architecture for OPT. The PyTorch adaptation of the original MODL code can be found in `model_torch.py`, while the original code is in `model.py`.
 
 ## 📚 References
 

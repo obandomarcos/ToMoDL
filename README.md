@@ -10,7 +10,7 @@
   ·
   <a href="https://scholar.google.com/citations?user=-xtye-QAAAAJ&hl=en">Teresa Correia</a>
 </p>
-Welcome to the ToMoDL GitHub repository! This repository contains code that implements a technique for reconstructing OPT (Optical Tomography) images by solving an optimization problem using a Model-Based Deep Learning (MoDL) architecture. 🌟
+Welcome to the ToMoDL GitHub repository! This repository contains code that implements a technique for reconstructing OPT (Optical Projection Tomography) images by solving an optimization problem using a Model-Based Deep Learning (MoDL) architecture. 🌟
 
 ### 📝 Description
 
@@ -23,7 +23,7 @@ Here, $\mathbf{A}$ can be any measurement operator, and in our case, we consider
 
 ### 📦 Dependencies
 
-The code relies on the Torch Radon library, developed by Matteo Ronchetti [2], for implementing the Radon forward and backward operators. To install it, you can use the following command:
+The code relies on the Torch Radon library, developed by Ronchetti [2], for implementing the Radon forward and backward operators. To install it, you can use the following command:
 
 ```shell script
 wget -qO- https://raw.githubusercontent.com/matteo-ronchetti/torch-radon/master/auto_install.py  | python -
@@ -39,9 +39,6 @@ The ToMoDL architecture can be trained using the OPT datasets stored in the `Dat
 
 To ensure compatibility with Torch Radon operators, sinograms are resized to 640 angle steps, making them a multiple of 16 projections. The image preprocessing involves registering opposite pairs to correct the axis of rotation's shift with respect to the detector.
 
-You can download the full dataset from the following link:
-
-🔗 Download Link: [ToMoDL Datasets](https://drive.google.com/drive/folders/1KCs__sLQTN4PclU1ehfbLATKUkBWt7cT?usp=sharing)
 
 ## 📂 File Descriptions
 

@@ -29,7 +29,7 @@ $$ \mathbf{x_{rec}} = \arg\min_{\mathbf{x}} ||\mathbf{A}\mathbf{x} - \mathbf{b}|
 
 Here, $\mathbf{A}$ can be any measurement operator, and in our case, we considered the Radon transform operator combined with an undersampling mask. $\mathcal{D}_{\mathbf{\theta}}(\mathbf{x})$ represents the denoiser, which uses a residual learning CNN.
 <p align="center">
-  <img src="https://raw.githubusercontent.com/marcoso96/ToMoDL/main/images/Algorithm.png" width = 75% >
+  <img src="https://raw.githubusercontent.com/marcoso96/ToMoDL/main/images/Algorithm.png" >
   <br>
   <em>ToMoDL solves the proposed inverse problem via a proximal gradient algorithm, where data consistency and denoising are alternatingly enforced. </em>
 </p>

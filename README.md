@@ -9,9 +9,9 @@
   <a href="https://scholar.google.com/citations?hl=es&user=LUH06dgAAAAJ&view_op=list_works&sortby=pubdate">Germán Mato</a>
   ·
   <a href="https://scholar.google.com/citations?user=-xtye-QAAAAJ&hl=en">Teresa Correia</a>
+  <img src="images/ComparativeQualitative.png" alt="example" width=80%>
+  <em>ToMoDL is a model-based neural network for tomographic reconstruction with a low number of samples<br>Introducing a physics informed reconstruction algorithm, high quality images can be recovered from more than 20 times less acquisition data.</em>
 </p>
-<img align="center" src="images/ComparativeQualitative.png" alt="example" width=80%>
-<em>ToMoDL is a model-based neural network for tomographic reconstruction with a low number of samples<br>Introducing a physics informed reconstruction algorithm, high quality images can be recovered from more than 20 times less acquisition data.</em>
 
 Welcome to the ToMoDL GitHub repository! This repository contains code that implements a technique for reconstructing OPT (Optical Projection Tomography) images by solving an optimization problem using a Model-Based Deep Learning (MoDL) architecture. 🌟
 

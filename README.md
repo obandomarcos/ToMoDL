@@ -10,8 +10,8 @@
   ·
   <a href="https://scholar.google.com/citations?user=-xtye-QAAAAJ&hl=en">Teresa Correia</a>
 </p>
+![ScreenShot](/images/ComparativeQualitative.png)
 <p align="center">
-![](images/ComparativeQualitative.png)
 <br>
 <em>ToMoDL is a model-based neural network for tomographic reconstruction with a low number of samples<br>Introducing a physics informed reconstruction algorithm, high quality images can be recovered from more than 20 times less acquisition data.</em>
 </p>

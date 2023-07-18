@@ -11,7 +11,7 @@
   <a href="https://scholar.google.com/citations?user=-xtye-QAAAAJ&hl=en">Teresa Correia</a>
 </p>
 <p align="center">
-<img src="images/ComparativeQualitative.png" alt="example" width=80%></img>
+<img src="./images/ComparativeQualitative.png" alt="example" width=80%></img>
 <br>
 <em>ToMoDL is a model-based neural network for tomographic reconstruction with a low number of samples<br>Introducing a physics informed reconstruction algorithm, high quality images can be recovered from more than 20 times less acquisition data.</em>
 </p>
@@ -28,7 +28,7 @@ $$ \mathbf{x_{rec}} = \arg\min_{\mathbf{x}} ||\mathbf{A}\mathbf{x} - \mathbf{b}|
 
 Here, $\mathbf{A}$ can be any measurement operator, and in our case, we considered the Radon transform operator combined with an undersampling mask. $\mathcal{D}_{\mathbf{\theta}}(\mathbf{x})$ represents the denoiser, which uses a residual learning CNN.
 <p align="center">
-  <img src="images/Algorithm.png" width=75%></a>
+  <img src="./images/Algorithm.png" width=75%></a>
   <br>
   <em>ToMoDL solves the proposed inverse problem via a proximal gradient algorithm, where data consistency and denoising are alternatingly enforced. </em>
 </p>

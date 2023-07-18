@@ -10,7 +10,8 @@
   ·
   <a href="https://scholar.google.com/citations?user=-xtye-QAAAAJ&hl=en">Teresa Correia</a>
 </p>
-<object data="images/ComparativeQualitativex20 (1).pdf" type="application/pdf" width="100%"> 
+[Some title here](images/ComparativeQualitativex20 (1).pdf)
+<object data=images/ComparativeQualitativex20 (1).pdf" type="application/pdf" width="100%"> 
 </object>
 
 Welcome to the ToMoDL GitHub repository! This repository contains code that implements a technique for reconstructing OPT (Optical Projection Tomography) images by solving an optimization problem using a Model-Based Deep Learning (MoDL) architecture. 🌟

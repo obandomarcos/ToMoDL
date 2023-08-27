@@ -1,4 +1,4 @@
-<h1 align="center"><ins>ToMoDL</ins>🔬<br>Model-Based Deep Learning Architecture for Optical Tomography Projection 3D Reconstruction</h1>
+<h1 align="center">🔬<ins>ToMoDL</ins>🔬<br>Model-Based Deep Learning Architecture for Optical Tomography Projection 3D Reconstruction</h1>
 <p align="center">
   <a href="https://www.linkedin.com/in/marcos-obando-22a816170">Marcos Obando</a>
   ·
@@ -10,9 +10,14 @@
   ·
   <a href="https://scholar.google.com/citations?user=-xtye-QAAAAJ&hl=en">Teresa Correia</a>
 </p>
-[Some title here](images/ComparativeQualitativex20 (1).pdf)
-<object data=images/ComparativeQualitativex20 (1).pdf" type="application/pdf" width="100%"> 
-</object>
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/marcoso96/ToMoDL/main/images/ComparativeQualitative.png" >
+  <br>
+  <em>ToMoDL is a model-based neural network for tomographic reconstruction with a low number of samples<br>Introducing a physics informed reconstruction algorithm, high quality images can be recovered from more than 20 times less acquisition data.</em>
+</p>
+
+##
 
 Welcome to the ToMoDL GitHub repository! This repository contains code that implements a technique for reconstructing OPT (Optical Projection Tomography) images by solving an optimization problem using a Model-Based Deep Learning (MoDL) architecture. 🌟
 
@@ -23,7 +28,11 @@ This code is based on the MoDL architecture developed in [1]. It provides a powe
 $$ \mathbf{x_{rec}} = \arg\min_{\mathbf{x}} ||\mathbf{A}\mathbf{x} - \mathbf{b}||^2_2 + \lambda ||\mathbf{x}-\mathcal{D}_{\mathbf{\theta}}(\mathbf{x})||^2_2 $$
 
 Here, $\mathbf{A}$ can be any measurement operator, and in our case, we considered the Radon transform operator combined with an undersampling mask. $\mathcal{D}_{\mathbf{\theta}}(\mathbf{x})$ represents the denoiser, which uses a residual learning CNN.
-
+<p align="center">
+  <img src="https://raw.githubusercontent.com/marcoso96/ToMoDL/main/images/Algorithm.png" >
+  <br>
+  <em>ToMoDL solves the proposed inverse problem via a proximal gradient algorithm, where data consistency and denoising are alternatingly enforced. </em>
+</p>
 
 ### 📦 Dependencies
 

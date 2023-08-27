@@ -59,7 +59,7 @@ NOTE: In order to test out the reconstruction algorithm itself, we provide a pre
 
 ## Demo
 
-Under the Lightning framework, using ToMoDL consists in three main modules for dataloading, model and training setting. Minimal configuration are provided within dictionaries at `config.py`. We'll directly import a default configuration for L=8 layers, K=8 iterations ToMoDL and train the model. We can configure [Weights and Biases (https://wandb.ai/site)] to monitor the training:
+Under the Lightning framework, using ToMoDL consists in three main modules for dataloading, model and training setting. Minimal configuration are provided within dictionaries at `config.py`. We'll directly import a default configuration for L=8 layers, K=8 iterations ToMoDL and train the model. We can configure [Weights and Biases](https://wandb.ai/site) to monitor the training:
 
 ```python
 from tomodl.training import train_utilities as trutils
@@ -102,7 +102,7 @@ image_tomodl = model_tomodl(us_unfil_im.to(device))['dc'+str(model_tomodl.model.
 
 ## Further configuration
 
-With modules built on top of [PyTorch Lightning ⚡ (https://lightning.ai/docs/pytorch/stable/)], `config.py` dictionaries enable us to explore useful strategies for iterative networks such as stochastic weights averaging, custom batch accumulation, parallelization across multiple devices among others. Here we show the default configuration for our training, where we extended its trainer in order to perform K-folding and resume training from previous folds. A further exploration of these features can be found at the `scripts` folder.
+With modules built on top of [PyTorch Lightning ⚡](https://lightning.ai/docs/pytorch/stable/), `config.py` dictionaries enable us to explore useful strategies for iterative networks such as stochastic weights averaging, custom batch accumulation, parallelization across multiple devices among others. Here we show the default configuration for our training, where we extended its trainer in order to perform K-folding and resume training from previous folds. A further exploration of these features can be found at the `scripts` folder.
 
 ```python
 lightning_trainer_dict = {'max_epochs': 40,

@@ -33,7 +33,7 @@ Here, $\mathbf{A}$ can be any measurement operator, and in our case, we consider
   <br>
   <em>ToMoDL solves the proposed inverse problem via a proximal gradient algorithm, where data consistency and denoising are alternatingly enforced. </em>
 </p>
-
+<!-- 
 ### 📦 Dependencies
 
 The code relies on the Torch Radon library, developed by Ronchetti [2], for implementing the Radon forward and backward operators. To install it, you can use the following command:
@@ -42,12 +42,21 @@ The code relies on the Torch Radon library, developed by Ronchetti [2], for impl
 wget -qO- https://raw.githubusercontent.com/matteo-ronchetti/torch-radon/master/auto_install.py  | python -
 ```
 
-Please note that Torch Radon has some compatibility issues with PyTorch versions above 1.7. We recommend creating a virtual environment with PyTorch version between 1.5 and 1.7. Python 3.8 should work fine.
-
-Additionally, the training code requires the `tqdm` library to track the training progress.
+Please note that Torch Radon has some compatibility issues with PyTorch versions above 1.7. We recommend creating a virtual environment with PyTorch version between 1.5 and 1.7. Python 3.8 should work fine. -->
 
 ## 📂 Installation
 
+We encourage to create a custom virtual environment for running ToMoDL with the following instructions:
+
+```
+conda create --name tomodl python=3.8
+```
+
+Install required packages using pip inside venv:
+
+```
+pip install -r requirements.txt
+```
 
 ### 📚 OPT Datasets
 

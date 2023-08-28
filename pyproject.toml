@@ -1,0 +1,29 @@
+[tool.poetry]
+name = "ToMoDL"
+version = "0.1.0"
+description = "ToMoDL library"
+authors = ["Marcos Obando <marcos.obando@ib.edu.ar>"]
+
+[[tool.poetry.source]]
+name = "piwheels"
+url = "https://www.piwheels.org/simple/"
+
+[tool.poetry.dependencies]
+python = "3.8.13"
+torch-radon = { git = "https://github.com/matteo-ronchetti/torch-radon.git", branch = "v2" }
+torch = "<1.8.0"
+pytorch_msssim = "*"
+pytorch_lightning = "1.7.1"
+numpy = "*"
+matplotlib = "*"
+wandb = "*"
+opencv-python = "*"
+Pillow = "*"
+scipy = "*"
+tqdm = "*"
+
+[tool.poetry.dev-dependencies]
+
+[build-system]
+requires = ["poetry_core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"

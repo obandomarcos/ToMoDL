@@ -16,7 +16,6 @@ import re
 import torch
 import os 
 from tqdm import tqdm
-import SimpleITK as sitk
 from torch_radon import Radon
 import pickle
 from pathlib import Path

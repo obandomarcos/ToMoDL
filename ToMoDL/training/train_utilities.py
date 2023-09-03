@@ -8,9 +8,6 @@ import os, sys
 from re import S
 import names
 
-sys.path.append('~/DeepOPT/')
-
-import argparse
 import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd

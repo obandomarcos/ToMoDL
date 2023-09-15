@@ -20,14 +20,17 @@ from time import time
 from superqt.utils import qthrottled
 from enum  import Enum
 import cv2 
-import matplotlib.pyplot as plt
 
 class Rec_modes(Enum):
     FBP_CPU = 0
     FBP_GPU = 1
     TWIST_CPU = 2
     UNET_GPU = 3
-    TOMODL = 4
+    MODL_GPU = 4
+
+class Order_Modes(Enum):
+    T_Q_Z = 0
+    Q_T_Z = 1
 
 class ReconstructionWidget(QWidget):
     
@@ -91,9 +94,15 @@ class ReconstructionWidget(QWidget):
                                   write_function = self.set_opt_processor)
         
         #create combobox for reconstruction method
-        self.reconbox = Combo_box(name ='Reconstruction method',
+        self.orderbox = Combo_box(name ='Reconstruction method',
                              initial = 'FBP (CPU)',
                              choices = Rec_modes,
+                             layout = slayout,
+                             write_function = self.set_opt_processor)
+        
+        self.reconbox = Combo_box(name ='Order',
+                             initial = Order_Modes.T_Q_Z,
+                             choices = Order_Modes,
                              layout = slayout,
                              write_function = self.set_opt_processor)
 
@@ -149,34 +158,36 @@ class ReconstructionWidget(QWidget):
             '''
             ToDO: Link projections
             '''
-            sinos = np.float32(self.get_sinos())
-        
-            theta, Q, Z = sinos.shape
 
-            print(sinos.shape)
+            sinos = np.moveaxis(np.float32(self.get_sinos()), 0, 1)
+            print(self.orderbox.val)
+            if self.orderbox.val == 0:
+                self.h.theta, self.h.Q, self.h.Z = sinos.shape
+            elif self.orderbox.val == 1:
+                self.h.Q, self.h.theta, self.h.Z = sinos.shape
+
             if self.reshapebox.val == True:
                 
                 optVolume = np.zeros([
-                    self.resizebox.val, self.resizebox.val, Z], np.float32)
+                    self.resizebox.val, self.resizebox.val, self.h.Z], np.float32)
                 sinos = self.h.resize(sinos)
 
             else:
                 
                 optVolume = np.zeros([
-                    int(np.ceil(Q/np.sqrt(2))), int(np.ceil(Q/np.sqrt(2))), Z], np.float32)
+                    int(np.ceil(self.h.Q/np.sqrt(2))), int(np.ceil(self.h.Q/np.sqrt(2))), self.h.Z], np.float32)
 
             time_in = time()
 
-            for zidx in range(1):
+            for zidx in range(self.h.Z):
                 
                 if self.registerbox.val == True:
-                    
+        
                     optVolume[:,:,zidx] = self.h.correct_and_reconstruct(sinos[:,:,zidx])
                     optVolume[:,:,zidx] = cv2.normalize(optVolume[:,:,zidx], None, alpha=0, beta=1, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F)
                 
                 else:
                     
-                    cv2.imwrite('sinossss.jpg', sinos[:,:,zidx])
                     optVolume[:,:, zidx] = self.h.reconstruct(sinos[:,:,zidx])
                     optVolume[:,:,zidx] = cv2.normalize(optVolume[:,:,zidx], None, alpha=0, beta=1, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F)
 
@@ -205,6 +216,7 @@ class ReconstructionWidget(QWidget):
             self.h.resize_bool = self.reshapebox.val
             self.h.register_bool = self.registerbox.val
             self.h.rec_process = self.reconbox.current_data
+            self.h.order_mode = self.orderbox.current_data
             print(self.h.rec_process)
 
             self.h.set_reconstruction_process()
@@ -239,5 +251,4 @@ class ReconstructionWidget(QWidget):
 @magic_factory
 def choose_layer(image: Image):
         pass #TODO: substitute with a qtwidget without magic functions
-
 

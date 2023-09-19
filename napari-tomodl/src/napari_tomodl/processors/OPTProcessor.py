@@ -205,7 +205,7 @@ class OPTProcessor:
                                     'use_batch_norm': True,
                                     'init_method': 'xavier'}
             
-            self.tomodl_dictionary = {'use_torch_radon': False,
+            self.tomodl_dictionary = {'use_torch_radon': True,
                                     'metric': 'psnr',
                                     'K_iterations' : 2,
                                     'number_projections_total' : sinogram.shape[0],
@@ -256,7 +256,6 @@ class OPTProcessor:
             self.iradon_function = lambda sino: self.iradon_functor(AT_tensor(sino)).detach().cpu().numpy()
 
         
-        print(sinogram.shape)
         reconstruction = self.iradon_function(sinogram)
 
         return reconstruction

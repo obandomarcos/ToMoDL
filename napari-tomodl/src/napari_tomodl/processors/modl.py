@@ -7,7 +7,7 @@ import torch
 import torch.nn as nn
 import numpy as np
 try:
-    from torch_radon import Radon, RadonFanbeam
+    from torch_radon import Radon as thrad
 except ImportError:
     pass
 
@@ -21,7 +21,7 @@ import torch.nn.functional as F
 from . import unet
 
 # Modify for multi-gpu
-device = torch.device("cpu")
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 class dwLayer(nn.Module):
     """
@@ -105,10 +105,10 @@ class dw(nn.Module):
             self.dw_layer_dict['weights_size'] = self.weights_size[i]
 
             if i == self.number_layers-1:
-                print('last layer')
                 self.dw_layer_dict['is_last_layer']= True
 
             self.nw['c'+str(i)] = dwLayer(self.dw_layer_dict)
+            self.nw['c'+str(i)].cuda(device)
 
         self.nw = nn.ModuleDict(self.nw)
           
@@ -188,7 +188,6 @@ class ToMoDL(nn.Module):
         j = str(i)
         
         self.out['dw'+j] = normalize_images(self.dw.forward(self.out['dc'+str(i-1)]))
-        # print('output dw forward: {} {}'.format(self.out['dw'+j].max(), self.out['dw'+j].min()))
         rhs = x/self.lam+self.out['dw'+j]
 
         self.out['dc'+j] = normalize_images(self.AtA.inverse(rhs))
@@ -268,10 +267,10 @@ class Aclass:
         self.lam = kw_dictionary['lambda']
         self.use_torch_radon = kw_dictionary['use_torch_radon']
         self.angles = np.linspace(0, 2*np.pi, self.number_projections,endpoint = False)
-        self.det_count = int(np.sqrt(2)*self.img_size+0.5)
+        self.det_count = int(np.ceil(np.sqrt(2)*self.img_size))
         
         if self.use_torch_radon == True:
-            self.radon = Radon(self.img_size, self.angles, clip_to_circle = False, det_count = self.det_count)
+            self.radon = thrad(self.img_size, self.angles, clip_to_circle = False, det_count = self.det_count)
         else:
             class Radon:
                 def __init__(self, num_angles, circle=True):

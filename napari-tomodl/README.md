@@ -26,7 +26,7 @@ ToMoDL allows users to reconstruct tomography images from its raw projections ju
 
 1 - Load ordered stack: Click File -> Open Files as Stack... and load the angular projections for parallel beam optical tomography reconstruction.
 
-![plot](https://github.com/marcoso96/ToMoDL/tree/napari/napari-tomodl/figures/fig1.png)
+![plot](https://github.com/marcoso96/ToMoDL/raw/tree/napari/napari-tomodl/figures/fig1.png)
 
 2 - Select the current volume in the dropdown menu with the button 'Select image layer'. Notice that the projections should be in grayscale and more than one slide in the stack.
 
@@ -42,7 +42,7 @@ ToMoDL allows users to reconstruct tomography images from its raw projections ju
 
 8 - Reconstruct! A new Layer should be created on top of the projections stack containing the reconstructed volume.
 
-![plot](https://github.com/marcoso96/ToMoDL/tree/napari/napari-tomodl/figures/fig2.png)
+![plot](https://github.com/marcoso96/ToMoDL/raw/tree/napari/napari-tomodl/figures/fig2.png)
 
 ## Installation
 

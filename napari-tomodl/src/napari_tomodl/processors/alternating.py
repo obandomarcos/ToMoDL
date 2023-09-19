@@ -74,7 +74,6 @@ def TwIST(y, A, AT, tau, kwarg, true_img = None):
   # Set the defaults for outputs that may not be computed
   debias_start = 0
   x_debias = []
-  mses = []
   
   # Read optional parameters
   for (k,v) in kwarg.items():
@@ -252,10 +251,6 @@ def TwIST(y, A, AT, tau, kwarg, true_img = None):
       x = np.zeros(Aty.size)
       objective = 0.5*(np.dot(y, y))
       times = 0
-      
-      if compute_mse:
-
-        mses.append(np.sum(true_img**2))
 
   #define the indicator vector or matrix of nonzeros in x
   nz_x = np.float64((x != 0.0))
@@ -272,13 +267,6 @@ def TwIST(y, A, AT, tau, kwarg, true_img = None):
   times.append(time() - t0)
   objective.append(prev_f)
 
-  if compute_mse:
-    if gpu == 1: 
-      print('Not implemented yet!')
-      return
-    else:
-      mses.append(np.sum((x-true_img)**2))
-                           
   cont_outer = 1
   it = 1
 
@@ -392,7 +380,6 @@ def TwIST(y, A, AT, tau, kwarg, true_img = None):
     objective.append(f)
     times.append(time()-t0)
     err = true_img - x
-    mses.append(np.linalg.norm(err.flatten().T))
 
     # print out the various stopping criteria
     if verbose:
@@ -426,11 +413,8 @@ def TwIST(y, A, AT, tau, kwarg, true_img = None):
     print('Not implemented yet!\n')
     return
   
-  if compute_mse:
-    
-    mses = np.array(mses)/true_img.size
 
-  return x, objective, mses
+  return x, objective
 
 def ADMM(y, A, AT, Den, alpha, delta, max_iter, 
           phi, tol, warm, invert, true_img = None, 
@@ -482,6 +466,7 @@ def ADMM(y, A, AT, Den, alpha, delta, max_iter,
 
   objective = []
   error_MSE = []
+  error_SSIM = []
 
   # % Warm Start - If used, initialices the model with a Conjugate Gradient
   # % aproximation
@@ -531,6 +516,7 @@ def ADMM(y, A, AT, Den, alpha, delta, max_iter,
       objective.append(0.5*(np.dot(res.flatten(), res.flatten())) +
                        alpha*phi(snew))
       error_MSE.append(np.linalg.norm(true_img-s)**2)
+      error_SSIM.append(ssim(true_img, s))
       
       if i>=2:
           crit = abs(objective[i]-objective[i-1])/objective[i-1]; 
@@ -548,7 +534,7 @@ def ADMM(y, A, AT, Den, alpha, delta, max_iter,
 
   error_MSE = np.array(error_MSE)/true_img.size
   
-  return s, objective, error_MSE
+  return s, objective, error_MSE, error_SSIM
 
 def ConjugateGradient(A, AT, y, b, u, delta, max_iter = 5):   
     # % Conjugate gradient routine for linear operators - compressed sensing
@@ -706,6 +692,7 @@ def iter_proj(method, hR, hRT, volume, max_angle, projections, n_z):
   recons_x = []
   objectives = []
   errors_MSE = [] 
+  errors_SSIM = [] 
   fbp_x = []
   trues_x = []
   
@@ -725,15 +712,16 @@ def iter_proj(method, hR, hRT, volume, max_angle, projections, n_z):
     
     fbp_sub = hRT_sub(y_sub)
     # Iterative method with fewer projections
-    x, objective, error_MSE = method(y_sub, hR_sub, hRT_sub, true_img)   
+    x, objective, error_MSE, error_SSIM = method(y_sub, hR_sub, hRT_sub, true_img)   
 
     recons_x.append(x)
     objectives.append(objective)
     errors_MSE.append(error_MSE)
+    errors_SSIM.append(error_SSIM)
     trues_x.append(true_img)
     fbp_x.append(fbp_sub)
 
-  return recons_x, fbp_x, objectives, errors_MSE, trues_x
+  return recons_x, fbp_x, objectives, errors_MSE, errors_SSIM, trues_x
 
 def normalize(x):
   y = x-x.min()

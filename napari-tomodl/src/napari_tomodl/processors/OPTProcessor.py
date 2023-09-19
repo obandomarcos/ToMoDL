@@ -45,7 +45,8 @@ class OPTProcessor:
         self.resize_val = 100
         self.rec_process = Rec_Modes.FBP_CPU.value
         self.order_mode = Order_Modes.T_Q_Z.value
-        
+        self.clip_to_circle = False
+
         self.resize_bool = True
         self.register_bool = True
         self.max_shift = 50
@@ -68,7 +69,7 @@ class OPTProcessor:
             
             assert(torch.cuda.is_available() == True)
             self.angles_gen = lambda num_angles: np.linspace(0, 2*np.pi, num_angles, endpoint = False)
-
+        
 
     def correct_and_reconstruct(self, sinogram: np.ndarray):
         '''
@@ -116,17 +117,37 @@ class OPTProcessor:
 
         if self.resize_bool == True:
             
-            sinogram_resize = np.zeros((int(np.ceil(self.resize_val*np.sqrt(2))),
-                                        self.theta, 
+            if self.order_mode == Order_Modes.T_Q_Z.value:
+                sinogram_resize = np.zeros((self.theta, int(np.ceil(self.resize_val*np.sqrt(2))),
                                         self.Z),
                                         dtype = np.float32)
-            
+                
+            if self.order_mode == Order_Modes.Q_T_Z.value:
+                
+                sinogram_resize = np.zeros((int(np.ceil(self.resize_val*np.sqrt(2))), self.theta,
+                                        self.Z),
+                                        dtype = np.float32)
+                
             for idx in range(self.Z):
+                
+                if self.order_mode == Order_Modes.T_Q_Z.value:
+
+                    resize = cv2.resize(sinogram_volume[:,:,idx], 
+                                                      (int(np.ceil(self.resize_val*np.sqrt(2))), self.theta),
+                                                      interpolation = cv2.INTER_NEAREST)
+                    sinogram_resize[:,:,idx] = resize 
                     
-                sinogram_resize[:,:,idx] = cv2.resize(sinogram_volume[:,:,idx], 
+
+                elif self.order_mode == Order_Modes.Q_T_Z.value:
+                    
+                    resize = cv2.resize(sinogram_volume[:,:,idx], 
                                                       (self.theta, int(np.ceil(self.resize_val*np.sqrt(2)))),
-                                                      interpolation = cv2.INTER_AREA)
-            
+                                                      interpolation = cv2.INTER_NEAREST)
+                    sinogram_resize[:,:,idx] = resize
+
+                    cv2.imwrite('image.png', resize)
+                    
+
         return sinogram_resize
     
     def reconstruct(self, sinogram: np.ndarray):
@@ -137,7 +158,6 @@ class OPTProcessor:
             * Optimize GPU usage with tensors
 
         '''
-
         ## Es un enriedo, pero inicializa los generadores de ángulos. Poco claro
         if self.init_volume_rec == False:
             
@@ -145,17 +165,29 @@ class OPTProcessor:
         
         if self.iradon_functor == None:
             
-            self.iradon_functor = radon_thrad(self.resize_val, self.angles, 
-                                              clip_to_circle = False, 
-                                              det_count = int(np.ceil(np.sqrt(2)*self.resize_val)))         
-
+            self.angles_torch = np.linspace(0, 2*np.pi, self.theta, endpoint = False)
+            self.iradon_functor = radon_thrad(self.resize_val, 
+                                              self.angles_torch, 
+                                              clip_to_circle = self.clip_to_circle,
+                                              det_count = np.ceil(np.sqrt(2)*self.resize_val).astype(int))         
+    
         if self.rec_process == Rec_Modes.FBP_GPU.value:
-
-            self.iradon_function = lambda sino: self.iradon_functor.backprojection((torch.Tensor(sino).to(device))).cpu().numpy()
+           
+            self.angles_torch = np.linspace(0, 2*np.pi, self.theta, endpoint = False)
+            
+            self.iradon_functor = radon_thrad(self.resize_val, 
+                                              self.angles_torch, 
+                                              clip_to_circle = self.clip_to_circle,
+                                              det_count = np.ceil(np.sqrt(2)*self.resize_val).astype(int))   
+            
+            self.iradon_function = lambda sino: self.iradon_functor.backprojection((torch.Tensor(sino.T).to(device))).cpu().numpy()
 
         elif self.rec_process == Rec_Modes.FBP_CPU.value:
             
-            self.iradon_function = lambda sino: iradon_scikit(sino, self.angles, circle = False, filter_name = None)
+            
+            self.iradon_function = lambda sino: iradon_scikit(sino, 
+                                                              self.angles, 
+                                                              circle = self.clip_to_circle)
         
         elif self.rec_process == Rec_Modes.MODL_GPU.value:
             
@@ -182,8 +214,12 @@ class OPTProcessor:
                                     'out_channels': 1}
                             
             self.iradon_functor = ToMoDL(self.tomodl_dictionary)
-    
-            self.iradon_function = lambda sino: self.iradon_functor(torch.Tensor(iradon_scikit(sino, self.angles, circle = False, filter_name = None)).to(device).unsqueeze(0).unsqueeze(1))['dc'+str(self.tomodl_dictionary['K_iterations'])].detach().cpu().numpy()
+            
+            self.iradon_function = lambda sino: self.iradon_functor(
+                                                    torch.Tensor(
+                                                        iradon_scikit(sino, 
+                                                                      self.angles, 
+                                                                      circle = self.clip_to_circle, filter_name = None)).to(device).unsqueeze(0).unsqueeze(1))['dc'+str(self.tomodl_dictionary['K_iterations'])].detach().cpu().numpy()
 
         elif self.rec_process == Rec_Modes.TWIST_CPU.value:
 
@@ -194,7 +230,7 @@ class OPTProcessor:
             twist_dictionary = {'LAMBDA': 1e-4, 
                                 'TOLERANCEA':1e-4,
                                 'STOPCRITERION':1, 
-                                'VERBOSE':0,
+                                'VERBOSE':1,
                                 'INITIALIZATION':0,
                                 'MAXITERA':10000, 
                                 'GPU':0,
@@ -203,17 +239,19 @@ class OPTProcessor:
 
                                 }
             
-            A = lambda x: radon_scikit(x, self.angles, circle = False)
-            AT = lambda sino: iradon_scikit(sino, self.angles, circle = False)
-            self.iradon_function = lambda sino: TwIST(sino.T, A, AT, 0.01, twist_dictionary, true_img = AT(sino.T))[0]
+            A = lambda x: radon_scikit(x, self.angles, circle = self.clip_to_circle)
+            AT = lambda sino: iradon_scikit(sino, self.angles, circle = self.clip_to_circle)
+            self.iradon_function = lambda sino: TwIST(sino, A, AT, 0.01, twist_dictionary, true_img = AT(sino))[0]
             
         elif self.rec_process == Rec_Modes.UNET_GPU.value:    
 
             self.iradon_functor = UNet(n_channels = 1, n_classes= 1, residual = True, up_conv = True, batch_norm = True, batch_norm_inconv = True).to(device)
-            AT_tensor = lambda sino: torch.Tensor(iradon_scikit(sino, self.angles, circle = False, filter_name = None)).to(device).unsqueeze(0).unsqueeze(1)
+            AT_tensor = lambda sino: torch.Tensor(iradon_scikit(sino, self.angles, circle = self.clip_to_circle, filter_name = None)).to(device).unsqueeze(0).unsqueeze(1)
             
             self.iradon_function = lambda sino: self.iradon_functor(AT_tensor(sino)).detach().cpu().numpy()
 
+        
+        print(sinogram.shape)
         reconstruction = self.iradon_function(sinogram)
 
         return reconstruction

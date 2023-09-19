@@ -86,6 +86,12 @@ class ReconstructionWidget(QWidget):
                                   layout=slayout, 
                                   write_function = self.set_opt_processor)        
 
+        self.clipcirclebox = Settings('Clip to circle',
+                            dtype=bool,
+                            initial = False, 
+                            layout=slayout, 
+                            write_function = self.set_opt_processor)        
+
 
         self.resizebox = Settings('Reconstruction size',
                                   dtype=int, 
@@ -94,14 +100,14 @@ class ReconstructionWidget(QWidget):
                                   write_function = self.set_opt_processor)
         
         #create combobox for reconstruction method
-        self.orderbox = Combo_box(name ='Reconstruction method',
-                             initial = 'FBP (CPU)',
+        self.reconbox = Combo_box(name ='Reconstruction method',
+                             initial = Rec_modes.FBP_GPU.value,
                              choices = Rec_modes,
                              layout = slayout,
                              write_function = self.set_opt_processor)
         
-        self.reconbox = Combo_box(name ='Order',
-                             initial = Order_Modes.T_Q_Z,
+        self.orderbox = Combo_box(name ='Order',
+                             initial = Order_Modes.Q_T_Z.value,
                              choices = Order_Modes,
                              layout = slayout,
                              write_function = self.set_opt_processor)
@@ -127,7 +133,7 @@ class ReconstructionWidget(QWidget):
             layer = self.viewer.add_image(image_values,
                                             name = fullname,
                                             scale = scale,
-                                            interpolation = 'linear')
+                                            interpolation2d = 'linear')
             return layer
 
     def select_layer(self, sinos:Image):
@@ -160,7 +166,7 @@ class ReconstructionWidget(QWidget):
             '''
 
             sinos = np.moveaxis(np.float32(self.get_sinos()), 0, 1)
-            print(self.orderbox.val)
+            
             if self.orderbox.val == 0:
                 self.h.theta, self.h.Q, self.h.Z = sinos.shape
             elif self.orderbox.val == 1:
@@ -182,17 +188,19 @@ class ReconstructionWidget(QWidget):
             for zidx in range(self.h.Z):
                 
                 if self.registerbox.val == True:
-        
+                    
+                    print(optVolume)
+                    sinos[:,:,zidx] = cv2.normalize(sinos[:,:,zidx], None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F)
                     optVolume[:,:,zidx] = self.h.correct_and_reconstruct(sinos[:,:,zidx])
                     optVolume[:,:,zidx] = cv2.normalize(optVolume[:,:,zidx], None, alpha=0, beta=1, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F)
                 
                 else:
                     
+                    sinos[:,:,zidx] = cv2.normalize(sinos[:,:,zidx], None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F)
                     optVolume[:,:, zidx] = self.h.reconstruct(sinos[:,:,zidx])
-                    optVolume[:,:,zidx] = cv2.normalize(optVolume[:,:,zidx], None, alpha=0, beta=1, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F)
-
-            print('Min: ', optVolume[:,:, zidx].min(), )
-            print('Max: ', optVolume[:,:, zidx].max())
+                    optVolume[:,:,zidx] = cv2.normalize(optVolume[:,:,zidx], None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F)
+                    
+                    
             print('Tiempo de cómputo total: {} s'.format(round(time()-time_in, 3)))
             return np.rollaxis(optVolume, -1)
 
@@ -200,7 +208,7 @@ class ReconstructionWidget(QWidget):
     
     def get_sinos(self):
         try:
-            print(self.imageRaw_name)
+            
             return self.viewer.layers[self.imageRaw_name].data
         except:
              raise(KeyError(r'Please select a valid 3D image ($\theta$, q, z)'))
@@ -215,12 +223,11 @@ class ReconstructionWidget(QWidget):
             self.h.resize_val = self.resizebox.val
             self.h.resize_bool = self.reshapebox.val
             self.h.register_bool = self.registerbox.val
-            self.h.rec_process = self.reconbox.current_data
-            self.h.order_mode = self.orderbox.current_data
-            print(self.h.rec_process)
-
+            self.h.rec_process = self.reconbox.val
+            self.h.order_mode = self.orderbox.val
+            self.h.clip_to_circle = self.clipcirclebox.val
+            print('set', self.h.rec_process)
             self.h.set_reconstruction_process()
-            print(self.h.iradon_function)
 
     def start_opt_processor(self):     
         self.isCalibrated = False
@@ -229,7 +236,7 @@ class ReconstructionWidget(QWidget):
             self.stop_opt_processor()
             self.start_opt_processor()
         else:
-            
+            print('Reset')
             self.h = OPTProcessor() 
 
     def stop_opt_processor(self):

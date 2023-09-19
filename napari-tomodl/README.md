@@ -20,6 +20,29 @@ https://github.com/napari/cookiecutter-napari-plugin#getting-started
 and review the napari docs for plugin developers:
 https://napari.org/stable/plugins/index.html
 -->
+## Introduction and usage
+
+ToMoDL allows users to reconstruct tomography images from its raw projections juts from uploading them as an ordered stack of files into the napari viewer.
+
+1 - Load ordered stack: Click File -> Open Files as Stack... and load the angular projections for parallel beam optical tomography reconstruction.
+
+![raw](https://github.com/marcoso96/ToMoDL/tree/napari/napari-tomodl/figures/fig1.png)
+
+2 - Select the current volume in the dropdown menu with the button 'Select image layer'. Notice that the projections should be in grayscale and more than one slide in the stack.
+
+3 - If the axis is not correctly aligned in acquisition time, we provide an algorithm to do so by clicking on 'Align axis'. This will align the sinogram respect to the center of the detector in order to maximise the variance of the reconstructions. See Walls et al. 
+
+4 - Reshape the reconstructed volume to a desired size. This can be useful to prevent exhausting your computing capabilities.
+
+5 - Clip to circle should be False by default.
+
+6 - Choose if filtering should be used. By the moment we only allow using ramp filtering for FBP only (both CPU and GPU).
+
+7 - Choose the correct order of the axis of the projections (T -> Theta axis, Q -> Detector axis)
+
+8 - Reconstruct! A new Layer should be created on top of the projections stack containing the reconstructed volume.
+
+![raw](https://github.com/marcoso96/ToMoDL/tree/napari/napari-tomodl/figures/fig2.png)
 
 ## Installation
 

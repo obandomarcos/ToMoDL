@@ -46,6 +46,7 @@ class OPTProcessor:
         self.rec_process = Rec_Modes.FBP_CPU.value
         self.order_mode = Order_Modes.T_Q_Z.value
         self.clip_to_circle = False
+        self.use_filter = False
 
         self.resize_bool = True
         self.register_bool = True
@@ -180,14 +181,18 @@ class OPTProcessor:
                                               clip_to_circle = self.clip_to_circle,
                                               det_count = np.ceil(np.sqrt(2)*self.resize_val).astype(int))   
             
-            self.iradon_function = lambda sino: self.iradon_functor.backprojection((torch.Tensor(sino.T).to(device))).cpu().numpy()
+            if self.use_filter == False:
+                self.iradon_function = lambda sino: self.iradon_functor.backprojection((torch.Tensor(sino.T).to(device))).cpu().numpy()
+            else:
+                self.iradon_function = lambda sino: self.iradon_functor.backprojection(self.iradon_functor.filter_sinogram(torch.Tensor(sino.T).to(device))).cpu().numpy()
 
         elif self.rec_process == Rec_Modes.FBP_CPU.value:
             
             
             self.iradon_function = lambda sino: iradon_scikit(sino, 
                                                               self.angles, 
-                                                              circle = self.clip_to_circle)
+                                                              circle = self.clip_to_circle,
+                                                              filter_name= None if self.use_filter == False else 'ramp')
         
         elif self.rec_process == Rec_Modes.MODL_GPU.value:
             

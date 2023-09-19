@@ -92,6 +92,11 @@ class ReconstructionWidget(QWidget):
                             layout=slayout, 
                             write_function = self.set_opt_processor)        
 
+        self.filterbox = Settings('Use filtering',
+                            dtype=bool,
+                            initial = False, 
+                            layout=slayout, 
+                            write_function = self.set_opt_processor) 
 
         self.resizebox = Settings('Reconstruction size',
                                   dtype=int, 
@@ -226,6 +231,7 @@ class ReconstructionWidget(QWidget):
             self.h.rec_process = self.reconbox.val
             self.h.order_mode = self.orderbox.val
             self.h.clip_to_circle = self.clipcirclebox.val
+            self.h.use_filter = self.filterbox.val
             print('set', self.h.rec_process)
             self.h.set_reconstruction_process()
 

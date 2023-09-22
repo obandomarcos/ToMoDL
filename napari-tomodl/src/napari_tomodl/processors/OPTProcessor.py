@@ -50,7 +50,7 @@ class OPTProcessor:
 
         self.resize_bool = True
         self.register_bool = True
-        self.max_shift = 50
+        self.max_shift = 200
         self.shift_step = 10
         self.center_shift = 0
 
@@ -82,27 +82,46 @@ class OPTProcessor:
         - sinogram
         '''
 
+        if self.shift_step < 1:
+            
+            if self.order_mode == Order_Modes.T_Q_Z.value:
+                shift_tuple = (0, np.copy(self.center_shift))
+            elif self.order_mode == Order_Modes.Q_T_Z.value:
+                shift_tuple = (np.copy(self.center_shift), 0)
+
+            # Restart shifts
+            self.max_shift = 200
+            self.shift_step = 10
+            self.center_shift = 0
+            print(shift_tuple)
+            return self.reconstruct(ndi.shift(sinogram, shift_tuple, mode = 'nearest'))
+        
         shifts = np.arange(-self.max_shift, self.max_shift, self.shift_step)+self.center_shift
         image_std = []
 
         for i, shift in enumerate(shifts):
+            
+            
+            if self.order_mode == Order_Modes.T_Q_Z.value:
+                shift_tuple = (0, shift)
+                
+            if self.order_mode == Order_Modes.Q_T_Z.value:
+                shift_tuple = (shift, 0)
 
-            sino_shift = ndi.shift(sinogram, (0, shift), mode = 'nearest')
+            sino_shift = ndi.shift(sinogram, shift_tuple, mode = 'nearest')
 
             # Get image reconstruction
             shift_iradon = self.reconstruct(sino_shift)
             
             # Calculate variance
             image_std.append(np.std(shift_iradon))
-        
+
         # To-Do: Change shifts
         self.center_shift = shifts[np.argmax(image_std)]
-        self.max_shift = 5
-        self.shift_step = 0.5
+        self.max_shift /= 5
+        self.shift_step /= 2.5
 
-        print(self.max_shift, self.shift_step, self.center_shift)
-
-        return np.fliplr(self.reconstruct(ndi.shift(sinogram, (0, self.center_shift), mode = 'nearest')))
+        return self.correct_and_reconstruct(sinogram)
 
     def resize(self, sinogram_volume: np.ndarray):
         '''

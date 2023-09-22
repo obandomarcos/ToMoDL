@@ -17,7 +17,7 @@ from magicgui.widgets import FunctionGui
 from magicgui import magic_factory, magicgui
 import warnings
 from time import time
-from superqt.utils import qthrottled
+import scipy.ndimage as ndi
 from enum  import Enum
 import cv2 
 
@@ -73,13 +73,12 @@ class ReconstructionWidget(QWidget):
 
     def createSettings(self, slayout):
         
-        self.registerbox = Settings('Align axis',
+        self.registerbox = Settings('Automatic axis alignment',
                                   dtype=bool,
                                   initial=True, 
                                   layout=slayout, 
                                   write_function = self.set_opt_processor)
         
-
         self.reshapebox = Settings('Reshape volume',
                                   dtype=bool,
                                   initial = True, 
@@ -97,7 +96,21 @@ class ReconstructionWidget(QWidget):
                             initial = False, 
                             layout=slayout, 
                             write_function = self.set_opt_processor) 
-
+        
+        self.manualalignbox = Settings('Manual axis alignment',
+                            dtype=bool,
+                            initial = False, 
+                            layout=slayout, 
+                            write_function = self.set_opt_processor) 
+        
+        self.alignbox = Settings('Axis shift',
+                            dtype=int,
+                            vmin=-500,
+                            vmax=500, 
+                            initial=0, 
+                            layout=slayout, 
+                            write_function = self.set_opt_processor)
+        
         self.resizebox = Settings('Reconstruction size',
                                   dtype=int, 
                                   initial=100, 
@@ -194,17 +207,27 @@ class ReconstructionWidget(QWidget):
                 
                 if self.registerbox.val == True:
                     
-                    print(optVolume)
                     sinos[:,:,zidx] = cv2.normalize(sinos[:,:,zidx], None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F)
                     optVolume[:,:,zidx] = self.h.correct_and_reconstruct(sinos[:,:,zidx])
-                    optVolume[:,:,zidx] = cv2.normalize(optVolume[:,:,zidx], None, alpha=0, beta=1, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F)
+                    optVolume[:,:,zidx] = cv2.normalize(optVolume[:,:,zidx], None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F)
                 
+                elif self.manualalignbox.val == True:
+
+                    sinos[:,:,zidx] = cv2.normalize(sinos[:,:,zidx], None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F)
+                    if self.orderbox.val == 0:
+                        optVolume[:,:, zidx] = self.h.reconstruct(ndi.shift(sinos[:,:,zidx], (0, self.alignbox.val), mode = 'nearest'))
+                    elif self.orderbox.val == 1:
+                        optVolume[:,:, zidx] = self.h.reconstruct(ndi.shift(sinos[:,:,zidx], (self.alignbox.val, 0), mode = 'nearest'))
+
+                    optVolume[:,:,zidx] = cv2.normalize(optVolume[:,:,zidx], None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F)
+
                 else:
                     
                     sinos[:,:,zidx] = cv2.normalize(sinos[:,:,zidx], None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F)
                     optVolume[:,:, zidx] = self.h.reconstruct(sinos[:,:,zidx])
                     optVolume[:,:,zidx] = cv2.normalize(optVolume[:,:,zidx], None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F)
-                    
+                
+                  
                     
             print('Tiempo de cómputo total: {} s'.format(round(time()-time_in, 3)))
             return np.rollaxis(optVolume, -1)

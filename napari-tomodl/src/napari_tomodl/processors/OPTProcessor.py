@@ -93,7 +93,7 @@ class OPTProcessor:
             self.max_shift = 200
             self.shift_step = 10
             self.center_shift = 0
-            print(shift_tuple)
+            
             return self.reconstruct(ndi.shift(sinogram, shift_tuple, mode = 'nearest'))
         
         shifts = np.arange(-self.max_shift, self.max_shift, self.shift_step)+self.center_shift
@@ -138,13 +138,13 @@ class OPTProcessor:
         if self.resize_bool == True:
             
             if self.order_mode == Order_Modes.Vertical.value:
-                print('hola sinos resize')
+                
                 sinogram_resize = np.zeros((self.theta, int(np.ceil(self.resize_val*np.sqrt(2))),
                                         self.Z),
                                         dtype = np.float32)
                 
             if self.order_mode == Order_Modes.Horizontal.value:
-                print('hola')
+                
                 sinogram_resize = np.zeros((int(np.ceil(self.resize_val*np.sqrt(2))), self.theta,
                                         self.Z),
                                         dtype = np.float32)

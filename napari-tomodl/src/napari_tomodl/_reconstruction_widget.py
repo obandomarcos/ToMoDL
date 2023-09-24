@@ -73,13 +73,18 @@ class ReconstructionWidget(QWidget):
 
     def createSettings(self, slayout):
         
-        
         self.reshapebox = Settings('Reshape volume',
                                   dtype=bool,
                                   initial = True, 
                                   layout=slayout, 
                                   write_function = self.set_opt_processor)        
 
+        self.resizebox = Settings('Reconstruction size',
+                                  dtype=int, 
+                                  initial=100, 
+                                  layout=slayout, 
+                                  write_function = self.set_opt_processor)
+        
         self.clipcirclebox = Settings('Clip to circle',
                             dtype=bool,
                             initial = False, 
@@ -113,11 +118,7 @@ class ReconstructionWidget(QWidget):
                             layout=slayout, 
                             write_function = self.set_opt_processor)
         
-        self.resizebox = Settings('Reconstruction size',
-                                  dtype=int, 
-                                  initial=100, 
-                                  layout=slayout, 
-                                  write_function = self.set_opt_processor)
+        
         
         #create combobox for reconstruction method
         self.reconbox = Combo_box(name ='Reconstruction method',
@@ -126,7 +127,7 @@ class ReconstructionWidget(QWidget):
                              layout = slayout,
                              write_function = self.set_opt_processor)
         
-        self.orderbox = Combo_box(name ='Order',
+        self.orderbox = Combo_box(name ='Rotation axis',
                              initial = Order_Modes.Horizontal.value,
                              choices = Order_Modes,
                              layout = slayout,
@@ -232,11 +233,11 @@ class ReconstructionWidget(QWidget):
                     
                     sinos[:,:,zidx] = cv2.normalize(sinos[:,:,zidx], None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F)
                     if self.orderbox.val == 0:
-                        print(sinos[:,:,zidx].shape)
+                        
                         optVolume[:,:, zidx] = self.h.reconstruct(sinos[:,:,zidx].T)
 
                     elif self.orderbox.val == 1:
-                        print(sinos[:,:,zidx].shape)
+                        
                         optVolume[:,:, zidx] = self.h.reconstruct(sinos[:,:,zidx])
                     
                     optVolume[:,:,zidx] = cv2.normalize(optVolume[:,:,zidx], None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F)

@@ -29,8 +29,8 @@ class Rec_modes(Enum):
     MODL_GPU = 4
 
 class Order_Modes(Enum):
-    T_Q_Z = 0
-    Q_T_Z = 1
+    Vertical = 0
+    Horizontal = 1
 
 class ReconstructionWidget(QWidget):
     
@@ -73,11 +73,6 @@ class ReconstructionWidget(QWidget):
 
     def createSettings(self, slayout):
         
-        self.registerbox = Settings('Automatic axis alignment',
-                                  dtype=bool,
-                                  initial=True, 
-                                  layout=slayout, 
-                                  write_function = self.set_opt_processor)
         
         self.reshapebox = Settings('Reshape volume',
                                   dtype=bool,
@@ -96,6 +91,13 @@ class ReconstructionWidget(QWidget):
                             initial = False, 
                             layout=slayout, 
                             write_function = self.set_opt_processor) 
+        
+
+        self.registerbox = Settings('Automatic axis alignment',
+                                  dtype=bool,
+                                  initial=False, 
+                                  layout=slayout, 
+                                  write_function = self.set_opt_processor)
         
         self.manualalignbox = Settings('Manual axis alignment',
                             dtype=bool,
@@ -125,7 +127,7 @@ class ReconstructionWidget(QWidget):
                              write_function = self.set_opt_processor)
         
         self.orderbox = Combo_box(name ='Order',
-                             initial = Order_Modes.Q_T_Z.value,
+                             initial = Order_Modes.Horizontal.value,
                              choices = Order_Modes,
                              layout = slayout,
                              write_function = self.set_opt_processor)
@@ -156,7 +158,6 @@ class ReconstructionWidget(QWidget):
 
     def select_layer(self, sinos:Image):
         
-        
         sinos = self.choose_layer_widget.image.value
         if sinos.data.ndim == 3:
             
@@ -183,11 +184,13 @@ class ReconstructionWidget(QWidget):
             ToDO: Link projections
             '''
 
-            sinos = np.moveaxis(np.float32(self.get_sinos()), 0, 1)
             
             if self.orderbox.val == 0:
+                sinos = np.moveaxis(np.float32(self.get_sinos()), 1, 2)
                 self.h.theta, self.h.Q, self.h.Z = sinos.shape
             elif self.orderbox.val == 1:
+                
+                sinos = np.moveaxis(np.float32(self.get_sinos()), 0, 1)
                 self.h.Q, self.h.theta, self.h.Z = sinos.shape
 
             if self.reshapebox.val == True:
@@ -195,7 +198,7 @@ class ReconstructionWidget(QWidget):
                 optVolume = np.zeros([
                     self.resizebox.val, self.resizebox.val, self.h.Z], np.float32)
                 sinos = self.h.resize(sinos)
-
+                
             else:
                 
                 optVolume = np.zeros([
@@ -208,14 +211,18 @@ class ReconstructionWidget(QWidget):
                 if self.registerbox.val == True:
                     
                     sinos[:,:,zidx] = cv2.normalize(sinos[:,:,zidx], None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F)
-                    optVolume[:,:,zidx] = self.h.correct_and_reconstruct(sinos[:,:,zidx])
+                    if self.orderbox.val == 0:
+                        optVolume[:,:, zidx] = self.h.correct_and_reconstruct(sinos[:,:,zidx].T)
+                    elif self.orderbox.val == 1:
+                        optVolume[:,:, zidx] = self.h.correct_and_reconstruct(sinos[:,:,zidx])
                     optVolume[:,:,zidx] = cv2.normalize(optVolume[:,:,zidx], None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F)
                 
                 elif self.manualalignbox.val == True:
 
                     sinos[:,:,zidx] = cv2.normalize(sinos[:,:,zidx], None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F)
+
                     if self.orderbox.val == 0:
-                        optVolume[:,:, zidx] = self.h.reconstruct(ndi.shift(sinos[:,:,zidx], (0, self.alignbox.val), mode = 'nearest'))
+                        optVolume[:,:, zidx] = self.h.reconstruct(ndi.shift(sinos[:,:,zidx], (0, self.alignbox.val), mode = 'nearest').T)
                     elif self.orderbox.val == 1:
                         optVolume[:,:, zidx] = self.h.reconstruct(ndi.shift(sinos[:,:,zidx], (self.alignbox.val, 0), mode = 'nearest'))
 
@@ -224,7 +231,14 @@ class ReconstructionWidget(QWidget):
                 else:
                     
                     sinos[:,:,zidx] = cv2.normalize(sinos[:,:,zidx], None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F)
-                    optVolume[:,:, zidx] = self.h.reconstruct(sinos[:,:,zidx])
+                    if self.orderbox.val == 0:
+                        print(sinos[:,:,zidx].shape)
+                        optVolume[:,:, zidx] = self.h.reconstruct(sinos[:,:,zidx].T)
+
+                    elif self.orderbox.val == 1:
+                        print(sinos[:,:,zidx].shape)
+                        optVolume[:,:, zidx] = self.h.reconstruct(sinos[:,:,zidx])
+                    
                     optVolume[:,:,zidx] = cv2.normalize(optVolume[:,:,zidx], None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F)
                 
                   
@@ -255,7 +269,7 @@ class ReconstructionWidget(QWidget):
             self.h.order_mode = self.orderbox.val
             self.h.clip_to_circle = self.clipcirclebox.val
             self.h.use_filter = self.filterbox.val
-            print('set', self.h.rec_process)
+            
             self.h.set_reconstruction_process()
 
     def start_opt_processor(self):     

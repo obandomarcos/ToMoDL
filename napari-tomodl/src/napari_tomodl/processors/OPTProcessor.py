@@ -32,8 +32,8 @@ class Rec_Modes(Enum):
     MODL_GPU = 4
 
 class Order_Modes(Enum):
-    T_Q_Z = 0
-    Q_T_Z = 1
+    Vertical = 0
+    Horizontal = 1
 
 class OPTProcessor:
 
@@ -44,7 +44,7 @@ class OPTProcessor:
 
         self.resize_val = 100
         self.rec_process = Rec_Modes.FBP_CPU.value
-        self.order_mode = Order_Modes.T_Q_Z.value
+        self.order_mode = Order_Modes.Vertical.value
         self.clip_to_circle = False
         self.use_filter = False
 
@@ -84,9 +84,9 @@ class OPTProcessor:
 
         if self.shift_step < 1:
             
-            if self.order_mode == Order_Modes.T_Q_Z.value:
+            if self.order_mode == Order_Modes.Vertical.value:
                 shift_tuple = (0, np.copy(self.center_shift))
-            elif self.order_mode == Order_Modes.Q_T_Z.value:
+            elif self.order_mode == Order_Modes.Horizontal.value:
                 shift_tuple = (np.copy(self.center_shift), 0)
 
             # Restart shifts
@@ -102,10 +102,10 @@ class OPTProcessor:
         for i, shift in enumerate(shifts):
             
             
-            if self.order_mode == Order_Modes.T_Q_Z.value:
+            if self.order_mode == Order_Modes.Vertical.value:
                 shift_tuple = (0, shift)
                 
-            if self.order_mode == Order_Modes.Q_T_Z.value:
+            if self.order_mode == Order_Modes.Horizontal.value:
                 shift_tuple = (shift, 0)
 
             sino_shift = ndi.shift(sinogram, shift_tuple, mode = 'nearest')
@@ -130,42 +130,39 @@ class OPTProcessor:
             -sinogram_volume (np.ndarray): array to resize in any mode specified.
         '''
         
-        if self.order_mode == Order_Modes.T_Q_Z.value:
+        if self.order_mode == Order_Modes.Vertical.value:
             self.theta, self.Q, self.Z = sinogram_volume.shape
-        if self.order_mode == Order_Modes.Q_T_Z.value:
+        if self.order_mode == Order_Modes.Horizontal.value:
             self.Q, self.theta, self.Z = sinogram_volume.shape
 
         if self.resize_bool == True:
             
-            if self.order_mode == Order_Modes.T_Q_Z.value:
+            if self.order_mode == Order_Modes.Vertical.value:
+                print('hola sinos resize')
                 sinogram_resize = np.zeros((self.theta, int(np.ceil(self.resize_val*np.sqrt(2))),
                                         self.Z),
                                         dtype = np.float32)
                 
-            if self.order_mode == Order_Modes.Q_T_Z.value:
-                
+            if self.order_mode == Order_Modes.Horizontal.value:
+                print('hola')
                 sinogram_resize = np.zeros((int(np.ceil(self.resize_val*np.sqrt(2))), self.theta,
                                         self.Z),
                                         dtype = np.float32)
                 
             for idx in range(self.Z):
                 
-                if self.order_mode == Order_Modes.T_Q_Z.value:
+                if self.order_mode == Order_Modes.Vertical.value:
 
-                    resize = cv2.resize(sinogram_volume[:,:,idx], 
+                    sinogram_resize[:,:,idx] = cv2.resize(sinogram_volume[:,:,idx], 
                                                       (int(np.ceil(self.resize_val*np.sqrt(2))), self.theta),
                                                       interpolation = cv2.INTER_NEAREST)
-                    sinogram_resize[:,:,idx] = resize 
                     
 
-                elif self.order_mode == Order_Modes.Q_T_Z.value:
+                elif self.order_mode == Order_Modes.Horizontal.value:
                     
-                    resize = cv2.resize(sinogram_volume[:,:,idx], 
+                    sinogram_resize[:,:,idx] = cv2.resize(sinogram_volume[:,:,idx], 
                                                       (self.theta, int(np.ceil(self.resize_val*np.sqrt(2)))),
                                                       interpolation = cv2.INTER_NEAREST)
-                    sinogram_resize[:,:,idx] = resize
-
-                    cv2.imwrite('image.png', resize)
                     
 
         return sinogram_resize

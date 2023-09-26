@@ -4,19 +4,28 @@ This code creates the model described in 'Convolutional neural networks for reco
 author: obanmarcos 
 '''
 
-import torch
-import torch.nn as nn
+
+try:
+    from torch_radon import Radon, RadonFanbeam
+    from torch_radon.solvers import cg
+    
+    import torch
+    import torch.nn as nn
+    import torch.nn.functional as F
+except:
+    print('Torch-Radon not available!')
+
 import numpy as np
-from torch_radon import Radon, RadonFanbeam
-from torch_radon.solvers import cg
 import matplotlib.pyplot as plt 
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
 
 
-# Modify for multi-gpu
-device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+try:
+    # Modify for multi-gpu
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+
+except:
+    print('Torch not available!')
+    
 # U-Net
 
 class double_conv(nn.Module):

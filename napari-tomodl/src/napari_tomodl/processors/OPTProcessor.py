@@ -5,11 +5,17 @@ Process sinograms in 2D
 from skimage.transform import radon as radon_scikit 
 from skimage.transform import iradon as iradon_scikit
 
-from torch_radon import Radon as radon_thrad
+try:
+    from torch_radon import Radon as radon_thrad
+    import torch
+    from .modl import ToMoDL
+    from .unet import UNet
+except:
+    print('Torch-Radon not available!')
+
 from .alternating import TwIST, TVdenoise, TVnorm
-from .modl import ToMoDL
-from .unet import UNet
-import torch
+
+
 import numpy as np
 from napari.layers import Image
 import scipy.ndimage as ndi
@@ -22,7 +28,10 @@ for k, v in os.environ.items():
     if k.startswith("QT_") and "cv2" in v:
         del os.environ[k]
 
-device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+try:
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+except:
+    print('Torch not available!')
 
 class Rec_Modes(Enum):
     FBP_CPU = 0
@@ -181,13 +190,16 @@ class OPTProcessor:
             self.angles = self.angles_gen(self.theta)   
         
         if self.iradon_functor == None:
-            
-            self.angles_torch = np.linspace(0, 2*np.pi, self.theta, endpoint = False)
-            self.iradon_functor = radon_thrad(self.resize_val, 
+            try:
+                self.angles_torch = np.linspace(0, 2*np.pi, self.theta, endpoint = False)
+                self.iradon_functor = radon_thrad(self.resize_val, 
                                               self.angles_torch, 
                                               clip_to_circle = self.clip_to_circle,
                                               det_count = np.ceil(np.sqrt(2)*self.resize_val).astype(int))         
-    
+            except:
+                self.iradon_functor = None
+                self.angles_torch = None
+                
         if self.rec_process == Rec_Modes.FBP_GPU.value:
            
             self.angles_torch = np.linspace(0, 2*np.pi, self.theta, endpoint = False)

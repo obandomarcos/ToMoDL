@@ -3,26 +3,28 @@ This code creates the model described in MoDL: Model-Based Deep Learning Archite
 
 @author: obanmarcos
 """
-import torch
-import torch.nn as nn
-import numpy as np
+
 try:
-    from torch_radon import Radon as thrad
-except ImportError:
-    pass
+    from torch_radon import Radon, RadonFanbeam
+    from torch_radon.solvers import cg
+    
+    import torch
+    import torch.nn as nn
+    import torch.nn.functional as F
+except:
+    print('Torch-Radon not available!')
 
 from skimage.transform import radon, iradon
-
-from torch_radon.solvers import cg
 import matplotlib.pyplot as plt 
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
+import numpy as np
 from . import unet
 
-# Modify for multi-gpu
-device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+try:
+    # Modify for multi-gpu
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
+except:
+    print('Torch not available!')
 class dwLayer(nn.Module):
     """
     Creates denoiser singular layer

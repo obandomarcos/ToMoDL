@@ -5,7 +5,7 @@ This code creates the model described in MoDL: Model-Based Deep Learning Archite
 """
 
 try:
-    from torch_radon import Radon, RadonFanbeam
+    from torch_radon import Radon as thrad
     from torch_radon.solvers import cg
     
     import torch
@@ -272,7 +272,7 @@ class Aclass:
         self.det_count = int(np.ceil(np.sqrt(2)*self.img_size))
         
         if self.use_torch_radon == True:
-            self.radon = Radon(self.img_size, self.angles, clip_to_circle = False, det_count = self.det_count)
+            self.radon = thrad(self.img_size, self.angles, clip_to_circle = False, det_count = self.det_count)
         else:
             class Radon:
                 def __init__(self, num_angles, circle=True):

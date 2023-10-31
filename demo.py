@@ -1,6 +1,13 @@
-from models.models_system import MoDLReconstructor
+from ToMoDL.models.models_system import MoDLReconstructor
 import matplotlib.pyplot as plt
+from pathlib import Path
+import ToMoDL.utilities.dataloading_utilities as dlutils
+from config import model_system_dict, trainer_system_dict, dataloader_system_dict
+from torch.utils.data import Dataloader
+import torch
+import wandb
 
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 run = wandb.init(project="deepopt")
 
 # Load model
@@ -9,7 +16,7 @@ artifact_tomodl_dir = artifact_tomodl.download()
 model_tomodl = MoDLReconstructor.load_from_checkpoint(Path(artifact_tomodl_dir) / "model.ckpt", kw_dictionary_model_system = model_system_dict)
 
 # Load dataset
-dataset_dict = {'root_folder' : 'path/to/test/dataset/', # In our case, datasets/x20/140315_3dpf_body_20
+dataset_dict = {'root_folder' : 'datasets/x20/140315_3dpf_body_20', # In our case, datasets/x20/140315_3dpf_body_20
                 'acceleration_factor' : 20,
                 'transform' : None}
 test_dataset = dlutils.ReconstructionDataset(**dataset_dict)

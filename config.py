@@ -114,7 +114,7 @@ profiler = None
 # profiler = SimpleProfiler(dirpath = './logs/', filename = 'Test_training_profile_pytorch')
 # profiler = PyTorchProfiler(dirpath = './logs/', filename = 'Test_training_profile_pytorch')
 
-trainer_dict = {'lightning_trainer_dict': lightning_trainer_dict,
+trainer_system_dict = {'lightning_trainer_dict': lightning_trainer_dict,
                 'use_k_folding': True, 
                 'track_checkpoints': True,
                 'epoch_number_checkpoint': 10,
@@ -140,7 +140,7 @@ trainer_dict = {'lightning_trainer_dict': lightning_trainer_dict,
 datasets_folder = '/path/to/datasets'
 data_transform = None                                    
 
-dataloader_dict = {'datasets_folder': datasets_folder,
+dataloader_system_dict = {'datasets_folder': datasets_folder,
                         'number_volumes' : 0,
                         'experiment_name': 'Bassi',
                         'img_resize': 100,

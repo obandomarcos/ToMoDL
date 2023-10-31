@@ -14,7 +14,7 @@ resnet_options_dict = {'number_layers': 8,
                         'in_channels':1,
                         'out_channels':1,
                         'stride':1, 
-                        'use_batch_norm': False,
+                        'use_batch_norm': True,
                         'init_method': 'xavier'}
 
 # Model parameters

@@ -20,6 +20,7 @@ from time import time
 import scipy.ndimage as ndi
 from enum  import Enum
 import cv2 
+import tqdm
 
 class Rec_modes(Enum):
     FBP_CPU = 0
@@ -207,7 +208,7 @@ class ReconstructionWidget(QWidget):
 
             time_in = time()
 
-            for zidx in range(self.h.Z):
+            for zidx in tqdm.tqdm(range(self.h.Z)):
                 
                 if self.registerbox.val == True:
                     
@@ -302,4 +303,3 @@ class ReconstructionWidget(QWidget):
 @magic_factory
 def choose_layer(image: Image):
         pass #TODO: substitute with a qtwidget without magic functions
-

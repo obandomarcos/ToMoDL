@@ -8,11 +8,19 @@ try:
     from torch_radon import Radon as thrad
     from torch_radon.solvers import cg
     
+    use_torch_radon = True
+    use_tomopy = False
+    use_scikit = False
+
+except:
     import torch
     import torch.nn as nn
     import torch.nn.functional as F
-except:
+    
     print('Torch-Radon not available!')
+    use_torch_radon = False
+    use_tomopy = False
+    use_scikit = True
 
 from skimage.transform import radon, iradon
 import matplotlib.pyplot as plt 
@@ -21,10 +29,11 @@ from . import unet
 
 try:
     # Modify for multi-gpu
-    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    device = torch.device("cuda:0" if use_torch_radon == True else "cpu")
 
 except:
     print('Torch not available!')
+
 class dwLayer(nn.Module):
     """
     Creates denoiser singular layer
@@ -109,8 +118,7 @@ class dw(nn.Module):
             if i == self.number_layers-1:
                 self.dw_layer_dict['is_last_layer']= True
 
-            self.nw['c'+str(i)] = dwLayer(self.dw_layer_dict)
-            self.nw['c'+str(i)].cuda(device)
+            self.nw['c'+str(i)] = dwLayer(self.dw_layer_dict).to(device)
 
         self.nw = nn.ModuleDict(self.nw)
           
@@ -156,103 +164,6 @@ class dw(nn.Module):
         'is_last_layer': False,
         'init_method':self.init_method}
 
-class ToMoDL(nn.Module):
-  
-  def __init__(self, kw_dictionary):
-    """
-    Main function that creates the model
-    Params : 
-
-        - nLayer (int): Number of layers
-        - K (int): unrolled network number of iterations
-        - n_angles (int): Number of total angles of the sinogram, fully sampled
-        - proj_num (int): Number of undersampled angles of the model
-        - image_size (int): Image size in pixels
-        - 
-
-    """
-    super(ToMoDL, self).__init__()
-
-    self.process_kwdictionary(kw_dictionary)
-    self.define_denoiser()
-    
-  def forward(self, x):
-    """
-    Forward pass through network
-    Params:
-        - x (torch.Tensor) : Backprojected sinogram, in image space    
-    """
-    
-    self.out['dc0'] = x
-
-    for i in range(1,self.K+1):
-    
-        j = str(i)
-        
-        self.out['dw'+j] = normalize_images(self.dw.forward(self.out['dc'+str(i-1)]))
-        rhs = x/self.lam+self.out['dw'+j]
-
-        self.out['dc'+j] = normalize_images(self.AtA.inverse(rhs))
-        
-        del rhs
-
-        torch.cuda.empty_cache()
-
-    return self.out
-  
-  def process_kwdictionary(self, kw_dictionary):
-    '''
-    Process keyword dictionary.
-    Params: 
-        - kw_dictionary (dict): Dictionary with keywords
-    '''
-
-    self.out = {}
-    self.use_torch_radon = kw_dictionary['use_torch_radon']
-    self.K = kw_dictionary['K_iterations']
-    self.number_projections_total = kw_dictionary['number_projections_total']
-    self.acceleration_factor = kw_dictionary['acceleration_factor']
-    self.number_projections_undersampled = self.number_projections_total//self.acceleration_factor
-    self.image_size = kw_dictionary['image_size'] 
-    
-    self.lam = kw_dictionary['lambda']
-    self.lam = torch.nn.Parameter(torch.tensor([self.lam], requires_grad = True, device = device))
-    
-    self.use_shared_weights = kw_dictionary['use_shared_weights']
-    self.denoiser_method = kw_dictionary['denoiser_method']
-    
-    self.in_channels = kw_dictionary['in_channels']
-    self.out_channels = kw_dictionary['out_channels']
-
-    if self.denoiser_method == 'U-Net':
-        self.unet_options = kw_dictionary['unet_options']
-    elif self.denoiser_method == 'resnet':
-        self.resnet_options = kw_dictionary['resnet_options']
-    
-    self.AtA_dictionary = {'image_size': self.image_size, 'number_projections': self.number_projections_total, 'lambda':self.lam, 'use_torch_radon': self.use_torch_radon}
-
-    self.AtA = Aclass(self.AtA_dictionary)
-
-  def define_denoiser(self):
-    '''
-    Defines denoiser used in MoDL. Options include Resnet and U-Net
-
-    References:
-        - Aggarwal, H. K., Mani, M. P., & Jacob, M. (2018). MoDL: Model-based deep learning architecture for inverse problems. IEEE transactions on medical imaging, 38(2), 394-405.
-        - Davis, S. P., Kumar, S., Alexandrov, Y., Bhargava, A., da Silva Xavier, G., Rutter, G. A., ... & McGinty, J. (2019). Convolutional neural networks for reconstruction of undersampled optical projection tomography data applied to in vivo imaging of zebrafish. Journal of biophotonics, 12(12), e201900128.
-    '''
-
-    if self.denoiser_method == 'U-Net':
-        
-        self.dw = unet.UNet(self.unet_options)                                               
-    
-    elif self.denoiser_method == 'resnet':
-        
-        if self.use_shared_weights == True:
-            self.dw = dw(self.resnet_options)
-        else:
-            self.dw = nn.ModuleList([dw(self.resnet_options) for _ in range(self.K)])
-
 class Aclass:
     """
     This class is created to do the data-consistency (DC) step as described in paper.
@@ -268,31 +179,33 @@ class Aclass:
         self.number_projections = kw_dictionary['number_projections']
         self.lam = kw_dictionary['lambda']
         self.use_torch_radon = kw_dictionary['use_torch_radon']
+        self.use_scikit = kw_dictionary['use_scikit']
         self.angles = np.linspace(0, 2*np.pi, self.number_projections,endpoint = False)
         self.det_count = int(np.ceil(np.sqrt(2)*self.img_size))
         
         if self.use_torch_radon == True:
             self.radon = thrad(self.img_size, self.angles, clip_to_circle = False, det_count = self.det_count)
-        else:
+        
+        elif self.use_scikit == True:
             class Radon:
                 def __init__(self, num_angles, circle=True):
                     self.num_angles = num_angles
                     self.circle = circle
-                
+
                 def forward(self, image):
                     # Compute the Radon transform of the image
-                    image = image.detach().cpu().numpy()
-                    sinogram = radon(image, theta=np.linspace(0, 180, self.num_angles), circle=self.circle)
-                    sinogram = torch.tensor(sinogram)
+                    image = image.detach().numpy()
+                    sinogram = radon(image, theta=np.linspace(0, 2*180, self.num_angles), circle=self.circle)
+                    sinogram = torch.tensor(sinogram).to(device)
                     return sinogram
                 
                 def backprojection(self, sinogram):
                     # Compute the backprojection of the sinogram
-                    sinogram = sinogram.detach().cpu().numpy()
+                    sinogram = sinogram.detach().numpy()
                     reconstruction = iradon(sinogram, theta=np.linspace(0, 2*180, self.num_angles), circle=self.circle, filter_name=None)
-                    reconstruction = torch.tensor(reconstruction)
+                    reconstruction = torch.tensor(reconstruction).to(device)
                     return reconstruction
-            
+
             self.radon = Radon(self.number_projections, circle=False)
 
     def forward(self, img):
@@ -354,6 +267,103 @@ class Aclass:
 
         # print('output CG: {} {}'.format(x.max(), x.min()))
         return x
+
+class ToMoDL(nn.Module):
+  
+  def __init__(self, kw_dictionary):
+    """
+    Main function that creates the model
+    Params : 
+
+        - nLayer (int): Number of layers
+        - K (int): unrolled network number of iterations
+        - n_angles (int): Number of total angles of the sinogram, fully sampled
+        - proj_num (int): Number of undersampled angles of the model
+        - image_size (int): Image size in pixels
+        - 
+
+    """
+    super(ToMoDL, self).__init__()
+
+    self.process_kwdictionary(kw_dictionary)
+    self.define_denoiser()
+    
+  def forward(self, x):
+    """
+    Forward pass through network
+    Params:
+        - x (torch.Tensor) : Backprojected sinogram, in image space    
+    """
+    
+    self.out['dc0'] = x
+
+    for i in range(1,self.K+1):
+    
+        j = str(i)
+        
+        self.out['dw'+j] = normalize_images(self.dw.forward(self.out['dc'+str(i-1)]))
+        rhs = x/self.lam+self.out['dw'+j]
+
+        self.out['dc'+j] = normalize_images(self.AtA.inverse(rhs))
+        
+        del rhs
+
+    return self.out
+  
+  def process_kwdictionary(self, kw_dictionary):
+    '''
+    Process keyword dictionary.
+    Params: 
+        - kw_dictionary (dict): Dictionary with keywords
+    '''
+
+    self.out = {}
+    self.use_torch_radon = use_torch_radon
+    self.use_scikit = use_scikit
+    self.use_tomopy = use_tomopy  
+    self.K = kw_dictionary['K_iterations']
+    self.number_projections_total = kw_dictionary['number_projections_total']
+    self.acceleration_factor = kw_dictionary['acceleration_factor']
+    self.number_projections_undersampled = self.number_projections_total//self.acceleration_factor
+    self.image_size = kw_dictionary['image_size'] 
+    
+    self.lam = kw_dictionary['lambda']
+    self.lam = torch.nn.Parameter(torch.tensor([self.lam], requires_grad = True, device = device))
+    
+    self.use_shared_weights = kw_dictionary['use_shared_weights']
+    self.denoiser_method = kw_dictionary['denoiser_method']
+    
+    self.in_channels = kw_dictionary['in_channels']
+    self.out_channels = kw_dictionary['out_channels']
+
+    if self.denoiser_method == 'U-Net':
+        self.unet_options = kw_dictionary['unet_options']
+    elif self.denoiser_method == 'resnet':
+        self.resnet_options = kw_dictionary['resnet_options']
+    
+    self.AtA_dictionary = {'image_size': self.image_size, 'number_projections': self.number_projections_total, 'lambda':self.lam, 'use_torch_radon': self.use_torch_radon, "use_scikit": self.use_scikit, "use_tomopy": self.use_tomopy}
+
+    self.AtA = Aclass(self.AtA_dictionary)
+
+  def define_denoiser(self):
+    '''
+    Defines denoiser used in MoDL. Options include Resnet and U-Net
+
+    References:
+        - Aggarwal, H. K., Mani, M. P., & Jacob, M. (2018). MoDL: Model-based deep learning architecture for inverse problems. IEEE transactions on medical imaging, 38(2), 394-405.
+        - Davis, S. P., Kumar, S., Alexandrov, Y., Bhargava, A., da Silva Xavier, G., Rutter, G. A., ... & McGinty, J. (2019). Convolutional neural networks for reconstruction of undersampled optical projection tomography data applied to in vivo imaging of zebrafish. Journal of biophotonics, 12(12), e201900128.
+    '''
+
+    if self.denoiser_method == 'U-Net':
+        
+        self.dw = unet.UNet(self.unet_options)                                               
+    
+    elif self.denoiser_method == 'resnet':
+        
+        if self.use_shared_weights == True:
+            self.dw = dw(self.resnet_options)
+        else:
+            self.dw = nn.ModuleList([dw(self.resnet_options) for _ in range(self.K)])
 
 def normalize_images(images):
     '''

@@ -5,13 +5,18 @@ Process sinograms in 2D
 from skimage.transform import radon as radon_scikit 
 from skimage.transform import iradon as iradon_scikit
 
+
+import torch
+from .modl import ToMoDL
+from .unet import UNet
 try:
     from torch_radon import Radon as radon_thrad
-    import torch
-    from .modl import ToMoDL
-    from .unet import UNet
+    use_cuda = True
+
 except:
+    use_cuda = False
     print('Torch-Radon not available!')
+
 
 from .alternating import TwIST, TVdenoise, TVnorm
 
@@ -23,13 +28,14 @@ import os
 import matplotlib.pyplot as plt 
 import cv2
 from enum  import Enum
+import tqdm
 
 for k, v in os.environ.items():
     if k.startswith("QT_") and "cv2" in v:
         del os.environ[k]
 
 try:
-    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    device = torch.device("cuda:0" if use_cuda == True else "cpu")
 except:
     print('Torch not available!')
 
@@ -158,7 +164,7 @@ class OPTProcessor:
                                         self.Z),
                                         dtype = np.float32)
                 
-            for idx in range(self.Z):
+            for idx in tqdm.tqdm(range(self.Z)):
                 
                 if self.order_mode == Order_Modes.Vertical.value:
 

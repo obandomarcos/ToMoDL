@@ -9,12 +9,13 @@ try:
     from torch_radon import Radon, RadonFanbeam
     from torch_radon.solvers import cg
     
-    import torch
-    import torch.nn as nn
-    import torch.nn.functional as F
+
 except:
     print('Torch-Radon not available!')
 
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
 import numpy as np
 import matplotlib.pyplot as plt 
 

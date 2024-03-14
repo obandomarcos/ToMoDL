@@ -11,8 +11,7 @@ try:
     use_torch_radon = True
     use_tomopy = False
     use_scikit = False
-
-except:
+except ModuleNotFoundError:
     import torch
     import torch.nn as nn
     import torch.nn.functional as F

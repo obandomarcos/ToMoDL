@@ -14,8 +14,11 @@ from . import modl
 import pytorch_lightning as pl
 import torch.nn as nn
 import numpy as np
-from torch_radon import Radon, RadonFanbeam
-from torch_radon.solvers import cg
+try:
+    from torch_radon import Radon as thrad
+    from torch_radon.solvers import cg
+except ModuleNotFoundError:
+    from skimage.transform import radon, iradon
 import matplotlib.pyplot as plt 
 import torch
 import torch.nn as nn
@@ -44,7 +47,7 @@ class MoDLReconstructor(pl.LightningModule):
 
         self.process_kwdictionary(kw_dictionary_model_system)
         
-        self.model = modl.modl(self.kw_dictionary_modl)
+        self.model = modl.ToMoDL(self.kw_dictionary_modl)
 
         self.save_hyperparameters(self.hparams)
 

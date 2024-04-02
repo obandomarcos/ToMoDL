@@ -28,6 +28,7 @@ class Rec_modes(Enum):
     TWIST_CPU = 2
     UNET_GPU = 3
     MODL_GPU = 4
+    MODL_CPU = 5
 
 class Order_Modes(Enum):
     Vertical = 0
@@ -74,6 +75,7 @@ class ReconstructionWidget(QWidget):
 
     def createSettings(self, slayout):
         
+
         self.reshapebox = Settings('Reshape volume',
                                   dtype=bool,
                                   initial = True, 
@@ -120,7 +122,6 @@ class ReconstructionWidget(QWidget):
                             write_function = self.set_opt_processor)
         
         
-        
         #create combobox for reconstruction method
         self.reconbox = Combo_box(name ='Reconstruction method',
                              initial = Rec_modes.FBP_GPU.value,
@@ -128,6 +129,18 @@ class ReconstructionWidget(QWidget):
                              layout = slayout,
                              write_function = self.set_opt_processor)
         
+        self.fullvolume = Settings('Reconstruct full volume',
+                                  dtype=bool,
+                                  initial = False, 
+                                  layout=slayout, 
+                                  write_function = self.set_opt_processor) 
+
+        self.slices = Settings('# of slices to reconstruct',
+                                  dtype=int, 
+                                  initial=0, 
+                                  layout=slayout, 
+                                  write_function = self.set_opt_processor)
+
         self.orderbox = Combo_box(name ='Rotation axis',
                              initial = Order_Modes.Horizontal.value,
                              choices = Order_Modes,
@@ -208,7 +221,7 @@ class ReconstructionWidget(QWidget):
 
             time_in = time()
 
-            for zidx in tqdm.tqdm(range(self.h.Z)):
+            for zidx in tqdm.tqdm(range(self.h.Z if self.fullvolume.val == True else self.slices.val)):
                 
                 if self.registerbox.val == True:
                     
@@ -303,3 +316,4 @@ class ReconstructionWidget(QWidget):
 @magic_factory
 def choose_layer(image: Image):
         pass #TODO: substitute with a qtwidget without magic functions
+

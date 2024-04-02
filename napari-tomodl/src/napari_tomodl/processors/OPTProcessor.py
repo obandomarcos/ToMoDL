@@ -29,6 +29,7 @@ import matplotlib.pyplot as plt
 import cv2
 from enum  import Enum
 import tqdm
+import os, sys
 
 for k, v in os.environ.items():
     if k.startswith("QT_") and "cv2" in v:
@@ -45,10 +46,19 @@ class Rec_Modes(Enum):
     TWIST_CPU = 2
     UNET_GPU = 3
     MODL_GPU = 4
+    MODL_CPU = 5
 
 class Order_Modes(Enum):
     Vertical = 0
     Horizontal = 1
+
+def my_filtering_function(pair):
+    unwanted_key = 'num_batches'
+    key, value = pair
+    if unwanted_key in key:
+        return False  # filter pair out of the dictionary
+    else:
+        return True  # keep pair in the filtered dictionary
 
 class OPTProcessor:
 
@@ -230,7 +240,7 @@ class OPTProcessor:
         
         elif self.rec_process == Rec_Modes.MODL_GPU.value:
             
-            resnet_options_dict = {'number_layers': 5,
+            resnet_options_dict = {'number_layers': 8,
                                     'kernel_size':3,
                                     'features':64,
                                     'in_channels':1,
@@ -241,11 +251,11 @@ class OPTProcessor:
             
             self.tomodl_dictionary = {'use_torch_radon': True,
                                     'metric': 'psnr',
-                                    'K_iterations' : 2,
+                                    'K_iterations' : 8,
                                     'number_projections_total' : sinogram.shape[0],
                                     'acceleration_factor': 10,
                                     'image_size': 100,
-                                    'lambda': 0.00001,
+                                    'lambda': 0.01,
                                     'use_shared_weights': True,
                                     'denoiser_method': 'resnet',
                                     'resnet_options': resnet_options_dict,
@@ -254,6 +264,52 @@ class OPTProcessor:
                             
             self.iradon_functor = ToMoDL(self.tomodl_dictionary)
             
+            __location__ = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)))
+            artifact_path = os.path.join(__location__, 'model.ckpt')
+            tomodl_checkpoint = torch.load(artifact_path, map_location = torch.device("cuda:0"))
+
+            tomodl_checkpoint['state_dict'] = {k.replace("model.", ""): v for (k,v) in tomodl_checkpoint['state_dict'].items()}
+
+            self.iradon_functor.load_state_dict(dict(filter(my_filtering_function, tomodl_checkpoint['state_dict'].items())))
+            self.iradon_function = lambda sino: self.iradon_functor(
+                                                    torch.Tensor(
+                                                        iradon_scikit(sino, 
+                                                                      self.angles, 
+                                                                      circle = self.clip_to_circle, filter_name = None)).to(device).unsqueeze(0).unsqueeze(1))['dc'+str(self.tomodl_dictionary['K_iterations'])].detach().cpu().numpy()
+
+        elif self.rec_process == Rec_Modes.MODL_CPU.value:
+            
+            resnet_options_dict = {'number_layers': 8,
+                                    'kernel_size':3,
+                                    'features':64,
+                                    'in_channels':1,
+                                    'out_channels':1,
+                                    'stride':1, 
+                                    'use_batch_norm': True,
+                                    'init_method': 'xavier'}
+            
+            self.tomodl_dictionary = {'use_torch_radon': True,
+                                    'metric': 'psnr',
+                                    'K_iterations' : 8,
+                                    'number_projections_total' : sinogram.shape[0],
+                                    'acceleration_factor': 32,
+                                    'image_size': 100,
+                                    'lambda': 0.025,
+                                    'use_shared_weights': True,
+                                    'denoiser_method': 'resnet',
+                                    'resnet_options': resnet_options_dict,
+                                    'in_channels': 1,
+                                    'out_channels': 1}
+                            
+            self.iradon_functor = ToMoDL(self.tomodl_dictionary)
+            
+            __location__ = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)))
+            artifact_path = os.path.join(__location__, 'model.ckpt')
+            tomodl_checkpoint = torch.load(artifact_path, map_location = torch.device("cpu"))
+
+            tomodl_checkpoint['state_dict'] = {k.replace("model.", ""): v for (k,v) in tomodl_checkpoint['state_dict'].items()}
+
+            self.iradon_functor.load_state_dict(dict(filter(my_filtering_function, tomodl_checkpoint['state_dict'].items())))
             self.iradon_function = lambda sino: self.iradon_functor(
                                                     torch.Tensor(
                                                         iradon_scikit(sino, 

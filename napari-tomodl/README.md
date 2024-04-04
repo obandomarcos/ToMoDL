@@ -26,11 +26,11 @@ ToMoDL allows users to reconstruct tomography images from its raw projections ju
 
 1 - Load ordered stack: Click File -> Open Files as Stack... and load the angular projections for parallel beam optical tomography reconstruction.
 
-![plot](https://raw.githubusercontent.com/marcoso96/ToMoDL/napari/napari-tomodl/figures/fig3.png)
+![plot](https://raw.githubusercontent.com/marcoso96/ToMoDL/main/napari-tomodl/figures/fig3.png)
 
 2 - Select the current volume in the dropdown menu with the button 'Select image layer'. Notice that the projections should be in grayscale and more than one slide in the stack.
 
-![plot](https://raw.githubusercontent.com/marcoso96/ToMoDL/napari/napari-tomodl/figures/fig4.png)
+![plot](https://raw.githubusercontent.com/marcoso96/ToMoDL/main/napari-tomodl/figures/fig4.png)
 
 3 - If the axis is not correctly aligned in acquisition time, we provide an algorithm to do so by clicking on 'Align axis'. This will align the sinogram respect to the center of the detector in order to maximise the variance of the reconstructions. See Walls et al. 
 
@@ -54,7 +54,7 @@ This package requires [torch-radon] for optimized GPU tomographic reconstruction
 
 and `PyTorch == 1.8.0` via wheel, which can be downloaded and installed with: 
 
-    pip install 'torch @ https://download.pytorch.org/whl/cu111/torch-1.8.0%%2Bcu111-cp38-cp38-linux_x86_64.whl'
+    pip install 'torch @ https://download.pytorch.org/whl/cu111/torch-1.8.0%2Bcu111-cp38-cp38-linux_x86_64.whl'
 
 You can install `napari-tomodl` via [pip]:
 

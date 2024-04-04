@@ -44,7 +44,7 @@ ToMoDL allows users to reconstruct tomography images from its raw projections ju
 
 8 - Reconstruct! A new Layer should be created on top of the projections stack containing the reconstructed volume.
 
-![plot](https://raw.githubusercontent.com/marcoso96/ToMoDL/napari/napari-tomodl/figures/fig2.png)
+![plot](https://raw.githubusercontent.com/marcoso96/ToMoDL/main/napari-tomodl/figures/fig2.png)
 
 ## Installation
 

@@ -16,10 +16,7 @@ import re
 import torch
 import os 
 from tqdm import tqdm
-try:
-    from torch_radon import Radon
-except ModuleNotFoundError:
-    from skimage.transform import radon
+from torch_radon import Radon
 import pickle
 from pathlib import Path
 import torch

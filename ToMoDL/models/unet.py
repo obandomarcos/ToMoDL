@@ -7,15 +7,9 @@ author: obanmarcos
 import torch
 import torch.nn as nn
 import numpy as np
-try:
-    from torch_radon import Radon as thrad
-    from torch_radon.solvers import cg
-    
-    use_torch_radon = True
-    use_tomopy = False
-    use_scikit = False
-except ModuleNotFoundError:
-    from skimage.transform import radon, iradon
+from torch_radon import Radon, RadonFanbeam
+from torch_radon.solvers import cg
+import matplotlib.pyplot as plt 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F

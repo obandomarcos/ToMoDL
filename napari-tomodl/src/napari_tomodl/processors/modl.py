@@ -8,11 +8,16 @@ try:
     from torch_radon import Radon as thrad
     from torch_radon.solvers import cg
     
+    import torch
+    import torch.nn as nn
+    import torch.nn.functional as F
+
     use_torch_radon = True
     use_tomopy = False
     use_scikit = False
 
 except:
+    
     import torch
     import torch.nn as nn
     import torch.nn.functional as F

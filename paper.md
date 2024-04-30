@@ -54,6 +54,12 @@ From the side of the visualizers, napari [@chiu2022napari], a fast and practical
 
 The software presented here intends to close the gap between a wide variety of reconstruction methdos and a powerful visualization tool by introducing  a ready-to-use widget that offers state-of-the-art methods for tomographic reconstruction as well as a framework that will allow to include future methodologies.
 
+# Methods and Workflow
+
+
+# Use cases
+
+
 # Mathematics
 
 Single dollars ($) are required for inline mathematics e.g. $f(x) = e^{\pi/x}$

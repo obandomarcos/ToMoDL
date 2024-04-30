@@ -34,13 +34,13 @@ Recent advances in different tomographic methodologies have contributed to a bro
 
 We present here napari-TomoDL, a plugin of the napari viewer [@chiu2022napari]  that contains four main methods for tomographic reconstruction: filtered backprojection (FBP) [@kak2001principles], Two-step Iterative Shrinkage/Thresholding (TwIST) [@bioucas2007new], U-Net [@ronneberger2015u] and ToMoDL [@obando2023model],  being the last our recent introduced method for optical projection tomography reconstruction. Tne neural network based techniques have been trained in the Pytorch framwework [@NEURIPS2019_9015] and they display excellent results when the reconstruction is performed with a very sparse set of projections [obando2023model@}. The plugin also offers the capability of axis alignment via variance maximization [@walls2005correction]. 
 
-The input to the plugin is a stack of projections. The user only has to determine which is the rotation axis of the system (vertical or horizontal) and choose the reconstruction method. Additional options iclude 
-  -resizing
-  -manual or automatic center-of-rotation alignement
-  -clip to circle
-  -filtering
-  -full or partial volume reconstruction
-  -choice of use of CPU or GPU for the reconstruction.
+The input to the plugin is a stack of projections. The user only has to determine which is the rotation axis of the system (vertical or horizontal) and choose the reconstruction method. Additional options iclude: 
+- resizing
+- manual or automatic center-of-rotation alignement
+- clip to circle
+- filtering
+- full or partial volume reconstruction
+- choice of use of CPU or GPU for the reconstruction.
 
 napari-TomoDL is integrally based on well-established open source software libraries such as NumPy [@harris2020array], Scipy [@virtanen2020scipy], scikit-image [@scikit-image]. The neural network methods in the software are implemented in PyTorch [@NEURIPS2019_9015]. The computational burden that the Radon transform poses when applied iteratively is  overcome by using  TorchRadon [@ronchetti2020torchradon], a fast differentiable routine for computed tomography reconstruction developed as a PyTorch extension.
 

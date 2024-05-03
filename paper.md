@@ -69,7 +69,7 @@ The complete pipeline of the software includes the following staps:
 -Read data in image stack
 -Normalization of size
 -Normalization of intensity
--
+-Writing output
 
 Figure with workflow
 

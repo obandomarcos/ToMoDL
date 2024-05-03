@@ -56,6 +56,23 @@ The software presented here intends to close the gap between a wide variety of r
 
 # Methods and Workflow
 
+The reconstruction methods implemented in the the packages are:
+
+-**FBP** Filtered backprojection is a widely used method for tomographic reconstruction. The method involves filtering the data in the frequency domain and then backprojecting the filtered data onto the 3D volume. The filter used in FBP is typically a ramp filter, which amplifies high-frequency components of the data. FBP is computationally efficient and works well for simple geometries, such as parallel-beam tomography.
+-**TwIST** (Two-step Iterative Shrinkage and Thresholding) is an iterative method for tomographic reconstruction, which involves iteratively solving a convex optimisation problem such as (1) using the shrinkage and thresholding ­ technique for each 2D slice. In this implementation, we chose to minimise the total variation norm as our regularising function. TwIST can handle a wide range of geometries and produces high-quality reconstructions. However, it is computationally expensive and requires careful tuning of ­ parameters [@correia2015accelerated].
+-**Unet**is a deep learning architecture for tomographic reconstruction that uses a U-shaped network with skip ­connections [@ronneberger2015u] . The proposed network in [@@article{davis2019convolutional] processes undersampled FBP reconstructions and outputs streak-free 2D images. The skip connections help preserve fine details in the reconstruction and the network can handle complex geometries and noisy data. While reconstruction times for this approach are short, making it suitable for real-time imaging, training a U-Net requires a large amount of data.
+-**ToMODL** is a method that combines  iteration over a data consistency step and an image domain artefact removal step achieved by a convolutional neural network. The data consistenmcy step is implemented using the gradient conjugate algorithm and the artefact removal via a deep neural network  with shared weights across iterations.  As the forward model is explicitly accounted for, the number of network parameters to be learned is significantly reduced compared to direct inversion approaches, thereby providing better performance in training data constrained settings [@obando2023model].
+
+The complete pipeline of the software includes the following staps:
+**Marcos this is purely tentative**
+
+-Read data in image stack
+-Normalization of size
+-Normalization of intensity
+-
+
+Figure with workflow
+
 
 # Use cases
 

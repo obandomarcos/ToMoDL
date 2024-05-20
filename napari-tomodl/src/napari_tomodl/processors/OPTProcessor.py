@@ -232,7 +232,6 @@ class OPTProcessor:
 
         elif self.rec_process == Rec_Modes.FBP_CPU.value:
             
-            
             self.iradon_function = lambda sino: iradon_scikit(sino, 
                                                               self.angles, 
                                                               circle = self.clip_to_circle,
@@ -346,7 +345,7 @@ class OPTProcessor:
             self.iradon_function = lambda sino: self.iradon_functor(AT_tensor(sino)).detach().cpu().numpy()
 
         
-        reconstruction = self.iradon_function(sinogram)
+        reconstruction = self.iradon_function(sinogram) 
 
         return reconstruction
         

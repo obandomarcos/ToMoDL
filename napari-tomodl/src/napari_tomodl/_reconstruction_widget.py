@@ -135,7 +135,7 @@ class ReconstructionWidget(QWidget):
                                   layout=slayout, 
                                   write_function = self.set_opt_processor) 
 
-        self.slices = Settings('# of slices to reconstruct',
+        self.slices = Settings('Slice to reconstruct',
                                   dtype=int, 
                                   initial=0, 
                                   layout=slayout, 
@@ -220,46 +220,90 @@ class ReconstructionWidget(QWidget):
                     int(np.ceil(self.h.Q/np.sqrt(2))), int(np.ceil(self.h.Q/np.sqrt(2))), self.h.Z], np.float32)
 
             time_in = time()
+            
+            if self.fullvolume.val == True:
+                slices = np.arange(self.h.Z)
+            else:
+                slices = [self.slices.val]
+            
+            if self.fullvolume.val == True:
 
-            for zidx in tqdm.tqdm(range(self.h.Z if self.fullvolume.val == True else self.slices.val)):
-                
-                if self.registerbox.val == True:
+                for zidx in tqdm.tqdm(slices):
                     
-                    sinos[:,:,zidx] = cv2.normalize(sinos[:,:,zidx], None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F)
-                    if self.orderbox.val == 0:
-                        optVolume[:,:, zidx] = self.h.correct_and_reconstruct(sinos[:,:,zidx].T)
-                    elif self.orderbox.val == 1:
-                        optVolume[:,:, zidx] = self.h.correct_and_reconstruct(sinos[:,:,zidx])
-                    optVolume[:,:,zidx] = cv2.normalize(optVolume[:,:,zidx], None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F)
-                
-                elif self.manualalignbox.val == True:
-
-                    sinos[:,:,zidx] = cv2.normalize(sinos[:,:,zidx], None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F)
-
-                    if self.orderbox.val == 0:
-                        optVolume[:,:, zidx] = self.h.reconstruct(ndi.shift(sinos[:,:,zidx], (0, self.alignbox.val), mode = 'nearest').T)
-                    elif self.orderbox.val == 1:
-                        optVolume[:,:, zidx] = self.h.reconstruct(ndi.shift(sinos[:,:,zidx], (self.alignbox.val, 0), mode = 'nearest'))
-
-                    optVolume[:,:,zidx] = cv2.normalize(optVolume[:,:,zidx], None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F)
-
-                else:
-                    
-                    sinos[:,:,zidx] = cv2.normalize(sinos[:,:,zidx], None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F)
-                    if self.orderbox.val == 0:
+                    if self.registerbox.val == True:
                         
-                        optVolume[:,:, zidx] = self.h.reconstruct(sinos[:,:,zidx].T)
-
-                    elif self.orderbox.val == 1:
-                        
-                        optVolume[:,:, zidx] = self.h.reconstruct(sinos[:,:,zidx])
+                        # sinos[:,:,zidx] = cv2.normalize(sinos[:,:,zidx], None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F)
+                        if self.orderbox.val == 0:
+                            optVolume[:,:, zidx] = self.h.correct_and_reconstruct(sinos[:,:,zidx].T)
+                        elif self.orderbox.val == 1:
+                            optVolume[:,:, zidx] = self.h.correct_and_reconstruct(sinos[:,:,zidx])
+                        optVolume[:,:,zidx] = cv2.normalize(optVolume[:,:,zidx], None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F)
                     
-                    optVolume[:,:,zidx] = cv2.normalize(optVolume[:,:,zidx], None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F)
-                
-                  
+                    elif self.manualalignbox.val == True:
+
+                        # sinos[:,:,zidx] = cv2.normalize(sinos[:,:,zidx], None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F)
+
+                        if self.orderbox.val == 0:
+                            optVolume[:,:, zidx] = self.h.reconstruct(ndi.shift(sinos[:,:,zidx], (0, self.alignbox.val), mode = 'nearest').T)
+                        elif self.orderbox.val == 1:
+                            optVolume[:,:, zidx] = self.h.reconstruct(ndi.shift(sinos[:,:,zidx], (self.alignbox.val, 0), mode = 'nearest'))
+
+                        optVolume[:,:,zidx] = cv2.normalize(optVolume[:,:,zidx], None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F)
+
+                    else:
+                        
+                        # sinos[:,:,zidx] = cv2.normalize(sinos[:,:,zidx], None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F)
+                        if self.orderbox.val == 0:
+                            
+                            optVolume[:,:, zidx] = self.h.reconstruct(sinos[:,:,zidx].T)
+
+                        elif self.orderbox.val == 1:
+                            
+                            optVolume[:,:, zidx] = self.h.reconstruct(sinos[:,:,zidx])
+                        
+                        optVolume[:,:,zidx] = cv2.normalize(optVolume[:,:,zidx], None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F)
+                        print(zidx, optVolume[:,:,zidx].mean(), "hola")
+            
+            else:
+
+                for zidx in tqdm.tqdm(slices):
+                    
+                    if self.registerbox.val == True:
+                        
+                        # sinos[:,:,zidx] = cv2.normalize(sinos[:,:,zidx], None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F)
+                        if self.orderbox.val == 0:
+                            slicevol = self.h.correct_and_reconstruct(sinos[:,:,zidx].T)
+                        elif self.orderbox.val == 1:
+                            slicevol = self.h.correct_and_reconstruct(sinos[:,:,zidx])
+                        slicevol = cv2.normalize(slicevol, None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F)
+                    
+                    elif self.manualalignbox.val == True:
+
+                        # sinos[:,:,zidx] = cv2.normalize(sinos[:,:,zidx], None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F)
+
+                        if self.orderbox.val == 0:
+                            slicevol = self.h.reconstruct(ndi.shift(sinos[:,:,zidx], (0, self.alignbox.val), mode = 'nearest').T)
+                        elif self.orderbox.val == 1:
+                            slicevol = self.h.reconstruct(ndi.shift(sinos[:,:,zidx], (self.alignbox.val, 0), mode = 'nearest'))
+
+                        slicevol = cv2.normalize(slicevol, None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F)
+
+                    else:
+                        
+                        # sinos[:,:,zidx] = cv2.normalize(sinos[:,:,zidx], None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F)
+                        if self.orderbox.val == 0:
+                            
+                            slicevol = self.h.reconstruct(sinos[:,:,zidx].T)
+
+                        elif self.orderbox.val == 1:
+                            
+                            slicevol = self.h.reconstruct(sinos[:,:,zidx])
+                        
+                        slicevol = cv2.normalize(slicevol, None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F)
+
                     
             print('Tiempo de cómputo total: {} s'.format(round(time()-time_in, 3)))
-            return np.rollaxis(optVolume, -1)
+            return np.rollaxis(optVolume, -1) if self.fullvolume.val == True else slicevol
 
         _reconstruct()
     

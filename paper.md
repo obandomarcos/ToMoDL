@@ -75,6 +75,8 @@ The complete pipeline of the software includes the following steps:
 Figure with workflow
 
 
+![Caption for example figure.\label{fig:}](./napari-tomodl/figures/Figura1.pdf)
+
 # Use cases
 
 

@@ -63,39 +63,30 @@ The reconstruction methods implemented in the the packages are:
 - **Unet** is a deep learning architecture for tomographic reconstruction that uses a U-shaped network with skip ­connections [@ronneberger2015u] . The proposed network in [@davis2019convolutional] processes undersampled FBP reconstructions and outputs streak-free 2D images. The skip connections help preserve fine details in the reconstruction and the network can handle complex geometries and noisy data. While reconstruction times for this approach are short, making it suitable for real-time imaging, training a U-Net requires a large amount of data.
 - **ToMODL** is a method that combines  iteration over a data consistency step and an image domain artefact removal step achieved by a convolutional neural network. The data consistenmcy step is implemented using the gradient conjugate algorithm and the artefact removal via a deep neural network  with shared weights across iterations.  As the forward model is explicitly accounted for, the number of network parameters to be learned is significantly reduced compared to direct inversion approaches, thereby providing better performance in training data constrained settings [@obando2023model].
 
-The complete pipeline of the software includes the following steps:
+In Fig. \autoref{fig:workflow}, a complete pipeline describing the usage of napari-tomodl is presented. Based on the single-channel raw data acquired by a parallel tomography use-case, this ordered stack of files undergoes the following steps in order to obtain ready-to-analyse reconstructions:
 
-**Marcos this is purely tentative**
+1. Load the raw image stack using napari file manager tab, obtaining a new raw 3D image layer.
+2. Over the plugin's sliding window, select the target raw image layer and click over the "Select image layer" button.
+3. Rotation axis can be aligned using automatic/manual methods. For the manual way, select an integer corresponding to the pixel shift respect to the rotation axis. A single slice reconstruction (as described in step ) is recommended for manual iteration over this step.
+4. Use filtering for reconstructions, only applying for FBP methods, and size of the reconstructed 'xy' slice.
+5. Choose between FBP (analytical), TwIST (iterative), U-Net or ToMoDL methods (deep learning).
+6. Choose to reconstruct full volume or single slice, specifying slice index in this case.
+7. Regarding the alignment of the loaded volume, choose rotation axis between vertical or horizontal.
 
-- Read data in image stack
-- Normalization of size
-- Normalization of intensity
-- Writing output
-
-Figure with workflow
+Once these steps are completed, the 'Reconstruction' button allows for executing the desired specifications for image recovery from projections. In napari, outputs are written as image layers which can be analysed by other plugins and saved in different formats. One special feature that napari offers on top of 3D images is volume renderization, useful once a full volume is computed with the presented plugin. Normalization of intensity and contrast can be also applied to specific layers using napari's built-in tools in the top-left bar.
 
 
-![Caption for example figure.\label{fig:}](./napari-tomodl/figures/Figura1.pdf)
+
+![Napari-tomodl usage pipeline, described step-by-step from a stack of raw projection acquisition to reconstruction of single specific slice or full volume.\label{fig:Workflow}](./napari-tomodl/figures/Figura1.pdf)
 
 # Use cases
 
+We present three parallel tomography use cases for the napari-tomodl plugin based on raw data acquisitions:
 
-# Mathematics
 
-Single dollars ($) are required for inline mathematics e.g. $f(x) = e^{\pi/x}$
 
-Double dollars make self-standing equations:
 
-$$\Theta(x) = \left\{\begin{array}{l}
-0\textrm{ if } x < 0\cr
-1\textrm{ else}
-\end{array}\right.$$
 
-You can also use plain \LaTeX for equations
-\begin{equation}\label{eq:fourier}
-\hat f(\omega) = \int_{-\infty}^{\infty} f(x) e^{i\omega x} dx
-\end{equation}
-and refer to \autoref{eq:fourier} from text.
 
 # Citations
 

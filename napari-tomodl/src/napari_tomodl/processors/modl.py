@@ -3,24 +3,21 @@ This code creates the model described in MoDL: Model-Based Deep Learning Archite
 
 @author: obanmarcos
 """
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+
 
 try:
     from torch_radon import Radon as thrad
     from torch_radon.solvers import cg
     
-    import torch
-    import torch.nn as nn
-    import torch.nn.functional as F
-
     use_torch_radon = True
     use_tomopy = False
     use_scikit = False
 
 except:
     
-    import torch
-    import torch.nn as nn
-    import torch.nn.functional as F
     
     print('Torch-Radon not available!')
     use_torch_radon = False

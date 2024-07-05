@@ -28,7 +28,7 @@ from torch.utils.data import DataLoader
 from torchvision import transforms as T
 from pytorch_msssim import SSIM
 # from torchmetrics import StructuralSimilarityIndexMeasure as SSIM
-from torchmetrics import MultiScaleStructuralSimilarityIndexMeasure as MSSSIM
+from torchmetrics.image import MultiScaleStructuralSimilarityIndexMeasure as MSSSIM
 import wandb
 from pathlib import Path
 import pandas as pd
@@ -78,4 +78,3 @@ if __name__ == '__main__':
     fig.savefig('results/18-ReconstructFull_{}.pdf'.format(method))
 
     cv2.imwrite('results/18-ReconstructFull+{}.jpg'.format(method), vol_proj)
-

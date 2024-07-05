@@ -30,7 +30,7 @@ from torch.utils.data import DataLoader
 from torchvision import transforms as T
 from pytorch_msssim import SSIM
 # from torchmetrics import StructuralSimilarityIndexMeasure as SSIM
-from torchmetrics import MultiScaleStructuralSimilarityIndexMeasure as MSSSIM
+from torchmetrics.image import MultiScaleStructuralSimilarityIndexMeasure as MSSSIM
 import wandb
 from pathlib import Path
 
@@ -317,7 +317,3 @@ if __name__ == '__main__':
             dataframe = dataframe.append(row.copy(), ignore_index=True)
 
             dataframe.to_pickle(dataframe_path)
-
-
-            
-                

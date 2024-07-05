@@ -1,5 +1,5 @@
 from pytorch_msssim import SSIM
-from torchmetrics import MultiScaleStructuralSimilarityIndexMeasure as MSSSIM
+from torchmetrics.image import MultiScaleStructuralSimilarityIndexMeasure as MSSSIM
 import torch
 
 acceleration_factor = 20

@@ -22,7 +22,7 @@ from utilities.folders import *
 
 from torchvision import transforms as T
 from pytorch_msssim import SSIM
-from torchmetrics import MultiScaleStructuralSimilarityIndexMeasure as MSSSIM
+from torchmetrics.image import MultiScaleStructuralSimilarityIndexMeasure as MSSSIM
 from models.models_system import MoDLReconstructor
 from pathlib import Path
 from training import train_utilities as trutils
@@ -303,4 +303,3 @@ if __name__ == '__main__':
         ax.text(c_red[0], c_red[1]+h_red//2, s = 'Mean: {:0.4f}'.format(mean_box(image, c_red, w_red, h_red)), c = 'white', fontsize=12)
 
     fig.savefig('./logs/TestPSNR_PSNR-11_PerPatch-{}.pdf'.format(part), bbox_inches = 'tight')
-

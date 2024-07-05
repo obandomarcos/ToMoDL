@@ -27,7 +27,7 @@ from pytorch_lightning.loggers import WandbLogger
 from torchvision import transforms as T
 from pytorch_msssim import SSIM
 # from torchmetrics import StructuralSimilarityIndexMeasure as SSIM
-from torchmetrics import MultiScaleStructuralSimilarityIndexMeasure as MSSSIM
+from torchmetrics.image import MultiScaleStructuralSimilarityIndexMeasure as MSSSIM
 
 # Options for folding menu
 use_default_model_dict = True

@@ -1,4 +1,4 @@
-#%%
+# %%
 import os
 import os, sys
 from config import * 
@@ -23,7 +23,7 @@ from pytorch_lightning.loggers import WandbLogger
 from torchvision import transforms as T
 from pytorch_msssim import SSIM
 # from torchmetrics import StructuralSimilarityIndexMeasure as SSIM
-from torchmetrics import MultiScaleStructuralSimilarityIndexMeasure as MSSSIM
+from torchmetrics.image import MultiScaleStructuralSimilarityIndexMeasure as MSSSIM
 from skimage.transform import radon, iradon
 import matplotlib.patches as patches
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -117,7 +117,7 @@ model_system_dict = {'acc_factor_data': 1,
                 'track_alternating_twist': False,
                 'track_unet': False}
 
-#%% 20% percent trained on 20
+# %% 20% percent trained on 20
 run = wandb.init()
 artifact_tomodl = run.use_artifact('omarcos/PSNR - Training Samples/model-uqb3ptp0:v0', type='model')
 artifact_tomodl_dir = artifact_tomodl.download()
@@ -136,7 +136,7 @@ dataset_list = ['/home/obanmarcos/Balseiro/DeepOPT/datasets/full_fish/x20/140415
 dataset_dict = {'root_folder' : dataset_list[0], 
                 'acceleration_factor' : acceleration_factor,
                 'transform' : None}
-#%%
+# %%
 test_dataset = dlutils.ReconstructionDataset(**dataset_dict)    
 
 test_dataloader = DataLoader(test_dataset, 
@@ -165,6 +165,3 @@ for enum, (us_unfil_im, us_fil_im, fs_fil_im) in enumerate(test_dataloader):
     print(cv2.imwrite(f'/home/obanmarcos/Balseiro/DeepOPT/Volumes/X20_Tomodl/{enum}.jpg', 255.0*im_tomodl))
     print(cv2.imwrite(f'/home/obanmarcos/Balseiro/DeepOPT/Volumes/X20_fbp/a_{enum}.jpg', 255.0*im_fbp))
     print(cv2.imwrite(f'/home/obanmarcos/Balseiro/DeepOPT/Volumes/X20_fbp_GT/a_truth_{enum}.jpg', 255.0*im_truth))
-    
-
-

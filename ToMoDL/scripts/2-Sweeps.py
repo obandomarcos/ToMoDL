@@ -24,7 +24,7 @@ from pytorch_msssim import SSIM
 import wandb
 
 # from torchmetrics import StructuralSimilarityIndexMeasure as SSIM
-from torchmetrics import MultiScaleStructuralSimilarityIndexMeasure as MSSSIM
+from torchmetrics.image import MultiScaleStructuralSimilarityIndexMeasure as MSSSIM
 
 # Options for folding menu
 use_default_model_dict = True

@@ -5,6 +5,9 @@ __pycache__/
 .history/
 # C extensions
 *.so
+datasets/140*
+datasets/Contrast*
+datasets/sino1*
 
 # Distribution / packaging
 .Python

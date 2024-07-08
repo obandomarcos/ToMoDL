@@ -5,13 +5,13 @@ author: obanmarcos
 '''
 
 
-try:
-    from torch_radon import Radon, RadonFanbeam
-    from torch_radon.solvers import cg
+# try:
+#     from torch_radon import Radon, RadonFanbeam
+#     from torch_radon.solvers import cg
     
 
-except:
-    print('Torch-Radon not available!')
+# except:
+#     print('Torch-Radon not available!')
 
 import torch
 import torch.nn as nn

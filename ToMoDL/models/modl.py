@@ -31,7 +31,7 @@ from . import unet
 
 try:
     # Modify for multi-gpu
-    device = torch.device("cuda:0" if use_torch_radon == True else "cpu")
+    device = torch.device("cuda:0" if use_torch_radon == True and torch.cuda.is_available() else "cpu")
 
 except:
     print("Torch not available!")
@@ -190,7 +190,7 @@ class Aclass:
 
         if self.use_torch_radon == True:
             # self.radon = thrad(self.img_size, self.angles, clip_to_circle=False, det_count=self.det_count)
-            self.radon = thrad(thetas=np.linspace(0, np.pi, self.number_projections), image_size=self.img_size, circle=False, device=device, filter=None)
+            self.radon = thrad(thetas=self.angles, image_size=self.img_size, circle=False, device=device, filter=None)
 
         elif self.use_scikit == True:
 
@@ -202,14 +202,14 @@ class Aclass:
                 def forward(self, image):
                     # Compute the Radon transform of the image
                     image = image.cpu().detach().numpy()
-                    sinogram = radon(image, theta=np.linspace(0, 180, self.num_angles), circle=self.circle)
+                    sinogram = radon(image, theta=np.linspace(0, 2 * 180, self.num_angles), circle=self.circle)
                     sinogram = torch.tensor(sinogram).to(device)
                     return sinogram
 
                 def backprojection(self, sinogram):
                     # Compute the backprojection of the sinogram
                     sinogram = sinogram.detach().numpy()
-                    reconstruction = iradon(sinogram, theta=np.linspace(0, 180, self.num_angles), circle=self.circle, filter_name=None)
+                    reconstruction = iradon(sinogram, theta=np.linspace(0, 2 * 180, self.num_angles), circle=self.circle, filter_name=None)
                     reconstruction = torch.tensor(reconstruction).to(device)
                     return reconstruction
 
@@ -226,10 +226,11 @@ class Aclass:
             sinogram = self.radon.forward(expand_img) / self.img_size
             iradon = self.radon.filter_backprojection(sinogram)[0, 0] * np.pi / self.number_projections
             output = iradon + self.lam * img
+            del expand_img
         else:
             sinogram = self.radon.forward(img) / self.img_size
             iradon = self.radon.backprojection(sinogram) * np.pi / self.number_projections
-            output = iradon.to("cuda:0") + self.lam * img
+            output = iradon.to(device) + self.lam * img
         del sinogram
 
         # print('output forward: {} {}'.format(output.max(), output.min()))

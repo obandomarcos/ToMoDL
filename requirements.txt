@@ -3,7 +3,7 @@
 torch-radon24
 torch >= 2.3.0
 pytorch_msssim 
-numpy
+numpy == 1.26.4
 matplotlib 
 wandb
 opencv-python

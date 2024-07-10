@@ -34,14 +34,15 @@ unfil_im = us_unfil_im.numpy().squeeze()
 fil_im = us_fil_im.numpy().squeeze()
 fs_im = fs_fil_im.numpy().squeeze()
 
-image_tomodl = model_tomodl(us_unfil_im.to(device))["dc" + str(model_tomodl.model.K)][0, 0, ...].cpu().detach().numpy()  # Model Output
+image_tomodl = model_tomodl(us_unfil_im.to(device))["dc" + str(model_tomodl.model.K)][0, 0].cpu().detach().numpy()  # Model Output
 
 # Plot comparison
 plt.figure(figsize=(15, 3))
+
 plt.subplot(141)
 plt.imshow(unfil_im)
 plt.colorbar()
-plt.title('Unfileterd')
+plt.title('Unfiltered')
 
 plt.subplot(142)
 plt.imshow(fil_im)
@@ -56,7 +57,7 @@ plt.title('Full image')
 plt.subplot(144)
 plt.imshow(image_tomodl)
 plt.colorbar()
-plt.title('inference')
+plt.title('Inference')
 
 plt.tight_layout()
 plt.show()

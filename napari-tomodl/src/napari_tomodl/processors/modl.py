@@ -191,7 +191,7 @@ class Aclass:
 
         if self.use_torch_radon == True:
             # self.radon = thrad(self.img_size, self.angles, clip_to_circle=False, det_count=self.det_count)
-            self.radon = thrad(thetas=self.angles, image_size=self.img_size, circle=False, device=device, filter=None)
+            self.radon = thrad(thetas=self.angles, circle=False, device=device, filter_name=None)
 
         elif self.use_scikit == True:
 

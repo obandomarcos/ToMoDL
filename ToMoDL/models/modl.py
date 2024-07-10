@@ -190,7 +190,7 @@ class Aclass:
 
         if self.use_torch_radon == True:
             # self.radon = thrad(self.img_size, self.angles, clip_to_circle=False, det_count=self.det_count)
-            self.radon = thrad(thetas=self.angles, image_size=self.img_size, circle=False, device=device, filter=None)
+            self.radon = thrad(thetas=self.angles, circle=False, device=device, filter_name=None)
 
         elif self.use_scikit == True:
 
@@ -223,7 +223,7 @@ class Aclass:
         """
         if use_torch_radon:
             expand_img = img[None, None]
-            sinogram = self.radon.forward(expand_img) / self.img_size
+            sinogram = self.radon(expand_img) / self.img_size
             iradon = self.radon.filter_backprojection(sinogram)[0, 0] * np.pi / self.number_projections
             output = iradon + self.lam * img
             del expand_img

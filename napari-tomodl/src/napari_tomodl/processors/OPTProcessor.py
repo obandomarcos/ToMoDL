@@ -289,10 +289,9 @@ class OPTProcessor:
                 .numpy()
             )
         elif self.rec_process == Rec_Modes.FBP_CPU.value:
-            self.a = sinogram
             self.iradon_function = lambda sino: iradon_scikit(
                 sino, self.angles, circle=self.clip_to_circle, filter_name=None if self.use_filter == False else "ramp"
-            )
+            ).astype(np.float32)
 
         elif self.rec_process == Rec_Modes.MODL_GPU.value:
 

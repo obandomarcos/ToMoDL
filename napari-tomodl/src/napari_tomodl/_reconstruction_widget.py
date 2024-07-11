@@ -210,8 +210,9 @@ class ReconstructionWidget(QWidget):
 
             else:
 
-                optVolume = np.zeros([
-                    int(np.ceil(self.h.Q/np.sqrt(2))), int(np.ceil(self.h.Q/np.sqrt(2))), self.h.Z], np.float32)
+                optVolume = np.zeros(
+                    [int(np.floor(self.h.Q / np.sqrt(2))), int(np.floor(self.h.Q / np.sqrt(2))), self.h.Z], np.float32
+                )
 
             time_in = time()
 

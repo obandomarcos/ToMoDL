@@ -77,6 +77,7 @@ class OPTProcessor:
         self.order_mode = Order_Modes.Vertical.value
         self.clip_to_circle = False
         self.use_filter = False
+        self.batch_size = 1
 
         self.resize_bool = True
         self.register_bool = True
@@ -292,6 +293,7 @@ class OPTProcessor:
             self.iradon_function = lambda sino: iradon_scikit(
                 sino, self.angles, circle=self.clip_to_circle, filter_name=None if self.use_filter == False else "ramp"
             ).astype(np.float32)
+            print("batch_size", self.batch_size)
 
         elif self.rec_process == Rec_Modes.MODL_GPU.value:
 

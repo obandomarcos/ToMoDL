@@ -2,13 +2,27 @@
 Created on Tue Feb 2 16:34:41 2023
 @authors: Marcos Obando
 """
+
 # %%
-import os 
+import os
 from .processors.OPTProcessor import OPTProcessor
 from .widget_settings import Settings, Combo_box
+
 # import processors
 import napari
-from qtpy.QtWidgets import QVBoxLayout, QSplitter, QHBoxLayout, QWidget, QPushButton, QLineEdit, QSpinBox, QDoubleSpinBox, QFormLayout, QComboBox, QLabel
+from qtpy.QtWidgets import (
+    QVBoxLayout,
+    QSplitter,
+    QHBoxLayout,
+    QWidget,
+    QPushButton,
+    QLineEdit,
+    QSpinBox,
+    QDoubleSpinBox,
+    QFormLayout,
+    QComboBox,
+    QLabel,
+)
 from qtpy.QtCore import Qt
 from napari.layers import Image
 import numpy as np
@@ -18,9 +32,10 @@ from magicgui import magic_factory, magicgui
 import warnings
 from time import time
 import scipy.ndimage as ndi
-from enum  import Enum
-import cv2 
+from enum import Enum
+import cv2
 import tqdm
+
 
 class Rec_modes(Enum):
     FBP_CPU = 0
@@ -30,15 +45,17 @@ class Rec_modes(Enum):
     MODL_GPU = 4
     MODL_CPU = 5
 
+
 class Order_Modes(Enum):
     Vertical = 0
     Horizontal = 1
 
+
 class ReconstructionWidget(QWidget):
 
-    name = 'Reconstructor'
+    name = "Reconstructor"
 
-    def __init__(self, viewer:napari.Viewer):
+    def __init__(self, viewer: napari.Viewer):
         self.viewer = viewer
         super().__init__()
         self.setup_ui()
@@ -50,149 +67,142 @@ class ReconstructionWidget(QWidget):
         layout = QVBoxLayout()
         self.setLayout(layout)
 
-        def add_section(_layout,_title):
+        def add_section(_layout, _title):
             from qtpy.QtCore import Qt
+
             splitter = QSplitter(Qt.Vertical)
             _layout.addWidget(splitter)
             # _layout.addWidget(QLabel(_title))
 
         image_layout = QVBoxLayout()
-        add_section(image_layout,'Image selection')
+        add_section(image_layout, "Image selection")
         layout.addLayout(image_layout)
 
         self.choose_layer_widget = choose_layer()
         self.choose_layer_widget.call_button.visible = False
         self.add_magic_function(self.choose_layer_widget, image_layout)
-        select_button = QPushButton('Select image layer')
+        select_button = QPushButton("Select image layer")
         select_button.clicked.connect(self.select_layer)
         image_layout.addWidget(select_button)
 
         settings_layout = QVBoxLayout()
-        add_section(settings_layout,'Settings')
+        add_section(settings_layout, "Settings")
         layout.addLayout(settings_layout)
         self.createSettings(settings_layout)
 
     def createSettings(self, slayout):
 
-        self.reshapebox = Settings('Reshape volume',
-                                  dtype=bool,
-                                  initial = True, 
-                                  layout=slayout, 
-                                  write_function = self.set_opt_processor)        
+        self.reshapebox = Settings(
+            "Reshape volume", dtype=bool, initial=True, layout=slayout, write_function=self.set_opt_processor
+        )
 
-        self.resizebox = Settings('Reconstruction size',
-                                  dtype=int, 
-                                  initial=100, 
-                                  layout=slayout, 
-                                  write_function = self.set_opt_processor)
+        self.resizebox = Settings(
+            "Reconstruction size", dtype=int, initial=100, layout=slayout, write_function=self.set_opt_processor
+        )
 
-        self.clipcirclebox = Settings('Clip to circle',
-                            dtype=bool,
-                            initial = False, 
-                            layout=slayout, 
-                            write_function = self.set_opt_processor)        
+        self.clipcirclebox = Settings(
+            "Clip to circle", dtype=bool, initial=False, layout=slayout, write_function=self.set_opt_processor
+        )
 
-        self.filterbox = Settings('Use filtering',
-                            dtype=bool,
-                            initial = False, 
-                            layout=slayout, 
-                            write_function = self.set_opt_processor) 
+        self.filterbox = Settings(
+            "Use filtering", dtype=bool, initial=False, layout=slayout, write_function=self.set_opt_processor
+        )
 
-        self.registerbox = Settings('Automatic axis alignment',
-                                  dtype=bool,
-                                  initial=False, 
-                                  layout=slayout, 
-                                  write_function = self.set_opt_processor)
+        self.registerbox = Settings(
+            "Automatic axis alignment", dtype=bool, initial=False, layout=slayout, write_function=self.set_opt_processor
+        )
 
-        self.manualalignbox = Settings('Manual axis alignment',
-                            dtype=bool,
-                            initial = False, 
-                            layout=slayout, 
-                            write_function = self.set_opt_processor) 
+        self.manualalignbox = Settings(
+            "Manual axis alignment", dtype=bool, initial=False, layout=slayout, write_function=self.set_opt_processor
+        )
 
-        self.alignbox = Settings('Axis shift',
-                            dtype=int,
-                            vmin=-500,
-                            vmax=500, 
-                            initial=0, 
-                            layout=slayout, 
-                            write_function = self.set_opt_processor)
+        self.alignbox = Settings(
+            "Axis shift",
+            dtype=int,
+            vmin=-500,
+            vmax=500,
+            initial=0,
+            layout=slayout,
+            write_function=self.set_opt_processor,
+        )
 
         # create combobox for reconstruction method
-        self.reconbox = Combo_box(name ='Reconstruction method',
-                             initial = Rec_modes.FBP_GPU.value,
-                             choices = Rec_modes,
-                             layout = slayout,
-                             write_function = self.set_opt_processor)
+        self.reconbox = Combo_box(
+            name="Reconstruction method",
+            initial=Rec_modes.FBP_GPU.value,
+            choices=Rec_modes,
+            layout=slayout,
+            write_function=self.set_opt_processor,
+        )
 
-        self.fullvolume = Settings('Reconstruct full volume',
-                                  dtype=bool,
-                                  initial = False, 
-                                  layout=slayout, 
-                                  write_function = self.set_opt_processor) 
+        self.fullvolume = Settings(
+            "Reconstruct full volume", dtype=bool, initial=False, layout=slayout, write_function=self.set_opt_processor
+        )
+        self.batch_size = Settings(
+            "Batch size", dtype=int, initial=1, layout=slayout, write_function=self.set_opt_processor
+        )
+        self.is_reconstruct_one = Settings(
+            "Reconstruct only slices", dtype=bool, initial=False, layout=slayout, write_function=self.set_opt_processor
+        )
+        self.slices = Settings(
+            "# of slices to reconstruct", dtype=int, initial=0, layout=slayout, write_function=self.set_opt_processor
+        )
 
-        self.slices = Settings('Slice to reconstruct',
-                                  dtype=int, 
-                                  initial=0, 
-                                  layout=slayout, 
-                                  write_function = self.set_opt_processor)
-
-        self.orderbox = Combo_box(name ='Rotation axis',
-                             initial = Order_Modes.Horizontal.value,
-                             choices = Order_Modes,
-                             layout = slayout,
-                             write_function = self.set_opt_processor)
+        self.orderbox = Combo_box(
+            name="Rotation axis",
+            initial=Order_Modes.Horizontal.value,
+            choices=Order_Modes,
+            layout=slayout,
+            write_function=self.set_opt_processor,
+        )
 
         # add calculate psf button
-        calculate_btn = QPushButton('Reconstruct')
+        calculate_btn = QPushButton("Reconstruct")
         calculate_btn.clicked.connect(self.stack_reconstruction)
         slayout.addWidget(calculate_btn)
 
     def show_image(self, image_values, fullname, **kwargs):
 
-        if 'scale' in kwargs.keys():    
-            scale = kwargs['scale']
+        if "scale" in kwargs.keys():
+            scale = kwargs["scale"]
         else:
-            scale = [1.]*image_values.ndim
+            scale = [1.0] * image_values.ndim
 
-        if 'hold' in kwargs.keys() and fullname in self.viewer.layers:
+        if "hold" in kwargs.keys() and fullname in self.viewer.layers:
 
             self.viewer.layers[fullname].data = image_values
             self.viewer.layers[fullname].scale = scale
 
-        else:  
-            layer = self.viewer.add_image(image_values,
-                                            name = fullname,
-                                            scale = scale,
-                                            interpolation2d = 'linear')
+        else:
+            layer = self.viewer.add_image(image_values, name=fullname, scale=scale, interpolation2d="linear")
             return layer
 
-    def select_layer(self, sinos:Image):
+    def select_layer(self, sinos: Image):
 
         sinos = self.choose_layer_widget.image.value
         if sinos.data.ndim == 3:
 
             self.imageRaw_name = sinos.name
-            sz,sy,sx = sinos.data.shape
+            sz, sy, sx = sinos.data.shape
             print(sz, sy, sx)
-            if not hasattr(self, 'h'): 
+            if not hasattr(self, "h"):
                 self.start_opt_processor()
-            print(f'Selected image layer: {sinos.name}')
+            print(f"Selected image layer: {sinos.name}")
 
     def stack_reconstruction(self):
 
         def update_opt_image(stack):
 
-            imname = 'stack_' + self.imageRaw_name
+            imname = "stack_" + self.imageRaw_name
             self.show_image(stack, fullname=imname)
 
-            print('Stack reconstruction completed')
+            print("Stack reconstruction completed")
 
-        @thread_worker(connect={'returned':update_opt_image})
+        @thread_worker(connect={"returned": update_opt_image})
         def _reconstruct():
-            '''
+            """
             ToDO: Link projections
-            '''
+            """
 
             if self.orderbox.val == 0:
                 sinos = np.moveaxis(np.float32(self.get_sinos()), 1, 2)
@@ -204,8 +214,7 @@ class ReconstructionWidget(QWidget):
 
             if self.reshapebox.val == True:
 
-                optVolume = np.zeros([
-                    self.resizebox.val, self.resizebox.val, self.h.Z], np.float32)
+                optVolume = np.zeros([self.resizebox.val, self.resizebox.val, self.h.Z], np.float32)
                 sinos = self.h.resize(sinos)
 
             else:
@@ -215,89 +224,63 @@ class ReconstructionWidget(QWidget):
                 )
 
             time_in = time()
-
-            if self.fullvolume.val == True:
-                slices = np.arange(self.h.Z)
-            else:
+            if self.is_reconstruct_one.val == True and self.fullvolume.val == False:
                 slices = [self.slices.val]
-
-            if self.fullvolume.val == True:
-
-                for zidx in tqdm.tqdm(slices):
-
-                    if self.registerbox.val == True:
-
-                        # sinos[:,:,zidx] = cv2.normalize(sinos[:,:,zidx], None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F)
-                        if self.orderbox.val == 0:
-                            optVolume[:,:, zidx] = self.h.correct_and_reconstruct(sinos[:,:,zidx].T)
-                        elif self.orderbox.val == 1:
-                            optVolume[:,:, zidx] = self.h.correct_and_reconstruct(sinos[:,:,zidx])
-                        optVolume[:,:,zidx] = cv2.normalize(optVolume[:,:,zidx], None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F)
-
-                    elif self.manualalignbox.val == True:
-
-                        # sinos[:,:,zidx] = cv2.normalize(sinos[:,:,zidx], None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F)
-
-                        if self.orderbox.val == 0:
-                            optVolume[:,:, zidx] = self.h.reconstruct(ndi.shift(sinos[:,:,zidx], (0, self.alignbox.val), mode = 'nearest').T)
-                        elif self.orderbox.val == 1:
-                            optVolume[:,:, zidx] = self.h.reconstruct(ndi.shift(sinos[:,:,zidx], (self.alignbox.val, 0), mode = 'nearest'))
-
-                        optVolume[:,:,zidx] = cv2.normalize(optVolume[:,:,zidx], None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F)
-
-                    else:
-
-                        # sinos[:,:,zidx] = cv2.normalize(sinos[:,:,zidx], None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F)
-                        if self.orderbox.val == 0:
-
-                            optVolume[:,:, zidx] = self.h.reconstruct(sinos[:,:,zidx].T)
-
-                        elif self.orderbox.val == 1:
-
-                            optVolume[:,:, zidx] = self.h.reconstruct(sinos[:,:,zidx])
-
-                        optVolume[:,:,zidx] = cv2.normalize(optVolume[:,:,zidx], None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F)
-                        print(zidx, optVolume[:,:,zidx].mean(), "hola")
-
             else:
+                slices = range(self.h.Z if self.fullvolume.val == True else self.slices.val)
+            for zidx in tqdm.tqdm(slices):
 
-                for zidx in tqdm.tqdm(slices):
+                if self.registerbox.val == True:
 
-                    if self.registerbox.val == True:
+                    sinos[:, :, zidx] = cv2.normalize(
+                        sinos[:, :, zidx], None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F
+                    )
+                    if self.orderbox.val == 0:
+                        optVolume[:, :, zidx] = self.h.correct_and_reconstruct(sinos[:, :, zidx].T)
+                    elif self.orderbox.val == 1:
+                        optVolume[:, :, zidx] = self.h.correct_and_reconstruct(sinos[:, :, zidx])
+                    optVolume[:, :, zidx] = cv2.normalize(
+                        optVolume[:, :, zidx], None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F
+                    )
 
-                        # sinos[:,:,zidx] = cv2.normalize(sinos[:,:,zidx], None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F)
-                        if self.orderbox.val == 0:
-                            slicevol = self.h.correct_and_reconstruct(sinos[:,:,zidx].T)
-                        elif self.orderbox.val == 1:
-                            slicevol = self.h.correct_and_reconstruct(sinos[:,:,zidx])
-                        slicevol = cv2.normalize(slicevol, None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F)
+                elif self.manualalignbox.val == True:
 
-                    elif self.manualalignbox.val == True:
+                    sinos[:, :, zidx] = cv2.normalize(
+                        sinos[:, :, zidx], None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F
+                    )
 
-                        # sinos[:,:,zidx] = cv2.normalize(sinos[:,:,zidx], None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F)
+                    if self.orderbox.val == 0:
+                        optVolume[:, :, zidx] = self.h.reconstruct(
+                            ndi.shift(sinos[:, :, zidx], (0, self.alignbox.val), mode="nearest").T
+                        )
+                    elif self.orderbox.val == 1:
+                        optVolume[:, :, zidx] = self.h.reconstruct(
+                            ndi.shift(sinos[:, :, zidx], (self.alignbox.val, 0), mode="nearest")
+                        )
 
-                        if self.orderbox.val == 0:
-                            slicevol = self.h.reconstruct(ndi.shift(sinos[:,:,zidx], (0, self.alignbox.val), mode = 'nearest').T)
-                        elif self.orderbox.val == 1:
-                            slicevol = self.h.reconstruct(ndi.shift(sinos[:,:,zidx], (self.alignbox.val, 0), mode = 'nearest'))
+                    optVolume[:, :, zidx] = cv2.normalize(
+                        optVolume[:, :, zidx], None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F
+                    )
 
-                        slicevol = cv2.normalize(slicevol, None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F)
+                else:
 
-                    else:
+                    sinos[:, :, zidx] = cv2.normalize(
+                        sinos[:, :, zidx], None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F
+                    )
+                    if self.orderbox.val == 0:
 
-                        # sinos[:,:,zidx] = cv2.normalize(sinos[:,:,zidx], None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F)
-                        if self.orderbox.val == 0:
+                        optVolume[:, :, zidx] = self.h.reconstruct(sinos[:, :, zidx].T)
 
-                            slicevol = self.h.reconstruct(sinos[:,:,zidx].T)
+                    elif self.orderbox.val == 1:
 
-                        elif self.orderbox.val == 1:
+                        optVolume[:, :, zidx] = self.h.reconstruct(sinos[:, :, zidx])
 
-                            slicevol = self.h.reconstruct(sinos[:,:,zidx])
+                    optVolume[:, :, zidx] = cv2.normalize(
+                        optVolume[:, :, zidx], None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F
+                    )
 
-                        slicevol = cv2.normalize(slicevol, None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F)
-
-            print("Computation Time total: {} s".format(round(time() - time_in, 3)))
-            return np.rollaxis(optVolume, -1) if self.fullvolume.val == True else slicevol
+            print("Computation time total: {} s".format(round(time() - time_in, 3)))
+            return np.rollaxis(optVolume, -1) if self.is_reconstruct_one.val == False else optVolume[..., self.slices.val]
 
         _reconstruct()
 
@@ -306,14 +289,14 @@ class ReconstructionWidget(QWidget):
 
             return self.viewer.layers[self.imageRaw_name].data
         except:
-            raise(KeyError(r'Please select a valid 3D image ($\theta$, q, z)'))
+            raise (KeyError(r"Please select a valid 3D image ($\theta$, q, z)"))
 
     def set_opt_processor(self, *args):
-        '''
+        """
         Sets OPT reconstruction arguments
-        '''
+        """
 
-        if hasattr(self, 'h'):
+        if hasattr(self, "h"):
 
             self.h.resize_val = self.resizebox.val
             self.h.resize_bool = self.reshapebox.val
@@ -322,28 +305,28 @@ class ReconstructionWidget(QWidget):
             self.h.order_mode = self.orderbox.val
             self.h.clip_to_circle = self.clipcirclebox.val
             self.h.use_filter = self.filterbox.val
-
+            self.h.batch_size = self.batch_size.val
             self.h.set_reconstruction_process()
 
-    def start_opt_processor(self):     
+    def start_opt_processor(self):
         self.isCalibrated = False
 
-        if hasattr(self, 'h'):
+        if hasattr(self, "h"):
             self.stop_opt_processor()
             self.start_opt_processor()
         else:
-            print('Reset')
-            self.h = OPTProcessor() 
+            print("Reset")
+            self.h = OPTProcessor()
 
     def stop_opt_processor(self):
-        if hasattr(self, 'h'):
-            delattr(self, 'h')
+        if hasattr(self, "h"):
+            delattr(self, "h")
 
-    def reset_processor(self,*args):
+    def reset_processor(self, *args):
 
         self.isCalibrated = False
         self.stop_opt_processor()
-        self.start_opt_processor() 
+        self.start_opt_processor()
 
     def add_magic_function(self, widget, _layout):
 
@@ -351,6 +334,7 @@ class ReconstructionWidget(QWidget):
         self.viewer.layers.events.removed.connect(widget.reset_choices)
         _layout.addWidget(widget.native)
 
+
 @magic_factory
 def choose_layer(image: Image):
-        pass #TODO: substitute with a qtwidget without magic functions
+    pass  # TODO: substitute with a qtwidget without magic functions

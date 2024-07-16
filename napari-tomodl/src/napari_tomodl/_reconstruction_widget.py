@@ -7,7 +7,8 @@ Created on Tue Feb 2 16:34:41 2023
 import os
 from .processors.OPTProcessor import OPTProcessor
 from .widget_settings import Settings, Combo_box
-
+import gc
+import torch
 # import processors
 import napari
 from qtpy.QtWidgets import (
@@ -65,8 +66,7 @@ class ReconstructionWidget(QWidget):
         super().__init__()
         self.setup_ui()
         # self.viewer.dims.events.current_step.connect(self.select_index)
-        self.count1 = None
-
+    
     def setup_ui(self):
 
         # initialize layout
@@ -203,6 +203,9 @@ class ReconstructionWidget(QWidget):
             self.show_image(stack, fullname=imname)
 
             print("Stack reconstruction completed")
+            gc.collect()
+            torch.cuda.empty_cache()
+            
 
         @thread_worker(connect={"returned": update_opt_image})
         def _reconstruct():
@@ -298,6 +301,7 @@ class ReconstructionWidget(QWidget):
                 return np.rollaxis(optVolume, -1)
 
         _reconstruct()
+
 
     def get_sinos(self):
         try:

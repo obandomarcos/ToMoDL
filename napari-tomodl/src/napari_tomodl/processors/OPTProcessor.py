@@ -4,7 +4,6 @@ Process sinograms in 2D
 
 from skimage.transform import radon as radon_scikit
 from skimage.transform import iradon as iradon_scikit
-
 import torch
 from .modl import ToMoDL
 from .unet import UNet
@@ -247,10 +246,9 @@ class OPTProcessor:
             * Optimize GPU usage with tensors
 
         """
+        self.angles_torch = np.linspace(0, 2 * np.pi, self.theta, endpoint=False)
+        self.angles = np.linspace(0, 2 * np.pi, self.theta, endpoint=False)
         ## Es un enriedo, pero inicializa los generadores de ángulos. Poco claro
-        if self.init_volume_rec == False:
-
-            self.angles = self.angles_gen(self.theta)
 
         if self.iradon_functor == None:
             try:
@@ -274,18 +272,14 @@ class OPTProcessor:
                 device=device,
             )
 
-            # if self.use_filter == False:
-            #     self.iradon_function = lambda sino: self.iradon_functor.backprojection((torch.Tensor(sino.T).to(device))).cpu().numpy()
-            # else:
-            #     self.iradon_function = lambda sino: self.iradon_functor.backprojection(self.iradon_functor.filter_sinogram(torch.Tensor(sino.T).to(device))).cpu().numpy()
-
             # sino have shape (Q, theta, Z) => (Z, 1, Q, theta)
             # then we have the iradon to be (Z, 1, Q, Q) => (Q, Q, Z)
 
             def _iradon(sino):
                 sino = sino.transpose(2, 0, 1)
                 sino = torch.from_numpy(sino[:, None, :, :]).to(device)
-                reconstruction = self.iradon_functor.filter_backprojection(sino).permute(1, 2, 3, 0)[0].cpu().numpy()
+                reconstruction = self.iradon_functor.filter_backprojection(sino).permute(1, 2, 3, 0)[0].cpu()
+                reconstruction = np.asarray(reconstruction.numpy())
                 return reconstruction
 
             self.iradon_function = _iradon
@@ -354,25 +348,25 @@ class OPTProcessor:
             # )
 
             # use radon24
-            self.angles_torch = np.linspace(0, 2 * np.pi, self.theta, endpoint=False)
-            radon24 = radon_thrad(
-                self.angles_torch, circle=self.clip_to_circle, filter_name=None, device=torch.device("cuda:0")
-            )
-            # def _iradon(sino):
-            #     sino = sino.transpose(2, 0, 1)
-            #     sino = torch.from_numpy(sino[:, None, :, :]).to(device)
-            #     reconstruction = radon24.filter_backprojection(sino).permute(1, 2, 3, 0)[0].cpu().numpy()
-            #     return reconstruction
 
-            # self.iradon_function = _iradon
-            self.iradon_function = (
-                lambda sino: self.iradon_functor(
-                    radon24.filter_backprojection(torch.Tensor(sino[None, None]).to(device))
-                )["dc" + str(self.tomodl_dictionary["K_iterations"])]
-                .detach()
-                .cpu()
-                .numpy()
-            )
+            radon24 = radon_thrad(self.angles_torch, circle=self.clip_to_circle, filter_name=None, device=device)
+
+            # the self.iradon_functor receive a reconstructed image (B, 1, Q, Q)
+            # the input is a sinogram (B, 1, Q, theta)
+            def _iradon(sino):
+                sino = sino.transpose(2, 0, 1)
+                sino = torch.from_numpy(sino[:, None, :, :]).to(device)
+                reconstruction = radon24.filter_backprojection(sino)
+                output = (
+                    self.iradon_functor(reconstruction)["dc" + str(self.tomodl_dictionary["K_iterations"])]
+                    .detach()
+                    .cpu()
+                )
+                output = np.asarray(output.numpy())
+                return output.transpose(1, 2, 3, 0)[0]
+
+            self.iradon_function = _iradon
+
         elif self.rec_process == Rec_Modes.MODL_CPU.value:
 
             resnet_options_dict = {
@@ -451,20 +445,31 @@ class OPTProcessor:
             )[0][..., None]
 
         elif self.rec_process == Rec_Modes.UNET_GPU.value:
+            radon24 = radon_thrad(self.angles_torch, circle=self.clip_to_circle, filter_name=None, device=device)
 
             self.iradon_functor = UNet(
                 n_channels=1, n_classes=1, residual=True, up_conv=True, batch_norm=True, batch_norm_inconv=True
             ).to(device)
-            AT_tensor = (
-                lambda sino: torch.Tensor(
-                    iradon_scikit(sino, self.angles, circle=self.clip_to_circle, filter_name=None)
-                )
-                .to(device)
-                .unsqueeze(0)
-                .unsqueeze(1)
-            )
 
-            self.iradon_function = lambda sino: self.iradon_functor(AT_tensor(sino)).detach().cpu().numpy()
+            # AT_tensor = (
+            #     lambda sino: torch.Tensor(
+            #         iradon_scikit(sino, self.angles, circle=self.clip_to_circle, filter_name=None)
+            #     )
+            #     .to(device)
+            #     .unsqueeze(0)
+            #     .unsqueeze(1)
+            # )
+            # self.iradon_function = lambda sino: self.iradon_functor(AT_tensor(sino)).detach().cpu().numpy()
+
+            def _iradon(sino):
+                sino = sino.transpose(2, 0, 1)
+                sino = torch.from_numpy(sino[:, None, :, :]).to(device)
+                reconstruction = radon24.filter_backprojection(sino)
+                output = self.iradon_functor(reconstruction).detach().cpu()
+                output = np.asarray(output.numpy())
+                return output.transpose(1, 2, 3, 0)[0]
+
+            self.iradon_function = _iradon
 
         reconstruction = self.iradon_function(sinogram)
 

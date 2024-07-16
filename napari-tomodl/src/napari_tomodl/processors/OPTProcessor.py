@@ -13,7 +13,7 @@ try:
     from torch_radon24 import Radon as radon_thrad
 
     use_cuda = True
-    print("Torch-Radon available!")
+    print("Torch-Radon24 available!")
 except:
     use_cuda = False
     print("Torch-Radon not available!")
@@ -85,21 +85,18 @@ class OPTProcessor:
         self.shift_step = 10
         self.center_shift = 0
         self.is_resize = False
+        self.init_volume_rec = False
+        self.iradon_functor = None
         self.set_reconstruction_process()
 
     def set_reconstruction_process(self):
 
-        self.init_volume_rec = False
-        self.iradon_functor = None
         # This should change depending on the method
-        if (self.rec_process == Rec_Modes.FBP_CPU.value) or (self.rec_process == Rec_Modes.MODL_GPU.value):
+        if self.rec_process == Rec_Modes.FBP_CPU.value:
 
             self.angles_gen = lambda num_angles: np.linspace(0, 2 * 180, num_angles, endpoint=False)
-            self.iradon_function = lambda sino, num_angles: iradon_scikit(
-                sino.T, self.angles_gen(num_angles), circle=False
-            )
 
-        elif self.rec_process == Rec_Modes.FBP_GPU.value:
+        elif self.rec_process == Rec_Modes.FBP_GPU.value or self.rec_process == Rec_Modes.MODL_GPU.value:
 
             assert torch.cuda.is_available() == True
             self.angles_gen = lambda num_angles: np.linspace(0, 2 * np.pi, num_angles, endpoint=False)
@@ -167,14 +164,11 @@ class OPTProcessor:
         while self.shift_step >= 1:
             shifts = np.arange(-self.max_shift, self.max_shift, self.shift_step) + self.center_shift
             image_std = []
-
             for i, shift in enumerate(shifts):
-
                 if self.order_mode == Order_Modes.Vertical.value:
-                    shift_tuple = (0, shift)
-
+                    shift_tuple = (0, shift, 0)
                 if self.order_mode == Order_Modes.Horizontal.value:
-                    shift_tuple = (shift, 0)
+                    shift_tuple = (shift, 0, 0)
 
                 sino_shift = ndi.shift(sinogram, shift_tuple, mode="nearest")
 
@@ -189,7 +183,7 @@ class OPTProcessor:
             self.max_shift /= 5
             self.shift_step /= 2.5
 
-            sinogram = ndi.shift(sinogram, (0, self.center_shift), mode="nearest")
+            sinogram = ndi.shift(sinogram, (0, self.center_shift, 0), mode="nearest")
 
         # Restart shifts
         self.max_shift = 200
@@ -208,20 +202,20 @@ class OPTProcessor:
             self.theta, self.Q, self.Z = sinogram_volume.shape
         if self.order_mode == Order_Modes.Horizontal.value:
             self.Q, self.theta, self.Z = sinogram_volume.shape
+        if self.clip_to_circle == True:
+            sinogram_size = self.resize_val
+        else:
+            sinogram_size = int(np.ceil(self.resize_val * np.sqrt(2)))
 
         if self.resize_bool == True:
 
             if self.order_mode == Order_Modes.Vertical.value:
 
-                sinogram_resize = np.zeros(
-                    (self.theta, int(np.ceil(self.resize_val * np.sqrt(2))), self.Z), dtype=np.float32
-                )
+                sinogram_resize = np.zeros((self.theta, sinogram_size, self.Z), dtype=np.float32)
 
             if self.order_mode == Order_Modes.Horizontal.value:
 
-                sinogram_resize = np.zeros(
-                    (int(np.ceil(self.resize_val * np.sqrt(2))), self.theta, self.Z), dtype=np.float32
-                )
+                sinogram_resize = np.zeros((sinogram_size, self.theta, self.Z), dtype=np.float32)
 
             for idx in tqdm.tqdm(range(self.Z)):
 
@@ -229,7 +223,7 @@ class OPTProcessor:
 
                     sinogram_resize[:, :, idx] = cv2.resize(
                         sinogram_volume[:, :, idx],
-                        (int(np.ceil(self.resize_val * np.sqrt(2))), self.theta),
+                        (sinogram_size, self.theta),
                         interpolation=cv2.INTER_NEAREST,
                     )
 
@@ -237,7 +231,7 @@ class OPTProcessor:
 
                     sinogram_resize[:, :, idx] = cv2.resize(
                         sinogram_volume[:, :, idx],
-                        (self.theta, int(np.ceil(self.resize_val * np.sqrt(2)))),
+                        (self.theta, sinogram_size),
                         interpolation=cv2.INTER_NEAREST,
                     )
 
@@ -246,6 +240,8 @@ class OPTProcessor:
     def reconstruct(self, sinogram: np.ndarray):
         """
         Reconstruct with specific method
+        - CPU methods the sinogram will have shape (Q, theta, 1)
+        - GPU methods the sinogram will have shape (Q, theta, batch_process)
         TODO:
             * Include methods ToMODL
             * Optimize GPU usage with tensors
@@ -270,9 +266,7 @@ class OPTProcessor:
                 self.angles_torch = None
 
         if self.rec_process == Rec_Modes.FBP_GPU.value:
-
             self.angles_torch = np.linspace(0, 2 * np.pi, self.theta, endpoint=False)
-
             self.iradon_functor = radon_thrad(
                 thetas=self.angles_torch,
                 circle=self.clip_to_circle,
@@ -284,16 +278,26 @@ class OPTProcessor:
             #     self.iradon_function = lambda sino: self.iradon_functor.backprojection((torch.Tensor(sino.T).to(device))).cpu().numpy()
             # else:
             #     self.iradon_function = lambda sino: self.iradon_functor.backprojection(self.iradon_functor.filter_sinogram(torch.Tensor(sino.T).to(device))).cpu().numpy()
-            self.iradon_function = (
-                lambda sino: self.iradon_functor.filter_backprojection(torch.Tensor(sino)[None, None].to(device))[0, 0]
-                .cpu()
-                .numpy()
-            )
+
+            # sino have shape (Q, theta, Z) => (Z, 1, Q, theta)
+            # then we have the iradon to be (Z, 1, Q, Q) => (Q, Q, Z)
+
+            def _iradon(sino):
+                sino = sino.transpose(2, 0, 1)
+                sino = torch.from_numpy(sino[:, None, :, :]).to(device)
+                reconstruction = self.iradon_functor.filter_backprojection(sino).permute(1, 2, 3, 0)[0].cpu().numpy()
+                return reconstruction
+
+            self.iradon_function = _iradon
+
         elif self.rec_process == Rec_Modes.FBP_CPU.value:
+            self.angles = np.linspace(0, 2 * 180, self.theta, endpoint=False)
             self.iradon_function = lambda sino: iradon_scikit(
-                sino, self.angles, circle=self.clip_to_circle, filter_name=None if self.use_filter == False else "ramp"
-            ).astype(np.float32)
-            print("batch_size", self.batch_size)
+                sino[..., 0],
+                self.angles,
+                circle=self.clip_to_circle,
+                filter_name=None if self.use_filter == False else "ramp",
+            )[..., None]
 
         elif self.rec_process == Rec_Modes.MODL_GPU.value:
 
@@ -348,11 +352,19 @@ class OPTProcessor:
             #     .cpu()
             #     .numpy()
             # )
+
             # use radon24
             self.angles_torch = np.linspace(0, 2 * np.pi, self.theta, endpoint=False)
             radon24 = radon_thrad(
                 self.angles_torch, circle=self.clip_to_circle, filter_name=None, device=torch.device("cuda:0")
             )
+            # def _iradon(sino):
+            #     sino = sino.transpose(2, 0, 1)
+            #     sino = torch.from_numpy(sino[:, None, :, :]).to(device)
+            #     reconstruction = radon24.filter_backprojection(sino).permute(1, 2, 3, 0)[0].cpu().numpy()
+            #     return reconstruction
+
+            # self.iradon_function = _iradon
             self.iradon_function = (
                 lambda sino: self.iradon_functor(
                     radon24.filter_backprojection(torch.Tensor(sino[None, None]).to(device))
@@ -404,14 +416,14 @@ class OPTProcessor:
             )
             self.iradon_function = (
                 lambda sino: self.iradon_functor(
-                    torch.Tensor(iradon_scikit(sino, self.angles, circle=self.clip_to_circle, filter_name=None))
+                    torch.Tensor(iradon_scikit(sino[..., 0], self.angles, circle=self.clip_to_circle, filter_name=None))
                     .to(device)
                     .unsqueeze(0)
                     .unsqueeze(1)
                 )["dc" + str(self.tomodl_dictionary["K_iterations"])]
                 .detach()
                 .cpu()
-                .numpy()
+                .numpy()[..., None]
             )
 
         elif self.rec_process == Rec_Modes.TWIST_CPU.value:
@@ -434,7 +446,9 @@ class OPTProcessor:
 
             A = lambda x: radon_scikit(x, self.angles, circle=self.clip_to_circle)
             AT = lambda sino: iradon_scikit(sino, self.angles, circle=self.clip_to_circle)
-            self.iradon_function = lambda sino: TwIST(sino, A, AT, 0.01, twist_dictionary, true_img=AT(sino))[0]
+            self.iradon_function = lambda sino: TwIST(
+                sino[..., 0], A, AT, 0.01, twist_dictionary, true_img=AT(sino[..., 0])
+            )[0][..., None]
 
         elif self.rec_process == Rec_Modes.UNET_GPU.value:
 

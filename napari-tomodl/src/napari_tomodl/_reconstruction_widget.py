@@ -35,6 +35,11 @@ import scipy.ndimage as ndi
 from enum import Enum
 import cv2
 import tqdm
+import numpy as np
+
+
+def min_max_normalize(image):
+    return (image - image.min()) / (image.max() - image.min()) * 255
 
 
 class Rec_modes(Enum):
@@ -60,6 +65,7 @@ class ReconstructionWidget(QWidget):
         super().__init__()
         self.setup_ui()
         # self.viewer.dims.events.current_step.connect(self.select_index)
+        self.count1 = None
 
     def setup_ui(self):
 
@@ -129,7 +135,7 @@ class ReconstructionWidget(QWidget):
         # create combobox for reconstruction method
         self.reconbox = Combo_box(
             name="Reconstruction method",
-            initial=Rec_modes.FBP_GPU.value,
+            initial=Rec_modes.FBP_CPU.value,
             choices=Rec_modes,
             layout=slayout,
             write_function=self.set_opt_processor,
@@ -142,7 +148,7 @@ class ReconstructionWidget(QWidget):
             "Batch size", dtype=int, initial=1, layout=slayout, write_function=self.set_opt_processor
         )
         self.is_reconstruct_one = Settings(
-            "Reconstruct only slices", dtype=bool, initial=False, layout=slayout, write_function=self.set_opt_processor
+            "Reconstruct only slices", dtype=bool, initial=True, layout=slayout, write_function=self.set_opt_processor
         )
         self.slices = Settings(
             "# of slices to reconstruct", dtype=int, initial=0, layout=slayout, write_function=self.set_opt_processor
@@ -217,70 +223,134 @@ class ReconstructionWidget(QWidget):
                 optVolume = np.zeros([self.resizebox.val, self.resizebox.val, self.h.Z], np.float32)
                 sinos = self.h.resize(sinos)
 
-            else:
-
+            elif self.clipcirclebox.val == False:
                 optVolume = np.zeros(
                     [int(np.floor(self.h.Q / np.sqrt(2))), int(np.floor(self.h.Q / np.sqrt(2))), self.h.Z], np.float32
                 )
+            else:
+                optVolume = np.zeros([self.h.Q, self.h.Q, self.h.Z], np.float32)
 
             time_in = time()
+
+            # Reconstruction process
+            # if reconstructing only one slice
             if self.is_reconstruct_one.val == True and self.fullvolume.val == False:
-                slices = [self.slices.val]
+                slices_reconstruction = [self.slices.val]
+
+            # if reconstructing full volume or multiple slices
             else:
-                slices = range(self.h.Z if self.fullvolume.val == True else self.slices.val)
-            for zidx in tqdm.tqdm(slices):
+                slices_reconstruction = range(self.h.Z if self.fullvolume.val == True else self.slices.val)
 
+            batch_start = slices_reconstruction[0]
+            # if use GPU process in batch to improve performance
+            if self.reconbox.val in {Rec_modes.FBP_GPU.value, Rec_modes.MODL_GPU.value, Rec_modes.UNET_GPU.value}:
+                batch_process = self.batch_size.val
+            else:
+                batch_process = 1
+
+            batch_end = batch_start + batch_process
+            while batch_start <= slices_reconstruction[-1]:
+                print("Reconstructing slices {} to {}".format(batch_start, batch_end), end="\r")
+                
+                zidx = slice(batch_start, batch_end)
+                
                 if self.registerbox.val == True:
-
-                    sinos[:, :, zidx] = cv2.normalize(
-                        sinos[:, :, zidx], None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F
-                    )
+                    sinos[:, :, zidx] = min_max_normalize(sinos[:, :, zidx])
                     if self.orderbox.val == 0:
-                        optVolume[:, :, zidx] = self.h.correct_and_reconstruct(sinos[:, :, zidx].T)
+                        optVolume[:, :, zidx] = self.h.correct_and_reconstruct(sinos[:, :, zidx].transpose(1, 0, 2))
                     elif self.orderbox.val == 1:
                         optVolume[:, :, zidx] = self.h.correct_and_reconstruct(sinos[:, :, zidx])
-                    optVolume[:, :, zidx] = cv2.normalize(
-                        optVolume[:, :, zidx], None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F
-                    )
+                    sinos[:, :, zidx] = min_max_normalize(sinos[:, :, zidx])
 
                 elif self.manualalignbox.val == True:
-
-                    sinos[:, :, zidx] = cv2.normalize(
-                        sinos[:, :, zidx], None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F
-                    )
-
+                    sinos[:, :, zidx] = min_max_normalize(sinos[:, :, zidx])
                     if self.orderbox.val == 0:
                         optVolume[:, :, zidx] = self.h.reconstruct(
-                            ndi.shift(sinos[:, :, zidx], (0, self.alignbox.val), mode="nearest").T
+                            ndi.shift(sinos[:, :, zidx], (0, self.alignbox.val, 0), mode="nearest").transpose(1, 0, 2)
                         )
                     elif self.orderbox.val == 1:
                         optVolume[:, :, zidx] = self.h.reconstruct(
-                            ndi.shift(sinos[:, :, zidx], (self.alignbox.val, 0), mode="nearest")
+                            ndi.shift(sinos[:, :, zidx], (self.alignbox.val, 0, 0), mode="nearest")
                         )
-
-                    optVolume[:, :, zidx] = cv2.normalize(
-                        optVolume[:, :, zidx], None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F
-                    )
+                    sinos[:, :, zidx] = min_max_normalize(sinos[:, :, zidx])
 
                 else:
-
-                    sinos[:, :, zidx] = cv2.normalize(
-                        sinos[:, :, zidx], None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F
-                    )
+                    sinos[:, :, zidx] = min_max_normalize(sinos[:, :, zidx])
                     if self.orderbox.val == 0:
-
-                        optVolume[:, :, zidx] = self.h.reconstruct(sinos[:, :, zidx].T)
+                        optVolume[:, :, zidx] = self.h.reconstruct(sinos[:, :, zidx].transpose(1, 0, 2))
 
                     elif self.orderbox.val == 1:
-
                         optVolume[:, :, zidx] = self.h.reconstruct(sinos[:, :, zidx])
+                    sinos[:, :, zidx] = min_max_normalize(sinos[:, :, zidx])
 
-                    optVolume[:, :, zidx] = cv2.normalize(
-                        optVolume[:, :, zidx], None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F
-                    )
+                batch_start = batch_end
+                batch_end += batch_process
 
+            # else:
+            #     # process in CPU mode, slice by slice
+            #     for zidx in tqdm.tqdm(slices_reconstruction):
+
+            #         if self.registerbox.val == True:
+
+            #             # sinos[:, :, zidx] = cv2.normalize(
+            #             #     sinos[:, :, zidx], None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F
+            #             # )
+            #             sinos[:, :, zidx] = min_max_normalize(sinos[:, :, zidx])
+            #             if self.orderbox.val == 0:
+            #                 optVolume[:, :, zidx] = self.h.correct_and_reconstruct(sinos[:, :, zidx].T)
+            #             elif self.orderbox.val == 1:
+            #                 optVolume[:, :, zidx] = self.h.correct_and_reconstruct(sinos[:, :, zidx])
+            #             # optVolume[:, :, zidx] = cv2.normalize(
+            #             #     optVolume[:, :, zidx], None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F
+            #             # )
+            #             sinos[:, :, zidx] = min_max_normalize(sinos[:, :, zidx])
+
+            #         elif self.manualalignbox.val == True:
+
+            #             # sinos[:, :, zidx] = cv2.normalize(
+            #             #     sinos[:, :, zidx], None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F
+            #             # )
+            #             sinos[:, :, zidx] = min_max_normalize(sinos[:, :, zidx])
+
+            #             if self.orderbox.val == 0:
+            #                 optVolume[:, :, zidx] = self.h.reconstruct(
+            #                     ndi.shift(sinos[:, :, zidx], (0, self.alignbox.val), mode="nearest").T
+            #                 )
+            #             elif self.orderbox.val == 1:
+            #                 optVolume[:, :, zidx] = self.h.reconstruct(
+            #                     ndi.shift(sinos[:, :, zidx], (self.alignbox.val, 0), mode="nearest")
+            #                 )
+
+            #             # optVolume[:, :, zidx] = cv2.normalize(
+            #             #     optVolume[:, :, zidx], None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F
+            #             # )
+            #             sinos[:, :, zidx] = min_max_normalize(sinos[:, :, zidx])
+
+            #         else:
+
+            #             # sinos[:, :, zidx] = cv2.normalize(
+            #             #     sinos[:, :, zidx], None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F
+            #             # )
+            #             sinos[:, :, zidx] = min_max_normalize(sinos[:, :, zidx])
+
+            #             if self.orderbox.val == 0:
+
+            #                 optVolume[:, :, zidx] = self.h.reconstruct(sinos[:, :, zidx].T)
+
+            #             elif self.orderbox.val == 1:
+
+            #                 optVolume[:, :, zidx] = self.h.reconstruct(sinos[:, :, zidx])
+
+            #             # optVolume[:, :, zidx] = cv2.normalize(
+            #             #     optVolume[:, :, zidx], None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F
+            #             # )
+            #             sinos[:, :, zidx] = min_max_normalize(sinos[:, :, zidx])
             print("Computation time total: {} s".format(round(time() - time_in, 3)))
-            return np.rollaxis(optVolume, -1) if self.is_reconstruct_one.val == False else optVolume[..., self.slices.val]
+
+            if self.is_reconstruct_one.val == True and self.fullvolume.val == False:
+                return optVolume[..., self.slices.val]
+            else:
+                return np.rollaxis(optVolume, -1)
 
         _reconstruct()
 

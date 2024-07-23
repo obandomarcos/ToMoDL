@@ -247,7 +247,7 @@ class OPTProcessor:
 
         """
         self.angles_torch = np.linspace(0, 2 * np.pi, self.theta, endpoint=False)
-        self.angles = np.linspace(0, 2 * np.pi, self.theta, endpoint=False)
+        self.angles = np.linspace(0, 2 * 180, self.theta, endpoint=False)
         ## Es un enriedo, pero inicializa los generadores de ángulos. Poco claro
 
         if self.iradon_functor == None:
@@ -408,6 +408,7 @@ class OPTProcessor:
             self.iradon_functor.load_state_dict(
                 dict(filter(my_filtering_function, tomodl_checkpoint["state_dict"].items()))
             )
+            
             self.iradon_function = (
                 lambda sino: self.iradon_functor(
                     torch.Tensor(iradon_scikit(sino[..., 0], self.angles, circle=self.clip_to_circle, filter_name=None))

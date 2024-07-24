@@ -153,7 +153,9 @@ class ReconstructionWidget(QWidget):
             layout=slayout,
             write_function=self.set_opt_processor,
         )
-
+        self.lambda_modl = Settings(
+            "Lambda_MODL", dtype=float, initial=0.01, layout=slayout, write_function=self.set_opt_processor
+        )
         self.fullvolume = Settings(
             "Reconstruct full volume", dtype=bool, initial=False, layout=slayout, write_function=self.set_opt_processor
         )
@@ -343,6 +345,7 @@ class ReconstructionWidget(QWidget):
             self.h.clip_to_circle = self.clipcirclebox.val
             self.h.use_filter = self.filterbox.val
             self.h.batch_size = self.batch_size.val
+            self.h.lambda_modl = self.lambda_modl.val
             self.h.set_reconstruction_process()
 
     def start_opt_processor(self):

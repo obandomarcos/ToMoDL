@@ -86,6 +86,7 @@ class OPTProcessor:
         self.is_resize = False
         self.init_volume_rec = False
         self.iradon_functor = None
+        self.lambda_modl = 0.1
         self.set_reconstruction_process()
 
     def set_reconstruction_process(self):
@@ -248,7 +249,7 @@ class OPTProcessor:
         """
         self.angles_torch = np.linspace(0, 2 * np.pi, self.theta, endpoint=False)
         self.angles = np.linspace(0, 2 * 180, self.theta, endpoint=False)
-        
+
         ## Es un enriedo, pero inicializa los generadores de ángulos. Poco claro
 
         if self.iradon_functor == None:
@@ -312,7 +313,7 @@ class OPTProcessor:
                 "number_projections_total": sinogram.shape[0],
                 "acceleration_factor": 10,
                 "image_size": 100,
-                "lambda": 0.1,
+                "lambda": self.lambda_modl,
                 "use_shared_weights": True,
                 "denoiser_method": "resnet",
                 "resnet_options": resnet_options_dict,
@@ -333,21 +334,6 @@ class OPTProcessor:
             self.iradon_functor.load_state_dict(
                 dict(filter(my_filtering_function, tomodl_checkpoint["state_dict"].items()))
             )
-
-            # self.iradon_function = (
-            #     lambda sino: self.iradon_functor(
-            #         torch.Tensor(iradon_scikit(sino, self.angles, circle=self.clip_to_circle, filter_name=None))
-            #         .to(device)
-            #         .unsqueeze(0)
-            #         .unsqueeze(1)
-            #     )["dc" + str(self.tomodl_dictionary["K_iterations"])]
-            #     .detach()
-            #     .cpu()
-            #     .numpy()
-            # )
-
-            # use radon24
-
             radon24 = radon_thrad(self.angles_torch, circle=self.clip_to_circle, filter_name=None, device=device)
 
             # the self.iradon_functor receive a reconstructed image (B, 1, Q, Q)
@@ -367,7 +353,6 @@ class OPTProcessor:
             self.iradon_function = _iradon
 
         elif self.rec_process == Rec_Modes.MODL_CPU.value:
-            # self.angles = np.linspace(0, 2 * 180, self.theta, endpoint=False)
             resnet_options_dict = {
                 "number_layers": 8,
                 "kernel_size": 3,
@@ -386,7 +371,7 @@ class OPTProcessor:
                 "number_projections_total": sinogram.shape[0],
                 "acceleration_factor": 32,
                 "image_size": 100,
-                "lambda": 0.1,
+                "lambda": self.lambda_modl,
                 "use_shared_weights": True,
                 "denoiser_method": "resnet",
                 "resnet_options": resnet_options_dict,
@@ -395,6 +380,7 @@ class OPTProcessor:
             }
 
             self.iradon_functor = ToMoDL(self.tomodl_dictionary)
+            print("lambda_modl", self.lambda_modl)
 
             __location__ = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)))
             artifact_path = os.path.join(__location__, "model.ckpt")
@@ -407,7 +393,7 @@ class OPTProcessor:
             self.iradon_functor.load_state_dict(
                 dict(filter(my_filtering_function, tomodl_checkpoint["state_dict"].items()))
             )
-            
+
             self.iradon_function = (
                 lambda sino: self.iradon_functor(
                     torch.Tensor(iradon_scikit(sino[..., 0], self.angles, circle=self.clip_to_circle, filter_name=None))
@@ -450,16 +436,6 @@ class OPTProcessor:
             self.iradon_functor = UNet(
                 n_channels=1, n_classes=1, residual=True, up_conv=True, batch_norm=True, batch_norm_inconv=True
             ).to(device)
-
-            # AT_tensor = (
-            #     lambda sino: torch.Tensor(
-            #         iradon_scikit(sino, self.angles, circle=self.clip_to_circle, filter_name=None)
-            #     )
-            #     .to(device)
-            #     .unsqueeze(0)
-            #     .unsqueeze(1)
-            # )
-            # self.iradon_function = lambda sino: self.iradon_functor(AT_tensor(sino)).detach().cpu().numpy()
 
             def _iradon(sino):
                 sino = sino.transpose(2, 0, 1)

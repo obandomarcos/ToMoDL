@@ -312,7 +312,7 @@ class OPTProcessor:
                 "number_projections_total": sinogram.shape[0],
                 "acceleration_factor": 10,
                 "image_size": 100,
-                "lambda": 0.01,
+                "lambda": 0.1,
                 "use_shared_weights": True,
                 "denoiser_method": "resnet",
                 "resnet_options": resnet_options_dict,
@@ -367,7 +367,7 @@ class OPTProcessor:
             self.iradon_function = _iradon
 
         elif self.rec_process == Rec_Modes.MODL_CPU.value:
-
+            self.angles = np.linspace(0, 2 * 180, self.theta, endpoint=False)
             resnet_options_dict = {
                 "number_layers": 8,
                 "kernel_size": 3,
@@ -386,7 +386,7 @@ class OPTProcessor:
                 "number_projections_total": sinogram.shape[0],
                 "acceleration_factor": 32,
                 "image_size": 100,
-                "lambda": 0.025,
+                "lambda": 0.1,
                 "use_shared_weights": True,
                 "denoiser_method": "resnet",
                 "resnet_options": resnet_options_dict,

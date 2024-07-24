@@ -272,7 +272,8 @@ class Aclass:
         rTr = torch.sum(r * r)
 
         while (i < 10) and torch.ge(rTr, 1e-5):
-
+            
+            print(rTr)
             Ap = A(p)
             alpha = rTr / torch.sum(p * Ap)
             x = x + alpha * p
@@ -314,17 +315,17 @@ class ToMoDL(nn.Module):
             - x (torch.Tensor) : Backprojected sinogram, in image space
         """
 
-        self.out["dc0"] = x
+        self.out["dc0"] = normalize_images(x).to(device)
 
         for i in range(1, self.K + 1):
 
             j = str(i)
 
             self.out["dw" + j] = normalize_images(self.dw.forward(self.out["dc" + str(i - 1)]))
-            rhs = x / self.lam + self.out["dw" + j]
-
+            rhs = self.out["dc0"] / self.lam + self.out["dw" + j]
+                
             self.out["dc" + j] = normalize_images(self.AtA.inverse(rhs))
-
+            
             del rhs
 
         return self.out

@@ -44,7 +44,6 @@ def min_max_normalize(image):
     return (image - image.min()) / (image.max() - image.min()) * 255
 
 # this thread is used to update the progress bar
-# self.bar_thread.progressChanged.connect(self.progressBar.setValue)
 class BarThread(QThread):
     progressChanged = Signal(int)
 

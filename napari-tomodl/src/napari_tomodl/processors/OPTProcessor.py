@@ -334,6 +334,7 @@ class OPTProcessor:
             self.iradon_functor.load_state_dict(
                 dict(filter(my_filtering_function, tomodl_checkpoint["state_dict"].items()))
             )
+            self.iradon_functor.lam =  torch.nn.Parameter(torch.tensor([self.lambda_modl], requires_grad=True, device=device))
             radon24 = radon_thrad(self.angles_torch, circle=self.clip_to_circle, filter_name=None, device=device)
 
             # the self.iradon_functor receive a reconstructed image (B, 1, Q, Q)
@@ -369,7 +370,7 @@ class OPTProcessor:
                 "metric": "psnr",
                 "K_iterations": 8,
                 "number_projections_total": sinogram.shape[0],
-                "acceleration_factor": 32,
+                "acceleration_factor": 10,
                 "image_size": 100,
                 "lambda": self.lambda_modl,
                 "use_shared_weights": True,
@@ -379,9 +380,7 @@ class OPTProcessor:
                 "out_channels": 1,
             }
 
-            self.iradon_functor = ToMoDL(self.tomodl_dictionary)
-            print("lambda_modl", self.lambda_modl)
-
+            
             __location__ = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)))
             artifact_path = os.path.join(__location__, "model.ckpt")
             tomodl_checkpoint = torch.load(artifact_path, map_location=torch.device("cpu"))
@@ -394,6 +393,8 @@ class OPTProcessor:
                 dict(filter(my_filtering_function, tomodl_checkpoint["state_dict"].items()))
             )
 
+            self.iradon_functor.lam =  torch.nn.Parameter(torch.tensor([self.lambda_modl], requires_grad=True, device=device))
+            
             self.iradon_function = (
                 lambda sino: self.iradon_functor(
                     torch.Tensor(iradon_scikit(sino[..., 0], self.angles, circle=self.clip_to_circle, filter_name=None))

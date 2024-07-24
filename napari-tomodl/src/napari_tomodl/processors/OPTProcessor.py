@@ -248,6 +248,7 @@ class OPTProcessor:
         """
         self.angles_torch = np.linspace(0, 2 * np.pi, self.theta, endpoint=False)
         self.angles = np.linspace(0, 2 * 180, self.theta, endpoint=False)
+        
         ## Es un enriedo, pero inicializa los generadores de ángulos. Poco claro
 
         if self.iradon_functor == None:
@@ -264,7 +265,6 @@ class OPTProcessor:
                 self.angles_torch = None
 
         if self.rec_process == Rec_Modes.FBP_GPU.value:
-            self.angles_torch = np.linspace(0, 2 * np.pi, self.theta, endpoint=False)
             self.iradon_functor = radon_thrad(
                 thetas=self.angles_torch,
                 circle=self.clip_to_circle,
@@ -285,7 +285,6 @@ class OPTProcessor:
             self.iradon_function = _iradon
 
         elif self.rec_process == Rec_Modes.FBP_CPU.value:
-            self.angles = np.linspace(0, 2 * 180, self.theta, endpoint=False)
             self.iradon_function = lambda sino: iradon_scikit(
                 sino[..., 0],
                 self.angles,

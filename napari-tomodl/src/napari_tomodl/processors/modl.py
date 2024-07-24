@@ -273,7 +273,7 @@ class Aclass:
 
         while (i < 10) and torch.ge(rTr, 1e-5):
             
-            print(rTr)
+            # print(rTr)
             Ap = A(p)
             alpha = rTr / torch.sum(p * Ap)
             x = x + alpha * p

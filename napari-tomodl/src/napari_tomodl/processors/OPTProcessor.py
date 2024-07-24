@@ -367,7 +367,7 @@ class OPTProcessor:
             self.iradon_function = _iradon
 
         elif self.rec_process == Rec_Modes.MODL_CPU.value:
-            self.angles = np.linspace(0, 2 * 180, self.theta, endpoint=False)
+            # self.angles = np.linspace(0, 2 * 180, self.theta, endpoint=False)
             resnet_options_dict = {
                 "number_layers": 8,
                 "kernel_size": 3,

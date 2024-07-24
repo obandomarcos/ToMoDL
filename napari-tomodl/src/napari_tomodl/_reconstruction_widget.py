@@ -23,8 +23,9 @@ from qtpy.QtWidgets import (
     QFormLayout,
     QComboBox,
     QLabel,
+    QProgressBar,
 )
-from qtpy.QtCore import Qt
+from qtpy.QtCore import Qt, QThread, Signal
 from napari.layers import Image
 import numpy as np
 from napari.qt.threading import thread_worker
@@ -41,6 +42,20 @@ import numpy as np
 
 def min_max_normalize(image):
     return (image - image.min()) / (image.max() - image.min()) * 255
+
+# this thread is used to update the progress bar
+# self.bar_thread.progressChanged.connect(self.progressBar.setValue)
+class BarThread(QThread):
+    progressChanged = Signal(int)
+
+    def __init__(self, parent=None):
+        super(BarThread, self).__init__(parent)
+        self.max = 1
+        self.min = 0
+        self.value = 1
+    def run(self):
+        percent = (self.value - self.min) / (self.max - self.min) * 100
+        self.progressChanged.emit(int(percent))
 
 
 class Rec_modes(Enum):
@@ -66,23 +81,22 @@ class ReconstructionWidget(QWidget):
         super().__init__()
         self.setup_ui()
         # self.viewer.dims.events.current_step.connect(self.select_index)
-    
+        self.bar_thread = BarThread(self)
+        self.bar_thread.progressChanged.connect(self.progressBar.setValue)
     def setup_ui(self):
 
         # initialize layout
-        layout = QVBoxLayout()
-        self.setLayout(layout)
+        self.layout = QVBoxLayout()
+        self.setLayout(self.layout)
 
         def add_section(_layout, _title):
-            from qtpy.QtCore import Qt
-
             splitter = QSplitter(Qt.Vertical)
             _layout.addWidget(splitter)
             # _layout.addWidget(QLabel(_title))
 
         image_layout = QVBoxLayout()
         add_section(image_layout, "Image selection")
-        layout.addLayout(image_layout)
+        self.layout.addLayout(image_layout)
 
         self.choose_layer_widget = choose_layer()
         self.choose_layer_widget.call_button.visible = False
@@ -93,7 +107,7 @@ class ReconstructionWidget(QWidget):
 
         settings_layout = QVBoxLayout()
         add_section(settings_layout, "Settings")
-        layout.addLayout(settings_layout)
+        self.layout.addLayout(settings_layout)
         self.createSettings(settings_layout)
 
     def createSettings(self, slayout):
@@ -167,6 +181,9 @@ class ReconstructionWidget(QWidget):
         calculate_btn.clicked.connect(self.stack_reconstruction)
         slayout.addWidget(calculate_btn)
 
+        self.progressBar = QProgressBar()
+        slayout.addWidget(self.progressBar)
+
     def show_image(self, image_values, fullname, **kwargs):
 
         if "scale" in kwargs.keys():
@@ -205,9 +222,8 @@ class ReconstructionWidget(QWidget):
             print("Stack reconstruction completed")
             gc.collect()
             torch.cuda.empty_cache()
-            
 
-        @thread_worker(connect={"returned": update_opt_image})
+        @thread_worker(connect={"returned": update_opt_image},)
         def _reconstruct():
             """
             ToDO: Link projections
@@ -233,8 +249,6 @@ class ReconstructionWidget(QWidget):
             else:
                 optVolume = np.zeros([self.h.Q, self.h.Q, self.h.Z], np.float32)
 
-            time_in = time()
-
             # Reconstruction process
             # if reconstructing only one slice
             if self.is_reconstruct_one.val == True and self.fullvolume.val == False:
@@ -252,16 +266,21 @@ class ReconstructionWidget(QWidget):
                 batch_process = 1
 
             batch_end = batch_start + batch_process
+            # add progressBar to track the reconstruction process
+            self.bar_thread.start()
+            self.bar_thread.max = slices_reconstruction[-1]+1
+            time_in = time()
             while batch_start <= slices_reconstruction[-1]:
-                print("Reconstructing slices {} to {}".format(batch_start, batch_end), end="\r")
-
+                # print("Reconstructing slices {} to {}".format(batch_start, batch_end), end="\r")
+                self.bar_thread.value = batch_end
+                self.bar_thread.run()
                 zidx = slice(batch_start, batch_end)
 
                 if self.registerbox.val == True:
 
-                # sinos[:, :, zidx] = cv2.normalize(
-                #     sinos[:, :, zidx], None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F
-                # )
+                    # sinos[:, :, zidx] = cv2.normalize(
+                    #     sinos[:, :, zidx], None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F
+                    # )
                     sinos[:, :, zidx] = min_max_normalize(sinos[:, :, zidx])
                     if self.orderbox.val == 0:
                         optVolume[:, :, zidx] = self.h.correct_and_reconstruct(sinos[:, :, zidx].transpose(1, 0, 2))
@@ -299,9 +318,9 @@ class ReconstructionWidget(QWidget):
                 return optVolume[..., self.slices.val]
             else:
                 return np.rollaxis(optVolume, -1)
-
+            
+            self.bar_thread.quit()
         _reconstruct()
-
 
     def get_sinos(self):
         try:

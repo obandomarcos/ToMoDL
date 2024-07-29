@@ -9,6 +9,7 @@ from .processors.OPTProcessor import OPTProcessor
 from .widget_settings import Settings, Combo_box
 import gc
 import torch
+
 # import processors
 import napari
 from qtpy.QtWidgets import (
@@ -43,6 +44,7 @@ import numpy as np
 def min_max_normalize(image):
     return (image - image.min()) / (image.max() - image.min()) * 255
 
+
 # this thread is used to update the progress bar
 class BarThread(QThread):
     progressChanged = Signal(int)
@@ -52,6 +54,7 @@ class BarThread(QThread):
         self.max = 1
         self.min = 0
         self.value = 1
+
     def run(self):
         percent = (self.value - self.min) / (self.max - self.min) * 100
         self.progressChanged.emit(int(percent))
@@ -82,6 +85,7 @@ class ReconstructionWidget(QWidget):
         # self.viewer.dims.events.current_step.connect(self.select_index)
         self.bar_thread = BarThread(self)
         self.bar_thread.progressChanged.connect(self.progressBar.setValue)
+
     def setup_ui(self):
 
         # initialize layout
@@ -112,7 +116,7 @@ class ReconstructionWidget(QWidget):
     def createSettings(self, slayout):
 
         self.reshapebox = Settings(
-            "Reshape volume", dtype=bool, initial=True, layout=slayout, write_function=self.set_opt_processor
+            "Reshape volume", dtype=bool, initial=False, layout=slayout, write_function=self.set_opt_processor
         )
 
         self.resizebox = Settings(
@@ -224,7 +228,9 @@ class ReconstructionWidget(QWidget):
             gc.collect()
             torch.cuda.empty_cache()
 
-        @thread_worker(connect={"returned": update_opt_image},)
+        @thread_worker(
+            connect={"returned": update_opt_image},
+        )
         def _reconstruct():
             """
             ToDO: Link projections
@@ -269,7 +275,7 @@ class ReconstructionWidget(QWidget):
             batch_end = batch_start + batch_process
             # add progressBar to track the reconstruction process
             self.bar_thread.start()
-            self.bar_thread.max = slices_reconstruction[-1]+1
+            self.bar_thread.max = slices_reconstruction[-1] + 1
             time_in = time()
             while batch_start <= slices_reconstruction[-1]:
                 # print("Reconstructing slices {} to {}".format(batch_start, batch_end), end="\r")
@@ -319,8 +325,9 @@ class ReconstructionWidget(QWidget):
                 return optVolume[..., self.slices.val]
             else:
                 return np.rollaxis(optVolume, -1)
-            
+
             self.bar_thread.quit()
+
         _reconstruct()
 
     def get_sinos(self):

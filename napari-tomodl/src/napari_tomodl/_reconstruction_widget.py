@@ -175,7 +175,7 @@ class ReconstructionWidget(QWidget):
 
         self.orderbox = Combo_box(
             name="Rotation axis",
-            initial=Order_Modes.Horizontal.value,
+            initial=Order_Modes.Vertical.value,
             choices=Order_Modes,
             layout=slayout,
             write_function=self.set_opt_processor,
@@ -209,8 +209,19 @@ class ReconstructionWidget(QWidget):
 
         sinos = self.choose_layer_widget.image.value
         if sinos.data.ndim == 3:
-
+            self.input_type = "3D"
             self.imageRaw_name = sinos.name
+            sz, sy, sx = sinos.data.shape
+            print(sz, sy, sx)
+            if not hasattr(self, "h"):
+                self.start_opt_processor()
+            print(f"Selected image layer: {sinos.name}")
+
+        elif sinos.data.ndim == 2:
+            self.input_type = "2D"
+            self.imageRaw_name = sinos.name
+            # add dim to the image
+            sinos.data = np.expand_dims(sinos.data, axis=0)
             sz, sy, sx = sinos.data.shape
             print(sz, sy, sx)
             if not hasattr(self, "h"):
@@ -223,7 +234,6 @@ class ReconstructionWidget(QWidget):
 
             imname = "stack_" + self.imageRaw_name
             self.show_image(stack, fullname=imname)
-
             print("Stack reconstruction completed")
             gc.collect()
             torch.cuda.empty_cache()
@@ -236,12 +246,15 @@ class ReconstructionWidget(QWidget):
             ToDO: Link projections
             """
 
-            if self.orderbox.val == 0:
+            if self.orderbox.val == 0 and self.input_type == "3D":
                 sinos = np.moveaxis(np.float32(self.get_sinos()), 1, 2)
                 self.h.theta, self.h.Q, self.h.Z = sinos.shape
-            elif self.orderbox.val == 1:
-
+            elif self.orderbox.val == 1 and self.input_type == "3D":
                 sinos = np.moveaxis(np.float32(self.get_sinos()), 0, 1)
+                self.h.Q, self.h.theta, self.h.Z = sinos.shape
+            else:
+                sinos = np.float32(self.get_sinos())
+                sinos = np.transpose(sinos, (1, 2, 0))
                 self.h.Q, self.h.theta, self.h.Z = sinos.shape
 
             if self.reshapebox.val == True:
@@ -255,15 +268,16 @@ class ReconstructionWidget(QWidget):
                 )
             else:
                 optVolume = np.zeros([self.h.Q, self.h.Q, self.h.Z], np.float32)
-
+            print("Reconstructing volume of size: ", optVolume.shape)
             # Reconstruction process
             # if reconstructing only one slice
-            if self.is_reconstruct_one.val == True and self.fullvolume.val == False:
+            if self.is_reconstruct_one.val == True and self.fullvolume.val == False and self.input_type == "3D":
                 slices_reconstruction = [self.slices.val]
-
             # if reconstructing full volume or multiple slices
-            else:
+            elif self.input_type == "3D":
                 slices_reconstruction = range(self.h.Z if self.fullvolume.val == True else self.slices.val)
+            else:
+                slices_reconstruction = [0]
 
             batch_start = slices_reconstruction[0]
             # if use GPU process in batch to improve performance
@@ -278,53 +292,57 @@ class ReconstructionWidget(QWidget):
             self.bar_thread.max = slices_reconstruction[-1] + 1
             time_in = time()
             while batch_start <= slices_reconstruction[-1]:
-                # print("Reconstructing slices {} to {}".format(batch_start, batch_end), end="\r")
+                print("Reconstructing slices {} to {}".format(batch_start, batch_end), end="\r")
                 self.bar_thread.value = batch_end
                 self.bar_thread.run()
                 zidx = slice(batch_start, batch_end)
 
-                if self.registerbox.val == True:
+                if self.input_type == "3D":
+                    if self.registerbox.val == True:
 
-                    # sinos[:, :, zidx] = cv2.normalize(
-                    #     sinos[:, :, zidx], None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F
-                    # )
-                    sinos[:, :, zidx] = min_max_normalize(sinos[:, :, zidx])
-                    if self.orderbox.val == 0:
-                        optVolume[:, :, zidx] = self.h.correct_and_reconstruct(sinos[:, :, zidx].transpose(1, 0, 2))
-                    elif self.orderbox.val == 1:
-                        optVolume[:, :, zidx] = self.h.correct_and_reconstruct(sinos[:, :, zidx])
-                    sinos[:, :, zidx] = min_max_normalize(sinos[:, :, zidx])
+                        # sinos[:, :, zidx] = cv2.normalize(
+                        #     sinos[:, :, zidx], None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F
+                        # )
+                        sinos[:, :, zidx] = min_max_normalize(sinos[:, :, zidx])
+                        if self.orderbox.val == 0:
+                            optVolume[:, :, zidx] = self.h.correct_and_reconstruct(sinos[:, :, zidx].transpose(1, 0, 2))
+                        elif self.orderbox.val == 1:
+                            optVolume[:, :, zidx] = self.h.correct_and_reconstruct(sinos[:, :, zidx])
+                        sinos[:, :, zidx] = min_max_normalize(sinos[:, :, zidx])
 
-                elif self.manualalignbox.val == True:
-                    sinos[:, :, zidx] = min_max_normalize(sinos[:, :, zidx])
-                    if self.orderbox.val == 0:
-                        optVolume[:, :, zidx] = self.h.reconstruct(
-                            ndi.shift(sinos[:, :, zidx], (0, self.alignbox.val, 0), mode="nearest").transpose(1, 0, 2)
-                        )
-                    elif self.orderbox.val == 1:
-                        optVolume[:, :, zidx] = self.h.reconstruct(
-                            ndi.shift(sinos[:, :, zidx], (self.alignbox.val, 0, 0), mode="nearest")
-                        )
-                    sinos[:, :, zidx] = min_max_normalize(sinos[:, :, zidx])
+                    elif self.manualalignbox.val == True:
+                        sinos[:, :, zidx] = min_max_normalize(sinos[:, :, zidx])
+                        if self.orderbox.val == 0 and self.input_type == "3D":
+                            optVolume[:, :, zidx] = self.h.reconstruct(
+                                ndi.shift(sinos[:, :, zidx], (0, self.alignbox.val, 0), mode="nearest").transpose(1, 0, 2)
+                            )
+                        elif self.orderbox.val == 1:
+                            optVolume[:, :, zidx] = self.h.reconstruct(
+                                ndi.shift(sinos[:, :, zidx], (self.alignbox.val, 0, 0), mode="nearest")
+                            )
+                        sinos[:, :, zidx] = min_max_normalize(sinos[:, :, zidx])
 
-                else:
-                    sinos[:, :, zidx] = min_max_normalize(sinos[:, :, zidx])
-                    if self.orderbox.val == 0:
-                        optVolume[:, :, zidx] = self.h.reconstruct(sinos[:, :, zidx].transpose(1, 0, 2))
+                    else:
+                        sinos[:, :, zidx] = min_max_normalize(sinos[:, :, zidx])
+                        if self.orderbox.val == 0:
+                            optVolume[:, :, zidx] = self.h.reconstruct(sinos[:, :, zidx].transpose(1, 0, 2))
 
-                    elif self.orderbox.val == 1:
-                        optVolume[:, :, zidx] = self.h.reconstruct(sinos[:, :, zidx])
-                    sinos[:, :, zidx] = min_max_normalize(sinos[:, :, zidx])
-
+                        elif self.orderbox.val == 1:
+                            optVolume[:, :, zidx] = self.h.reconstruct(sinos[:, :, zidx])
+                        sinos[:, :, zidx] = min_max_normalize(sinos[:, :, zidx])
+                ####################### 2D reconstruction ############################
+                elif self.input_type == "2D":
+                    optVolume[:, :, zidx] = self.h.reconstruct(sinos[:, :, zidx])
                 batch_start = batch_end
                 batch_end += batch_process
-
             print("Computation time total: {} s".format(round(time() - time_in, 3)))
 
-            if self.is_reconstruct_one.val == True and self.fullvolume.val == False:
+            if self.is_reconstruct_one.val == True and self.fullvolume.val == False and self.input_type == "3D":
                 return optVolume[..., self.slices.val]
-            else:
+            elif self.input_type == "3D":
                 return np.rollaxis(optVolume, -1)
+            else:
+                return optVolume[..., 0]
 
             self.bar_thread.quit()
 
@@ -385,3 +403,5 @@ class ReconstructionWidget(QWidget):
 @magic_factory
 def choose_layer(image: Image):
     pass  # TODO: substitute with a qtwidget without magic functions
+
+# %%

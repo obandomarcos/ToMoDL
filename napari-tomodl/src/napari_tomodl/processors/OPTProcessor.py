@@ -151,7 +151,7 @@ class OPTProcessor:
 
     #     return self.correct_and_reconstruct(sinogram)
 
-    def correct_and_reconstruct(self, sinogram: np.ndarray):
+    def correct_and_reconstruct(self, sinogram: np.ndarray, type_sino="3D"):
         """
         Corrects rotation axis by finding optimal registration via maximising reconstructed image's intensity variance.
 
@@ -165,9 +165,9 @@ class OPTProcessor:
             shifts = np.arange(-self.max_shift, self.max_shift, self.shift_step) + self.center_shift
             image_std = []
             for i, shift in enumerate(shifts):
-                if self.order_mode == Order_Modes.Vertical.value:
+                if self.order_mode == Order_Modes.Vertical.value and type_sino == "3D":
                     shift_tuple = (0, shift, 0)
-                if self.order_mode == Order_Modes.Horizontal.value:
+                elif self.order_mode == Order_Modes.Horizontal.value or type_sino == "2D":
                     shift_tuple = (shift, 0, 0)
 
                 sino_shift = ndi.shift(sinogram, shift_tuple, mode="nearest")
@@ -182,8 +182,10 @@ class OPTProcessor:
             self.center_shift = shifts[np.argmax(image_std)]
             self.max_shift /= 5
             self.shift_step /= 2.5
-
-            sinogram = ndi.shift(sinogram, (0, self.center_shift, 0), mode="nearest")
+            if self.order_mode == Order_Modes.Vertical.value and type_sino == "3D":
+                sinogram = ndi.shift(sinogram, (0, self.center_shift, 0), mode="nearest")
+            elif self.order_mode == Order_Modes.Horizontal.value or type_sino == "2D":
+                sinogram = ndi.shift(sinogram, (self.center_shift, 0, 0), mode="nearest")
 
         # Restart shifts
         self.max_shift = 200
@@ -191,17 +193,18 @@ class OPTProcessor:
         self.center_shift = 0
         return self.reconstruct(sinogram)
 
-    def resize(self, sinogram_volume: np.ndarray):
+    def resize(self, sinogram_volume: np.ndarray, type_sino="3D"):
         """
         Resizes sinogram prior to reconstruction.
         Args:
             -sinogram_volume (np.ndarray): array to resize in any mode specified.
         """
 
-        if self.order_mode == Order_Modes.Vertical.value:
+        if self.order_mode == Order_Modes.Vertical.value and type_sino == "3D":
             self.theta, self.Q, self.Z = sinogram_volume.shape
-        if self.order_mode == Order_Modes.Horizontal.value:
+        elif self.order_mode == Order_Modes.Horizontal.value or type_sino == "2D":
             self.Q, self.theta, self.Z = sinogram_volume.shape
+
         if self.clip_to_circle == True:
             sinogram_size = self.resize_val
         else:
@@ -209,17 +212,17 @@ class OPTProcessor:
 
         if self.resize_bool == True:
 
-            if self.order_mode == Order_Modes.Vertical.value:
+            if self.order_mode == Order_Modes.Vertical.value and type_sino == "3D":
 
                 sinogram_resize = np.zeros((self.theta, sinogram_size, self.Z), dtype=np.float32)
 
-            if self.order_mode == Order_Modes.Horizontal.value:
+            elif self.order_mode == Order_Modes.Horizontal.value or type_sino == "2D":
 
                 sinogram_resize = np.zeros((sinogram_size, self.theta, self.Z), dtype=np.float32)
 
             for idx in tqdm.tqdm(range(self.Z)):
 
-                if self.order_mode == Order_Modes.Vertical.value:
+                if self.order_mode == Order_Modes.Vertical.value and type_sino == "3D":
 
                     sinogram_resize[:, :, idx] = cv2.resize(
                         sinogram_volume[:, :, idx],
@@ -227,7 +230,7 @@ class OPTProcessor:
                         interpolation=cv2.INTER_NEAREST,
                     )
 
-                elif self.order_mode == Order_Modes.Horizontal.value:
+                elif self.order_mode == Order_Modes.Horizontal.value or type_sino == "2D":
 
                     sinogram_resize[:, :, idx] = cv2.resize(
                         sinogram_volume[:, :, idx],
@@ -334,8 +337,10 @@ class OPTProcessor:
             self.iradon_functor.load_state_dict(
                 dict(filter(my_filtering_function, tomodl_checkpoint["state_dict"].items()))
             )
-            self.iradon_functor.lam =  torch.nn.Parameter(torch.tensor([self.lambda_modl], requires_grad=True, device=device))
-            
+            self.iradon_functor.lam = torch.nn.Parameter(
+                torch.tensor([self.lambda_modl], requires_grad=True, device=device)
+            )
+
             radon24 = radon_thrad(self.angles_torch, circle=self.clip_to_circle, filter_name=None, device=device)
 
             # the self.iradon_functor receive a reconstructed image (B, 1, Q, Q)
@@ -394,7 +399,9 @@ class OPTProcessor:
                 dict(filter(my_filtering_function, tomodl_checkpoint["state_dict"].items()))
             )
 
-            self.iradon_functor.lam =  torch.nn.Parameter(torch.tensor([self.lambda_modl], requires_grad=True, device=device))
+            self.iradon_functor.lam = torch.nn.Parameter(
+                torch.tensor([self.lambda_modl], requires_grad=True, device=device)
+            )
 
             self.iradon_function = (
                 lambda sino: self.iradon_functor(

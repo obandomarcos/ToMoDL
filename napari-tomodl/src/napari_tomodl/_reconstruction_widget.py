@@ -221,9 +221,9 @@ class ReconstructionWidget(QWidget):
             self.input_type = "2D"
             self.imageRaw_name = sinos.name
             # add dim to the image
-            sinos.data = np.expand_dims(sinos.data, axis=0)
-            sz, sy, sx = sinos.data.shape
-            print(sz, sy, sx)
+            # sinos.data = np.expand_dims(sinos.data, axis=0)
+            sy, sx = sinos.data.shape
+            print(sy, sx)
             if not hasattr(self, "h"):
                 self.start_opt_processor()
             print(f"Selected image layer: {sinos.name}")
@@ -253,14 +253,13 @@ class ReconstructionWidget(QWidget):
                 sinos = np.moveaxis(np.float32(self.get_sinos()), 0, 1)
                 self.h.Q, self.h.theta, self.h.Z = sinos.shape
             else:
-                sinos = np.float32(self.get_sinos())
-                sinos = np.transpose(sinos, (1, 2, 0))
+                sinos = np.float32(self.get_sinos())[..., None]
                 self.h.Q, self.h.theta, self.h.Z = sinos.shape
 
             if self.reshapebox.val == True:
 
                 optVolume = np.zeros([self.resizebox.val, self.resizebox.val, self.h.Z], np.float32)
-                sinos = self.h.resize(sinos)
+                sinos = self.h.resize(sinos, type_sino=self.input_type)
 
             elif self.clipcirclebox.val == False:
                 optVolume = np.zeros(
@@ -268,7 +267,7 @@ class ReconstructionWidget(QWidget):
                 )
             else:
                 optVolume = np.zeros([self.h.Q, self.h.Q, self.h.Z], np.float32)
-            print("Reconstructing volume of size: ", optVolume.shape)
+
             # Reconstruction process
             # if reconstructing only one slice
             if self.is_reconstruct_one.val == True and self.fullvolume.val == False and self.input_type == "3D":
@@ -296,7 +295,7 @@ class ReconstructionWidget(QWidget):
                 self.bar_thread.value = batch_end
                 self.bar_thread.run()
                 zidx = slice(batch_start, batch_end)
-
+                ####################### stacks reconstruction ############################
                 if self.input_type == "3D":
                     if self.registerbox.val == True:
 
@@ -312,7 +311,7 @@ class ReconstructionWidget(QWidget):
 
                     elif self.manualalignbox.val == True:
                         sinos[:, :, zidx] = min_max_normalize(sinos[:, :, zidx])
-                        if self.orderbox.val == 0 and self.input_type == "3D":
+                        if self.orderbox.val == 0:
                             optVolume[:, :, zidx] = self.h.reconstruct(
                                 ndi.shift(sinos[:, :, zidx], (0, self.alignbox.val, 0), mode="nearest").transpose(1, 0, 2)
                             )
@@ -330,9 +329,18 @@ class ReconstructionWidget(QWidget):
                         elif self.orderbox.val == 1:
                             optVolume[:, :, zidx] = self.h.reconstruct(sinos[:, :, zidx])
                         sinos[:, :, zidx] = min_max_normalize(sinos[:, :, zidx])
+                        
                 ####################### 2D reconstruction ############################
                 elif self.input_type == "2D":
-                    optVolume[:, :, zidx] = self.h.reconstruct(sinos[:, :, zidx])
+                    if self.registerbox.val == True:
+                        optVolume[:, :, zidx] = self.h.correct_and_reconstruct(sinos[:, :, zidx])
+                        
+                    elif self.manualalignbox.val == True:
+                        optVolume[:, :, zidx] = self.h.reconstruct(
+                            ndi.shift(sinos[:, :, zidx], (self.alignbox.val, 0, 0), mode="nearest")
+                        )
+                    else:
+                        optVolume[:, :, zidx] = self.h.reconstruct(sinos[:, :, zidx])
                 batch_start = batch_end
                 batch_end += batch_process
             print("Computation time total: {} s".format(round(time() - time_in, 3)))

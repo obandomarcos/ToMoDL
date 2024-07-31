@@ -7,4 +7,4 @@ contributions:
       title: Reconstruct OPT data with ToMoDL
   widgets:
     - command: napari-tomodl.make_reconstruct_widget
-      display_name: OPT reconstruction
+      display_name: napari-ToMoDL

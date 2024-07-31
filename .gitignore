@@ -10,6 +10,7 @@ datasets/Contrast*
 datasets/sino1*
 datasets/PET*
 datasets/LDC*
+datasets/EMBL*
 
 
 # Distribution / packaging

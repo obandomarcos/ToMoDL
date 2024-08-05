@@ -340,20 +340,7 @@ class ReconstructionWidget(QWidget):
                     sinos[:, :, zidx] = min_max_normalize(sinos[:, :, zidx])
                     
                     if self.registerbox.val == True:
-<<<<<<< HEAD
-
-                        # sinos[:, :, zidx] = cv2.normalize(
-                        #     sinos[:, :, zidx], None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F
-                        # )
-                        
-                        if self.orderbox.val == 0:
-                            optVolume[:, :, zidx] = self.h.correct_and_reconstruct(sinos[:, :, zidx].transpose(1, 0, 2))
-                        elif self.orderbox.val == 1:
-                            optVolume[:, :, zidx] = self.h.correct_and_reconstruct(sinos[:, :, zidx])
-                        sinos[:, :, zidx] = min_max_normalize(sinos[:, :, zidx])
-=======
                         optVolume[:, :, zidx] = self.h.correct_and_reconstruct(sinos[:, :, zidx])
->>>>>>> df33955f81889ba2db60ea5eae5cbcb0bfc90492
 
                     elif self.manualalignbox.val == True:
                         sinos[:, :, zidx] = min_max_normalize(sinos[:, :, zidx])

@@ -208,7 +208,8 @@ class ReconstructionWidget(QWidget):
     def select_layer(self, sinos: Image):
 
         sinos = self.choose_layer_widget.image.value
-        if sinos.data.ndim == 3:
+
+        if sinos.data.ndim == 3 and sinos.data.shape[2] > 1:
             self.input_type = "3D"
             self.imageRaw_name = sinos.name
             sz, sy, sx = sinos.data.shape
@@ -216,8 +217,7 @@ class ReconstructionWidget(QWidget):
             if not hasattr(self, "h"):
                 self.start_opt_processor()
             print(f"Selected image layer: {sinos.name}")
-
-        elif sinos.data.ndim == 2:
+        else:
             self.input_type = "2D"
             self.imageRaw_name = sinos.name
             # add dim to the image
@@ -228,6 +228,7 @@ class ReconstructionWidget(QWidget):
                 self.start_opt_processor()
             print(f"Selected image layer: {sinos.name}")
 
+            
     def stack_reconstruction(self):
 
         def update_opt_image(stack):
@@ -252,10 +253,13 @@ class ReconstructionWidget(QWidget):
             elif self.orderbox.val == 1 and self.input_type == "3D":
                 sinos = np.moveaxis(np.float32(self.get_sinos()), 0, 1)
                 self.h.Q, self.h.theta, self.h.Z = sinos.shape
-            else:
+            elif self.orderbox.val == 0 and self.input_type == "2D":
+                sinos = np.float32(self.get_sinos().T)[..., None]
+                self.h.theta, self.h.Q, self.h.Z = sinos.shape
+            elif self.orderbox.val == 1 and self.input_type == "2D":
                 sinos = np.float32(self.get_sinos())[..., None]
                 self.h.Q, self.h.theta, self.h.Z = sinos.shape
-
+            print(sinos.shape)
             if self.reshapebox.val == True:
 
                 optVolume = np.zeros([self.resizebox.val, self.resizebox.val, self.h.Z], np.float32)
@@ -332,15 +336,34 @@ class ReconstructionWidget(QWidget):
                         
                 ####################### 2D reconstruction ############################
                 elif self.input_type == "2D":
+                    
+                    sinos[:, :, zidx] = min_max_normalize(sinos[:, :, zidx])
+                    
                     if self.registerbox.val == True:
-                        optVolume[:, :, zidx] = self.h.correct_and_reconstruct(sinos[:, :, zidx])
+
+                        # sinos[:, :, zidx] = cv2.normalize(
+                        #     sinos[:, :, zidx], None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F
+                        # )
                         
+                        if self.orderbox.val == 0:
+                            optVolume[:, :, zidx] = self.h.correct_and_reconstruct(sinos[:, :, zidx].transpose(1, 0, 2))
+                        elif self.orderbox.val == 1:
+                            optVolume[:, :, zidx] = self.h.correct_and_reconstruct(sinos[:, :, zidx])
+                        sinos[:, :, zidx] = min_max_normalize(sinos[:, :, zidx])
+
                     elif self.manualalignbox.val == True:
-                        optVolume[:, :, zidx] = self.h.reconstruct(
-                            ndi.shift(sinos[:, :, zidx], (self.alignbox.val, 0, 0), mode="nearest")
-                        )
+                        sinos[:, :, zidx] = min_max_normalize(sinos[:, :, zidx])
+                        if self.orderbox.val == 0:
+                            optVolume[:, :, zidx] = self.h.reconstruct(
+                                ndi.shift(sinos[:, :, zidx], (0, self.alignbox.val, 0), mode="nearest").transpose(1, 0, 2)
+                            )
+                        elif self.orderbox.val == 1:
+                            optVolume[:, :, zidx] = self.h.reconstruct(
+                                ndi.shift(sinos[:, :, zidx], (self.alignbox.val, 0, 0), mode="nearest")
+                            )
                     else:
                         optVolume[:, :, zidx] = self.h.reconstruct(sinos[:, :, zidx])
+                
                 batch_start = batch_end
                 batch_end += batch_process
             print("Computation time total: {} s".format(round(time() - time_in, 3)))

@@ -8,15 +8,22 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+from skimage.transform import radon as radon_scikit
+from skimage.transform import iradon as iradon_scikit
+import torch
+
+# from .modl import ToMoDL
+
+from .unet import UNet
 
 try:
-    from torch_radon24 import Radon as thrad
-
-    # from torch_radon.solvers import cg
+    from torch_radon24 import Radon as radon_thrad
 
     use_torch_radon = True
     use_tomopy = False
     use_scikit = False
+
+    print("Torch-Radon24 available!")
 
 except:
 
@@ -30,12 +37,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 from . import unet
 
-try:
-    # Modify for multi-gpu
-    device = torch.device("cuda:0" if use_torch_radon == True else "cpu")
 
-except:
-    print("Torch not available!")
+# Modify for multi-gpu
+device = torch.device("cuda:0" if use_torch_radon == True else "cpu")
 
 
 class dwLayer(nn.Module):
@@ -116,7 +120,6 @@ class dw(nn.Module):
             - kw_dictionary (dict): Parameters dictionary
         """
         super(dw, self).__init__()
-
         self.process_kwdictionary(kw_dictionary=kw_dictionary)
 
         for i in np.arange(1, self.number_layers + 1):
@@ -126,7 +129,7 @@ class dw(nn.Module):
             if i == self.number_layers - 1:
                 self.dw_layer_dict["is_last_layer"] = True
 
-            self.nw["c" + str(i)] = dwLayer(self.dw_layer_dict).to(device)
+            self.nw["c" + str(i)] = dwLayer(self.dw_layer_dict).to(self.device)
 
         self.nw = nn.ModuleDict(self.nw)
 
@@ -162,6 +165,7 @@ class dw(nn.Module):
         self.stride = kw_dictionary["stride"]
         self.use_batch_norm = kw_dictionary["use_batch_norm"]
         self.init_method = kw_dictionary["init_method"]
+        self.device = kw_dictionary["device"]
 
         # Intermediate layers (in_channels, out_channels, kernel_size_x, kernel_size_y)
         self.weights_size = {
@@ -196,10 +200,9 @@ class Aclass:
         self.use_scikit = kw_dictionary["use_scikit"]
         self.angles = np.linspace(0, 2 * np.pi, self.number_projections, endpoint=False)
         self.det_count = int(np.ceil(np.sqrt(2) * self.img_size))
-
+        self.device = kw_dictionary["device"]
         if self.use_torch_radon == True:
-            # self.radon = thrad(self.img_size, self.angles, clip_to_circle=False, det_count=self.det_count)
-            self.radon = thrad(thetas=self.angles, circle=False, device=device, filter_name=None)
+            self.radon = radon_thrad(thetas=self.angles, circle=False, device=self.device, filter_name=None)
 
         elif self.use_scikit == True:
 
@@ -212,7 +215,7 @@ class Aclass:
                     # Compute the Radon transform of the image
                     image = image.detach().numpy()
                     sinogram = radon(image, theta=np.linspace(0, 2 * 180, self.num_angles), circle=self.circle)
-                    sinogram = torch.tensor(sinogram).to(device)
+                    sinogram = torch.tensor(sinogram).to(self.device)
                     return sinogram
 
                 def backprojection(self, sinogram):
@@ -221,7 +224,7 @@ class Aclass:
                     reconstruction = iradon(
                         sinogram, theta=np.linspace(0, 2 * 180, self.num_angles), circle=self.circle, filter_name=None
                     )
-                    reconstruction = torch.tensor(reconstruction).to(device)
+                    reconstruction = torch.tensor(reconstruction).to(self.device)
                     return reconstruction
 
             self.radon = Radon(self.number_projections, circle=False)
@@ -325,7 +328,7 @@ class ToMoDL(nn.Module):
             - x (torch.Tensor) : Backprojected sinogram, in image space
         """
 
-        self.out["dc0"] = normalize_images(x).to(device)
+        self.out["dc0"] = normalize_images(x)
 
         for i in range(1, self.K + 1):
 
@@ -351,6 +354,8 @@ class ToMoDL(nn.Module):
         self.use_torch_radon = use_torch_radon
         self.use_scikit = use_scikit
         self.use_tomopy = use_tomopy
+
+        self.device = kw_dictionary["device"]
         self.K = kw_dictionary["K_iterations"]
         self.number_projections_total = kw_dictionary["number_projections_total"]
         self.acceleration_factor = kw_dictionary["acceleration_factor"]
@@ -358,7 +363,7 @@ class ToMoDL(nn.Module):
         self.image_size = kw_dictionary["image_size"]
 
         self.lam = kw_dictionary["lambda"]
-        self.lam = torch.nn.Parameter(torch.tensor([self.lam], requires_grad=True, device=device))
+        self.lam = torch.nn.Parameter(torch.tensor([self.lam], requires_grad=True, device=self.device))
 
         self.use_shared_weights = kw_dictionary["use_shared_weights"]
         self.denoiser_method = kw_dictionary["denoiser_method"]
@@ -370,7 +375,6 @@ class ToMoDL(nn.Module):
             self.unet_options = kw_dictionary["unet_options"]
         elif self.denoiser_method == "resnet":
             self.resnet_options = kw_dictionary["resnet_options"]
-
         self.AtA_dictionary = {
             "image_size": self.image_size,
             "number_projections": self.number_projections_total,
@@ -378,6 +382,7 @@ class ToMoDL(nn.Module):
             "use_torch_radon": self.use_torch_radon,
             "use_scikit": self.use_scikit,
             "use_tomopy": self.use_tomopy,
+            "device": self.device,
         }
 
         self.AtA = Aclass(self.AtA_dictionary)
@@ -425,21 +430,6 @@ def normalize_images(images):
 Process sinograms in 2D
 """
 
-from skimage.transform import radon as radon_scikit
-from skimage.transform import iradon as iradon_scikit
-import torch
-from .modl import ToMoDL
-from .unet import UNet
-
-try:
-    from torch_radon24 import Radon as radon_thrad
-
-    use_cuda = True
-    print("Torch-Radon24 available!")
-except:
-    use_cuda = False
-    print("Torch-Radon not available!")
-
 
 from .alternating import TwIST, TVdenoise, TVnorm
 
@@ -457,11 +447,6 @@ import os, sys
 for k, v in os.environ.items():
     if k.startswith("QT_") and "cv2" in v:
         del os.environ[k]
-
-try:
-    device = torch.device("cuda:0" if use_cuda == True else "cpu")
-except:
-    print("Torch not available!")
 
 
 class Rec_Modes(Enum):
@@ -730,6 +715,7 @@ class OPTProcessor:
                 "stride": 1,
                 "use_batch_norm": True,
                 "init_method": "xavier",
+                "device": device,
             }
 
             self.tomodl_dictionary = {
@@ -745,6 +731,7 @@ class OPTProcessor:
                 "resnet_options": resnet_options_dict,
                 "in_channels": 1,
                 "out_channels": 1,
+                "device": device,
             }
 
             self.iradon_functor = ToMoDL(self.tomodl_dictionary)
@@ -792,6 +779,7 @@ class OPTProcessor:
                 "stride": 1,
                 "use_batch_norm": True,
                 "init_method": "xavier",
+                "device": torch.device("cpu"),
             }
 
             self.tomodl_dictionary = {
@@ -807,6 +795,7 @@ class OPTProcessor:
                 "resnet_options": resnet_options_dict,
                 "in_channels": 1,
                 "out_channels": 1,
+                "device": torch.device("cpu"),
             }
 
             self.iradon_functor = ToMoDL(self.tomodl_dictionary)
@@ -823,18 +812,16 @@ class OPTProcessor:
             )
 
             self.iradon_functor.lam = torch.nn.Parameter(
-                torch.tensor([self.lambda_modl], requires_grad=True, device=device)
+                torch.tensor([self.lambda_modl], requires_grad=True, device=torch.device("cpu"))
             )
 
             self.iradon_function = (
                 lambda sino: self.iradon_functor(
                     torch.Tensor(iradon_scikit(sino[..., 0], self.angles, circle=self.clip_to_circle, filter_name=None))
-                    .to(device)
                     .unsqueeze(0)
                     .unsqueeze(1)
                 )["dc" + str(self.tomodl_dictionary["K_iterations"])]
                 .detach()
-                .cpu()
                 .numpy()[..., None]
             )
 

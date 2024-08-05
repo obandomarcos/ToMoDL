@@ -292,8 +292,6 @@ class ReconstructionWidget(QWidget):
             time_in = time()
             while batch_start <= slices_reconstruction[-1]:
                 print("Reconstructing slices {} to {}".format(batch_start, batch_end), end="\r")
-                self.bar_thread.value = batch_end
-                self.bar_thread.run()
                 zidx = slice(batch_start, batch_end)
                 ####################### stacks reconstruction ############################
                 if self.input_type == "3D":
@@ -313,7 +311,9 @@ class ReconstructionWidget(QWidget):
                         sinos[:, :, zidx] = min_max_normalize(sinos[:, :, zidx])
                         if self.orderbox.val == 0:
                             optVolume[:, :, zidx] = self.h.reconstruct(
-                                ndi.shift(sinos[:, :, zidx], (0, self.alignbox.val, 0), mode="nearest").transpose(1, 0, 2)
+                                ndi.shift(sinos[:, :, zidx], (0, self.alignbox.val, 0), mode="nearest").transpose(
+                                    1, 0, 2
+                                )
                             )
                         elif self.orderbox.val == 1:
                             optVolume[:, :, zidx] = self.h.reconstruct(
@@ -341,13 +341,16 @@ class ReconstructionWidget(QWidget):
                         )
                     else:
                         optVolume[:, :, zidx] = self.h.reconstruct(sinos[:, :, zidx])
+
+                self.bar_thread.value = batch_end
+                self.bar_thread.run()
                 batch_start = batch_end
                 batch_end += batch_process
             print("Computation time total: {} s".format(round(time() - time_in, 3)))
-            
+
             self.bar_thread.value = 0
             self.bar_thread.run()
-            
+
             self.bar_thread.quit()
             if self.is_reconstruct_one.val == True and self.fullvolume.val == False and self.input_type == "3D":
                 return optVolume[..., self.slices.val]
@@ -413,5 +416,6 @@ class ReconstructionWidget(QWidget):
 @magic_factory
 def choose_layer(image: Image):
     pass  # TODO: substitute with a qtwidget without magic functions
+
 
 # %%

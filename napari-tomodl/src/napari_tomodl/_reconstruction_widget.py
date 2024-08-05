@@ -333,13 +333,14 @@ class ReconstructionWidget(QWidget):
                         elif self.orderbox.val == 1:
                             optVolume[:, :, zidx] = self.h.reconstruct(sinos[:, :, zidx])
                         sinos[:, :, zidx] = min_max_normalize(sinos[:, :, zidx])
-                        
+
                 ####################### 2D reconstruction ############################
                 elif self.input_type == "2D":
                     
                     sinos[:, :, zidx] = min_max_normalize(sinos[:, :, zidx])
                     
                     if self.registerbox.val == True:
+<<<<<<< HEAD
 
                         # sinos[:, :, zidx] = cv2.normalize(
                         #     sinos[:, :, zidx], None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F
@@ -350,6 +351,9 @@ class ReconstructionWidget(QWidget):
                         elif self.orderbox.val == 1:
                             optVolume[:, :, zidx] = self.h.correct_and_reconstruct(sinos[:, :, zidx])
                         sinos[:, :, zidx] = min_max_normalize(sinos[:, :, zidx])
+=======
+                        optVolume[:, :, zidx] = self.h.correct_and_reconstruct(sinos[:, :, zidx])
+>>>>>>> df33955f81889ba2db60ea5eae5cbcb0bfc90492
 
                     elif self.manualalignbox.val == True:
                         sinos[:, :, zidx] = min_max_normalize(sinos[:, :, zidx])
@@ -367,15 +371,17 @@ class ReconstructionWidget(QWidget):
                 batch_start = batch_end
                 batch_end += batch_process
             print("Computation time total: {} s".format(round(time() - time_in, 3)))
-
+            
+            self.bar_thread.value = 0
+            self.bar_thread.run()
+            
+            self.bar_thread.quit()
             if self.is_reconstruct_one.val == True and self.fullvolume.val == False and self.input_type == "3D":
                 return optVolume[..., self.slices.val]
             elif self.input_type == "3D":
                 return np.rollaxis(optVolume, -1)
             else:
                 return optVolume[..., 0]
-
-            self.bar_thread.quit()
 
         _reconstruct()
 

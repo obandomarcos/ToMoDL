@@ -337,7 +337,6 @@ class ReconstructionWidget(QWidget):
                 ####################### 2D reconstruction ############################
                 elif self.input_type == "2D":
                     
-                    
                     if self.registerbox.val == True:
                         optVolume[:, :, zidx] = self.h.correct_and_reconstruct(sinos[:, :, zidx])
 

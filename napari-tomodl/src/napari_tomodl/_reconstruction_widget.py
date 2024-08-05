@@ -228,7 +228,6 @@ class ReconstructionWidget(QWidget):
                 self.start_opt_processor()
             print(f"Selected image layer: {sinos.name}")
 
-            
     def stack_reconstruction(self):
 
         def update_opt_image(stack):
@@ -254,11 +253,12 @@ class ReconstructionWidget(QWidget):
                 sinos = np.moveaxis(np.float32(self.get_sinos()), 0, 1)
                 self.h.Q, self.h.theta, self.h.Z = sinos.shape
             elif self.orderbox.val == 0 and self.input_type == "2D":
-                sinos = np.float32(self.get_sinos().T)[..., None]
-                self.h.theta, self.h.Q, self.h.Z = sinos.shape
-            elif self.orderbox.val == 1 and self.input_type == "2D":
                 sinos = np.float32(self.get_sinos())[..., None]
                 self.h.Q, self.h.theta, self.h.Z = sinos.shape
+            elif self.orderbox.val == 1 and self.input_type == "2D":
+                sinos = np.float32(self.get_sinos().T)[..., None]
+                self.h.theta, self.h.Q, self.h.Z = sinos.shape
+
             print(sinos.shape)
             if self.reshapebox.val == True:
 
@@ -336,7 +336,7 @@ class ReconstructionWidget(QWidget):
 
                 ####################### 2D reconstruction ############################
                 elif self.input_type == "2D":
-                    
+
                     if self.registerbox.val == True:
                         optVolume[:, :, zidx] = self.h.correct_and_reconstruct(sinos[:, :, zidx])
 
@@ -351,9 +351,11 @@ class ReconstructionWidget(QWidget):
                             )
                     else:
                         optVolume[:, :, zidx] = self.h.reconstruct(sinos[:, :, zidx])
-                
+
                 batch_start = batch_end
                 batch_end += batch_process
+                self.bar_thread.value = batch_start
+                self.bar_thread.run()
             print("Computation time total: {} s".format(round(time() - time_in, 3)))
 
             self.bar_thread.value = 0
@@ -403,7 +405,6 @@ class ReconstructionWidget(QWidget):
         else:
             print("Reset")
             self.h = OPTProcessor()
-
     def stop_opt_processor(self):
         if hasattr(self, "h"):
             delattr(self, "h")

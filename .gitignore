@@ -7,10 +7,11 @@ __pycache__/
 *.so
 datasets/140*
 datasets/Contrast*
-datasets/sino1*
+datasets/sino*
 datasets/PET*
 datasets/LDC*
 datasets/EMBL*
+
 
 
 # Distribution / packaging

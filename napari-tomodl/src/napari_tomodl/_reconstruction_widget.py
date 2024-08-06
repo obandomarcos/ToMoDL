@@ -158,7 +158,7 @@ class ReconstructionWidget(QWidget):
             write_function=self.set_opt_processor,
         )
         self.lambda_modl = Settings(
-            "Lambda_MODL", dtype=float, initial=0.01, layout=slayout, write_function=self.set_opt_processor
+            "Lambda_MODL", dtype=float, initial=0.7, layout=slayout, write_function=self.set_opt_processor
         )
         self.fullvolume = Settings(
             "Reconstruct full volume", dtype=bool, initial=False, layout=slayout, write_function=self.set_opt_processor
@@ -360,6 +360,7 @@ class ReconstructionWidget(QWidget):
 
             self.bar_thread.value = 0
             self.bar_thread.run()
+
 
             self.bar_thread.quit()
             if self.is_reconstruct_one.val == True and self.fullvolume.val == False and self.input_type == "3D":

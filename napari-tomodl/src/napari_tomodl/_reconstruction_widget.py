@@ -253,11 +253,11 @@ class ReconstructionWidget(QWidget):
                 sinos = np.moveaxis(np.float32(self.get_sinos()), 0, 1)
                 self.h.Q, self.h.theta, self.h.Z = sinos.shape
             elif self.orderbox.val == 0 and self.input_type == "2D":
-                sinos = np.float32(self.get_sinos())[..., None]
-                self.h.Q, self.h.theta, self.h.Z = sinos.shape
-            elif self.orderbox.val == 1 and self.input_type == "2D":
                 sinos = np.float32(self.get_sinos().T)[..., None]
                 self.h.theta, self.h.Q, self.h.Z = sinos.shape
+            elif self.orderbox.val == 1 and self.input_type == "2D":
+                sinos = np.float32(self.get_sinos().T)[..., None]
+                self.h.Q, self.h.theta, self.h.Z = sinos.shape
 
             if self.reshapebox.val == True:
 
@@ -337,14 +337,27 @@ class ReconstructionWidget(QWidget):
                 elif self.input_type == "2D":
 
                     if self.registerbox.val == True:
-                        optVolume[:, :, zidx] = self.h.correct_and_reconstruct(sinos[:, :, zidx])
+                        if self.orderbox.val == 0:
+                            optVolume[:, :, zidx] = self.h.correct_and_reconstruct(sinos[:, :, zidx].transpose(1, 0, 2))
+                        elif self.orderbox.val == 1:
+                            optVolume[:, :, zidx] = self.h.correct_and_reconstruct(sinos[:, :, zidx])
 
                     elif self.manualalignbox.val == True:
+                        if self.orderbox.val == 0:
                             optVolume[:, :, zidx] = self.h.reconstruct(
-                                ndi.shift(sinos[:, :, zidx], (self.alignbox.val, 0, 0), mode="nearest")
+                                ndi.shift(sinos[:, :, zidx], (0, self.alignbox.val, 0), mode="nearest").transpose(
+                                    1, 0, 2
+                                )
                             )
+                        elif self.orderbox.val == 1:
+                            optVolume[:, :, zidx] = self.h.reconstruct(
+                                ndi.shift(sinos[:, :, zidx], (self.alignbox.val, 0, 0), mode="nearest"))
                     else:
-                        optVolume[:, :, zidx] = self.h.reconstruct(sinos[:, :, zidx])
+                        if self.orderbox.val == 0:
+                            optVolume[:, :, zidx] = self.h.reconstruct(sinos[:, :, zidx].transpose(1, 0, 2))
+
+                        elif self.orderbox.val == 1:
+                            optVolume[:, :, zidx] = self.h.reconstruct(sinos[:, :, zidx])
 
                 self.bar_thread.value = batch_end
                 self.bar_thread.run()

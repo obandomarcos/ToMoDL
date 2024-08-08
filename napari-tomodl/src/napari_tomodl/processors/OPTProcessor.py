@@ -600,9 +600,9 @@ class OPTProcessor:
             -sinogram_volume (np.ndarray): array to resize in any mode specified.
         """
 
-        if self.order_mode == Order_Modes.Vertical.value and type_sino == "3D":
+        if self.order_mode == Order_Modes.Vertical.value:
             self.theta, self.Q, self.Z = sinogram_volume.shape
-        elif self.order_mode == Order_Modes.Horizontal.value or type_sino == "2D":
+        elif self.order_mode == Order_Modes.Horizontal.value:
             self.Q, self.theta, self.Z = sinogram_volume.shape
 
         if self.clip_to_circle == True:
@@ -612,26 +612,24 @@ class OPTProcessor:
 
         if self.resize_bool == True:
 
-            if self.order_mode == Order_Modes.Vertical.value and type_sino == "3D":
+            if self.order_mode == Order_Modes.Vertical.value:
 
                 sinogram_resize = np.zeros((self.theta, sinogram_size, self.Z), dtype=np.float32)
 
-            elif self.order_mode == Order_Modes.Horizontal.value or type_sino == "2D":
+            elif self.order_mode == Order_Modes.Horizontal.value:
 
                 sinogram_resize = np.zeros((sinogram_size, self.theta, self.Z), dtype=np.float32)
 
             for idx in tqdm.tqdm(range(self.Z)):
 
-                if self.order_mode == Order_Modes.Vertical.value and type_sino == "3D":
-
+                if self.order_mode == Order_Modes.Vertical.value:
                     sinogram_resize[:, :, idx] = cv2.resize(
                         sinogram_volume[:, :, idx],
                         (sinogram_size, self.theta),
                         interpolation=cv2.INTER_NEAREST,
                     )
 
-                elif self.order_mode == Order_Modes.Horizontal.value or type_sino == "2D":
-
+                elif self.order_mode == Order_Modes.Horizontal.value:
                     sinogram_resize[:, :, idx] = cv2.resize(
                         sinogram_volume[:, :, idx],
                         (self.theta, sinogram_size),
@@ -716,7 +714,7 @@ class OPTProcessor:
                 "K_iterations": 8,
                 "number_projections_total": sinogram.shape[0],
                 "acceleration_factor": 10,
-                "image_size": 100,
+                "image_size": sinogram.shape[1],
                 "lambda": self.lambda_modl,
                 "use_shared_weights": True,
                 "denoiser_method": "resnet",
@@ -781,7 +779,7 @@ class OPTProcessor:
                 "K_iterations": 8,
                 "number_projections_total": sinogram.shape[0],
                 "acceleration_factor": 10,
-                "image_size": 100,
+                "image_size": sinogram.shape[1],
                 "lambda": self.lambda_modl,
                 "use_shared_weights": True,
                 "denoiser_method": "resnet",

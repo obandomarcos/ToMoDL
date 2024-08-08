@@ -259,7 +259,6 @@ class ReconstructionWidget(QWidget):
                 sinos = np.float32(self.get_sinos().T)[..., None]
                 self.h.theta, self.h.Q, self.h.Z = sinos.shape
 
-            print(sinos.shape)
             if self.reshapebox.val == True:
 
                 optVolume = np.zeros([self.resizebox.val, self.resizebox.val, self.h.Z], np.float32)
@@ -341,26 +340,21 @@ class ReconstructionWidget(QWidget):
                         optVolume[:, :, zidx] = self.h.correct_and_reconstruct(sinos[:, :, zidx])
 
                     elif self.manualalignbox.val == True:
-                        if self.orderbox.val == 0:
-                            optVolume[:, :, zidx] = self.h.reconstruct(
-                                ndi.shift(sinos[:, :, zidx], (0, self.alignbox.val, 0), mode="nearest").transpose(1, 0, 2)
-                            )
-                        elif self.orderbox.val == 1:
                             optVolume[:, :, zidx] = self.h.reconstruct(
                                 ndi.shift(sinos[:, :, zidx], (self.alignbox.val, 0, 0), mode="nearest")
                             )
                     else:
                         optVolume[:, :, zidx] = self.h.reconstruct(sinos[:, :, zidx])
 
+                self.bar_thread.value = batch_end
+                self.bar_thread.run()
                 batch_start = batch_end
                 batch_end += batch_process
-                self.bar_thread.value = batch_start
-                self.bar_thread.run()
+
             print("Computation time total: {} s".format(round(time() - time_in, 3)))
 
             self.bar_thread.value = 0
             self.bar_thread.run()
-
 
             self.bar_thread.quit()
             if self.is_reconstruct_one.val == True and self.fullvolume.val == False and self.input_type == "3D":
@@ -406,6 +400,7 @@ class ReconstructionWidget(QWidget):
         else:
             print("Reset")
             self.h = OPTProcessor()
+
     def stop_opt_processor(self):
         if hasattr(self, "h"):
             delattr(self, "h")

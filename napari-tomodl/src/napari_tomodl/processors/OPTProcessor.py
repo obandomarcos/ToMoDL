@@ -201,6 +201,7 @@ class Aclass:
         self.angles = np.linspace(0, 2 * np.pi, self.number_projections, endpoint=False)
         self.det_count = int(np.ceil(np.sqrt(2) * self.img_size))
         self.device = kw_dictionary["device"]
+        self.iter_conjugate = kw_dictionary["iter_conjugate"]
         if self.use_torch_radon == True:
             self.radon = radon_thrad(thetas=self.angles, circle=False, device=self.device, filter_name=None)
 
@@ -240,17 +241,11 @@ class Aclass:
         # iradon = self.radon.backprojection(sinogram)*np.pi/self.number_projections
         # del sinogram
         # output = iradon+self.lam*img
-        if use_torch_radon:
-            expand_img = img[None, None]
-            sinogram = self.radon(expand_img) / self.img_size
-            iradon = self.radon.filter_backprojection(sinogram)[0, 0] * np.pi / self.number_projections
-            output = iradon + self.lam * img
-            del expand_img
-        else:
-            sinogram = self.radon.forward(img) / self.img_size
-            iradon = self.radon.backprojection(sinogram) * np.pi / self.number_projections
-            output = iradon.to(device) + self.lam * img
-        del sinogram
+
+        sinogram = self.radon(img) / self.img_size
+        iradon = self.radon.filter_backprojection(sinogram) * np.pi / self.number_projections
+        output = iradon + self.lam * img
+
         # print('output forward: {} {}'.format(output.max(), output.min()))
         # print('Term z max {}, min {}'.format((iradon/self.lam).max(), (iradon/self.lam).min()))
         # print('Term input max {}, min {}'.format(img.max(), img.min()))
@@ -259,21 +254,16 @@ class Aclass:
 
     def inverse(self, rhs):
         """
-        Applies CG on each image on the batch
+        Applies CG on the batch
         Params:
             - rhs (torch.Tensor): Right-hand side tensor for applying inversion of (A^H A + lam*I) operator
         """
-
-        y = torch.zeros_like(rhs)
-
-        for i in range(rhs.shape[0]):
-
-            y[i, 0, :, :] = self.conjugate_gradients(self.forward, rhs[i, 0, :, :])  # This indexing may fail
+        y = self.conjugate_gradients(self.forward, rhs)  # This indexing may fail
 
         return y
 
-    @staticmethod
-    def conjugate_gradients(A, rhs):
+    # @staticmethod
+    def conjugate_gradients(self, A, rhs):
         """
         My implementation of conjugate gradients in PyTorch
         """
@@ -284,7 +274,7 @@ class Aclass:
         p = rhs
         rTr = torch.sum(r * r)
 
-        while (i < 10) and torch.ge(rTr, 1e-5):
+        while (i < self.iter_conjugate) and torch.ge(rTr, 1e-5):
 
             # print(rTr)
             Ap = A(p)
@@ -370,7 +360,7 @@ class ToMoDL(nn.Module):
 
         self.in_channels = kw_dictionary["in_channels"]
         self.out_channels = kw_dictionary["out_channels"]
-
+        self.iter_conjugate = kw_dictionary["iter_conjugate"]
         if self.denoiser_method == "U-Net":
             self.unet_options = kw_dictionary["unet_options"]
         elif self.denoiser_method == "resnet":
@@ -383,6 +373,7 @@ class ToMoDL(nn.Module):
             "use_scikit": self.use_scikit,
             "use_tomopy": self.use_tomopy,
             "device": self.device,
+            "iter_conjugate": self.iter_conjugate,
         }
 
         self.AtA = Aclass(self.AtA_dictionary)
@@ -494,6 +485,7 @@ class OPTProcessor:
         self.is_resize = False
         self.init_volume_rec = False
         self.iradon_functor = None
+        # self.tomodl =
         self.lambda_modl = 0.1
         self.set_reconstruction_process()
 
@@ -732,6 +724,7 @@ class OPTProcessor:
                 "in_channels": 1,
                 "out_channels": 1,
                 "device": device,
+                "iter_conjugate": 10,
             }
 
             self.iradon_functor = ToMoDL(self.tomodl_dictionary)
@@ -747,6 +740,7 @@ class OPTProcessor:
             self.iradon_functor.load_state_dict(
                 dict(filter(my_filtering_function, tomodl_checkpoint["state_dict"].items()))
             )
+            self.iradon_functor.eval()
             self.iradon_functor.lam = torch.nn.Parameter(
                 torch.tensor([self.lambda_modl], requires_grad=True, device=device)
             )
@@ -756,16 +750,15 @@ class OPTProcessor:
             # the self.iradon_functor receive a reconstructed image (B, 1, Q, Q)
             # the input is a sinogram (B, 1, Q, theta)
             def _iradon(sino):
-                sino = sino.transpose(2, 0, 1)
-                sino = torch.from_numpy(sino[:, None, :, :]).to(device)
-                reconstruction = radon24.filter_backprojection(sino)
-                output = (
-                    self.iradon_functor(reconstruction)["dc" + str(self.tomodl_dictionary["K_iterations"])]
-                    .detach()
-                    .cpu()
-                )
-                output = np.asarray(output.numpy())
-                return output.transpose(1, 2, 3, 0)[0]
+                with torch.inference_mode():
+                    sino = sino.transpose(2, 0, 1)
+                    sino = torch.from_numpy(sino[:, None, :, :]).to(device)
+                    reconstruction = radon24.filter_backprojection(sino)
+                    output = self.iradon_functor(reconstruction)[
+                        "dc" + str(self.tomodl_dictionary["K_iterations"])
+                    ].cpu()
+                    output = np.asarray(output.numpy())
+                    return output.transpose(1, 2, 3, 0)[0]
 
             self.iradon_function = _iradon
 
@@ -796,6 +789,7 @@ class OPTProcessor:
                 "in_channels": 1,
                 "out_channels": 1,
                 "device": torch.device("cpu"),
+                "iter_conjugate": 10,
             }
 
             self.iradon_functor = ToMoDL(self.tomodl_dictionary)
@@ -810,20 +804,19 @@ class OPTProcessor:
             self.iradon_functor.load_state_dict(
                 dict(filter(my_filtering_function, tomodl_checkpoint["state_dict"].items()))
             )
-
+            self.iradon_functor.eval()
             self.iradon_functor.lam = torch.nn.Parameter(
                 torch.tensor([self.lambda_modl], requires_grad=True, device=torch.device("cpu"))
             )
 
-            self.iradon_function = (
-                lambda sino: self.iradon_functor(
-                    torch.Tensor(iradon_scikit(sino[..., 0], self.angles, circle=self.clip_to_circle, filter_name=None))
-                    .unsqueeze(0)
-                    .unsqueeze(1)
-                )["dc" + str(self.tomodl_dictionary["K_iterations"])]
-                .detach()
-                .numpy()[..., None]
-            )
+            def _iradon(sino):
+                with torch.inference_mode():
+                    sino = iradon_scikit(sino[..., 0], self.angles, circle=self.clip_to_circle, filter_name=None)
+                    sino = torch.Tensor(sino[None, None])
+                    reconstruction = self.iradon_functor(sino)["dc" + str(self.tomodl_dictionary["K_iterations"])]
+                    reconstruction = np.asarray(reconstruction.numpy())[..., None]
+                    return reconstruction
+            self.iradon_function = _iradon
 
         elif self.rec_process == Rec_Modes.TWIST_CPU.value:
 

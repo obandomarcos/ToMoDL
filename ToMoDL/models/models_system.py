@@ -15,8 +15,8 @@ import pytorch_lightning as pl
 import torch.nn as nn
 import numpy as np
 try:
-    from torch_radon import Radon as thrad
-    from torch_radon.solvers import cg
+    from torch_radon24 import Radon as thrad
+    # from torch_radon.solvers import cg
 except ModuleNotFoundError:
     from skimage.transform import radon, iradon
 import matplotlib.pyplot as plt 

@@ -2,7 +2,7 @@ from ToMoDL.models.models_system import MoDLReconstructor
 import matplotlib.pyplot as plt
 from pathlib import Path
 import ToMoDL.utilities.dataloading_utilities as dlutils
-from config import model_system_dict, trainer_system_dict, dataloader_system_dict
+from config import model_system_dict
 from torch.utils.data import DataLoader
 import torch
 import wandb

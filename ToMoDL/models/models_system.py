@@ -14,11 +14,12 @@ from . import modl
 import pytorch_lightning as pl
 import torch.nn as nn
 import numpy as np
-try:
-    from torch_radon24 import Radon as thrad
+# try:
+#     from torch_radon24 import Radon as thrad
     # from torch_radon.solvers import cg
-except ModuleNotFoundError:
-    from skimage.transform import radon, iradon
+# 
+# except ModuleNotFoundError:
+#     from skimage.transform import radon, iradon
 import matplotlib.pyplot as plt 
 import torch
 import torch.nn as nn

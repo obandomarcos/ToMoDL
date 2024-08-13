@@ -222,11 +222,10 @@ class Aclass:
             - img (torch.Tensor): Input tensor
         """
         if use_torch_radon:
-            expand_img = img[None, None]
-            sinogram = self.radon(expand_img) / self.img_size
-            iradon = self.radon.filter_backprojection(sinogram)[0, 0] * np.pi / self.number_projections
+            sinogram = self.radon(img) / self.img_size
+            iradon = self.radon.filter_backprojection(sinogram) * np.pi / self.number_projections
             output = iradon + self.lam * img
-            del expand_img
+
         else:
             sinogram = self.radon.forward(img) / self.img_size
             iradon = self.radon.backprojection(sinogram) * np.pi / self.number_projections
@@ -250,7 +249,7 @@ class Aclass:
 
         for i in range(rhs.shape[0]):
 
-            y[i, 0, :, :] = self.conjugate_gradients(self.forward, rhs[i, 0, :, :])  # This indexing may fail
+            y = self.conjugate_gradients(self.forward, rhs)  # This indexing may fail
 
         return y
 
@@ -390,7 +389,6 @@ def normalize_images(images):
     image_norm = torch.zeros_like(images)
 
     for i, image in enumerate(images):
-
         # print(image.max())
         image = (image - image.mean()) / image.std()
         image_norm[i, ...] = (image - image.min()) / (image.max() - image.min())

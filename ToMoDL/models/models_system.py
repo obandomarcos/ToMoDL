@@ -86,7 +86,6 @@ class MoDLReconstructor(pl.LightningModule):
         psnr_loss = self.loss_dict['psnr_loss'](modl_rec['dc'+str(self.model.K)], filtered_fs_rec)
         self.log("train/psnr_fbp", self.psnr(psnr_fbp_loss, range_max_min = [filtered_fs_rec.min(), filtered_fs_rec.max()]), on_step = True, on_epoch = False, prog_bar=True)
         self.log("train/psnr", self.psnr(psnr_loss, range_max_min = [filtered_fs_rec.min(), filtered_fs_rec.max()]), on_step = True, on_epoch = False, prog_bar=True)
-        
         self.log('lambda', self.model.lam, on_step = True, on_epoch = False, prog_bar=True)
 
         if self.loss_dict['loss_name'] == 'psnr':

@@ -8,3 +8,4 @@ __email__ = "marcos.obando@ib.edu.ar"
 
 
 from ._reconstruction_widget import ReconstructionWidget
+from .processors import OPTProcessor

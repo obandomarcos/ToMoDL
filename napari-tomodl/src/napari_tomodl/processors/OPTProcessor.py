@@ -426,7 +426,6 @@ from .alternating import TwIST, TVdenoise, TVnorm
 
 
 import numpy as np
-from napari.layers import Image
 import scipy.ndimage as ndi
 import os
 import matplotlib.pyplot as plt
@@ -814,6 +813,7 @@ class OPTProcessor:
                     reconstruction = self.iradon_functor(sino)["dc" + str(self.tomodl_dictionary["K_iterations"])]
                     reconstruction = np.asarray(reconstruction.numpy())[..., None]
                     return reconstruction
+
             self.iradon_function = _iradon
 
         elif self.rec_process == Rec_Modes.TWIST_CPU.value:

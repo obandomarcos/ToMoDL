@@ -63,6 +63,7 @@ tomodl_checkpoint["state_dict"] = {k.replace("model.", ""): v for (k, v) in tomo
 model_tomodl.load_state_dict(dict(filter(my_filtering_function, tomodl_checkpoint["state_dict"].items())))
 model_tomodl.eval()
 model_tomodl.lam = torch.nn.Parameter(torch.tensor([labmda], requires_grad=True, device=device))
+
 # Load dataset
 dataset_dict = {
     "root_folder": "datasets/x20/140114_5dpf_body_20",  # In our case, datasets/x20/140114_5dpf_body_20

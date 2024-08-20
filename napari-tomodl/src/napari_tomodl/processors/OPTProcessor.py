@@ -475,6 +475,7 @@ class OPTProcessor:
         self.clip_to_circle = False
         self.use_filter = False
         self.batch_size = 1
+        self.is_half_rotation = False
 
         self.resize_bool = True
         self.register_bool = True
@@ -489,16 +490,20 @@ class OPTProcessor:
         self.set_reconstruction_process()
 
     def set_reconstruction_process(self):
-
+        
+        if self.is_half_rotation == True:
+            rotation_factor = 1
+        else:
+            rotation_factor = 2
         # This should change depending on the method
         if self.rec_process == Rec_Modes.FBP_CPU.value:
 
-            self.angles_gen = lambda num_angles: np.linspace(0, 2 * 180, num_angles, endpoint=False)
+            self.angles_gen = lambda num_angles: np.linspace(0, rotation_factor * 180, num_angles, endpoint=False)
 
         elif self.rec_process == Rec_Modes.FBP_GPU.value or self.rec_process == Rec_Modes.MODL_GPU.value:
 
             assert torch.cuda.is_available() == True
-            self.angles_gen = lambda num_angles: np.linspace(0, 2 * np.pi, num_angles, endpoint=False)
+            self.angles_gen = lambda num_angles: np.linspace(0, rotation_factor * np.pi, num_angles, endpoint=False)
 
     # def correct_and_reconstruct(self, sinogram: np.ndarray):
     #     """
@@ -647,14 +652,18 @@ class OPTProcessor:
             * Optimize GPU usage with tensors
 
         """
-        self.angles_torch = np.linspace(0, 2 * np.pi, self.theta, endpoint=False)
-        self.angles = np.linspace(0, 2 * 180, self.theta, endpoint=False)
+        if self.is_half_rotation == True:
+            rotation_factor = 1
+        else:
+            rotation_factor = 2
+        self.angles_torch = np.linspace(0, rotation_factor * np.pi, self.theta, endpoint=False)
+        self.angles = np.linspace(0, rotation_factor* 180, self.theta, endpoint=False)
 
         ## Es un enriedo, pero inicializa los generadores de ángulos. Poco claro
 
         if self.iradon_functor == None:
             try:
-                self.angles_torch = np.linspace(0, 2 * np.pi, self.theta, endpoint=False)
+                self.angles_torch = np.linspace(0, rotation_factor * np.pi, self.theta, endpoint=False)
                 self.iradon_functor = radon_thrad(
                     thetas=self.angles_torch,
                     circle=self.clip_to_circle,

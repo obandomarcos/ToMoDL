@@ -119,6 +119,10 @@ class ReconstructionWidget(QWidget):
             "Reshape volume", dtype=bool, initial=False, layout=slayout, write_function=self.set_opt_processor
         )
 
+        self.is_half_rotation = Settings(
+            "Half-rotation", dtype=bool, initial=False, layout=slayout, write_function=self.set_opt_processor
+        )
+
         self.resizebox = Settings(
             "Reconstruction size", dtype=int, initial=100, layout=slayout, write_function=self.set_opt_processor
         )
@@ -402,6 +406,7 @@ class ReconstructionWidget(QWidget):
             self.h.use_filter = self.filterbox.val
             self.h.batch_size = self.batch_size.val
             self.h.lambda_modl = self.lambda_modl.val
+            self.h.is_half_rotation = self.is_half_rotation.val
             self.h.set_reconstruction_process()
 
     def start_opt_processor(self):

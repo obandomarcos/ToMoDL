@@ -486,7 +486,7 @@ class OPTProcessor:
         self.init_volume_rec = False
         self.iradon_functor = None
         # self.tomodl =
-        self.lambda_modl = 0.1
+        self.invert_color = False
         self.set_reconstruction_process()
 
     def set_reconstruction_process(self):
@@ -495,6 +495,7 @@ class OPTProcessor:
             rotation_factor = 1
         else:
             rotation_factor = 2
+
         # This should change depending on the method
         if self.rec_process == Rec_Modes.FBP_CPU.value:
 
@@ -723,7 +724,7 @@ class OPTProcessor:
                 "number_projections_total": sinogram.shape[0],
                 "acceleration_factor": 10,
                 "image_size": sinogram.shape[1],
-                "lambda": self.lambda_modl,
+                "lambda": 0.7170,
                 "use_shared_weights": True,
                 "denoiser_method": "resnet",
                 "resnet_options": resnet_options_dict,
@@ -747,9 +748,6 @@ class OPTProcessor:
                 dict(filter(my_filtering_function, tomodl_checkpoint["state_dict"].items()))
             )
             self.iradon_functor.eval()
-            self.iradon_functor.lam = torch.nn.Parameter(
-                torch.tensor([self.lambda_modl], requires_grad=True, device=device)
-            )
 
             radon24 = radon_thrad(self.angles_torch, circle=self.clip_to_circle, filter_name=None, device=device)
 
@@ -788,7 +786,7 @@ class OPTProcessor:
                 "number_projections_total": sinogram.shape[0],
                 "acceleration_factor": 10,
                 "image_size": sinogram.shape[1],
-                "lambda": self.lambda_modl,
+                "lambda": 0.7170,
                 "use_shared_weights": True,
                 "denoiser_method": "resnet",
                 "resnet_options": resnet_options_dict,
@@ -811,9 +809,6 @@ class OPTProcessor:
                 dict(filter(my_filtering_function, tomodl_checkpoint["state_dict"].items()))
             )
             self.iradon_functor.eval()
-            self.iradon_functor.lam = torch.nn.Parameter(
-                torch.tensor([self.lambda_modl], requires_grad=True, device=torch.device("cpu"))
-            )
 
             def _iradon(sino):
                 with torch.inference_mode():
@@ -868,4 +863,7 @@ class OPTProcessor:
 
         reconstruction = self.iradon_function(sinogram)
 
+        if self.invert_color == True:
+            reconstruction = reconstruction.max() - reconstruction
+            
         return reconstruction

@@ -161,8 +161,11 @@ class ReconstructionWidget(QWidget):
             layout=slayout,
             write_function=self.set_opt_processor,
         )
-        self.lambda_modl = Settings(
-            "Lambda_MODL", dtype=float, initial=0.7, layout=slayout, write_function=self.set_opt_processor
+        # self.lambda_modl = Settings(
+        #     "Lambda_MODL", dtype=float, initial=0.7, layout=slayout, write_function=self.set_opt_processor
+        # )
+        self.invert_color = Settings(
+            "Invert colors", dtype=bool, initial=False, layout=slayout, write_function=self.set_opt_processor
         )
         self.fullvolume = Settings(
             "Reconstruct full volume", dtype=bool, initial=False, layout=slayout, write_function=self.set_opt_processor
@@ -405,7 +408,7 @@ class ReconstructionWidget(QWidget):
             self.h.clip_to_circle = self.clipcirclebox.val
             self.h.use_filter = self.filterbox.val
             self.h.batch_size = self.batch_size.val
-            self.h.lambda_modl = self.lambda_modl.val
+            self.h.invert_color = self.invert_color.val
             self.h.is_half_rotation = self.is_half_rotation.val
             self.h.set_reconstruction_process()
 

@@ -7,6 +7,6 @@ if __name__ == '__main__':
 
     opt_widget = ReconstructionWidget(viewer)
 
-    viewer.window.add_dock_widget(opt_widget, name = 'OPT reconstruction')
+    viewer.window.add_dock_widget(opt_widget, name = 'napari-ToMoDL')
 
     napari.run()

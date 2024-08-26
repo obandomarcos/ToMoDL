@@ -115,24 +115,10 @@ class ReconstructionWidget(QWidget):
 
     def createSettings(self, slayout):
 
-        self.reshapebox = Settings(
-            "Reshape volume", dtype=bool, initial=False, layout=slayout, write_function=self.set_opt_processor
-        )
+        
 
         self.is_half_rotation = Settings(
             "Half-rotation", dtype=bool, initial=False, layout=slayout, write_function=self.set_opt_processor
-        )
-
-        self.resizebox = Settings(
-            "Reconstruction size", dtype=int, initial=100, layout=slayout, write_function=self.set_opt_processor
-        )
-
-        self.clipcirclebox = Settings(
-            "Clip to circle", dtype=bool, initial=False, layout=slayout, write_function=self.set_opt_processor
-        )
-
-        self.filterbox = Settings(
-            "Use filtering", dtype=bool, initial=False, layout=slayout, write_function=self.set_opt_processor
         )
 
         self.registerbox = Settings(
@@ -152,6 +138,24 @@ class ReconstructionWidget(QWidget):
             layout=slayout,
             write_function=self.set_opt_processor,
         )
+        
+        self.reshapebox = Settings(
+            "Reshape volume", dtype=bool, initial=False, layout=slayout, write_function=self.set_opt_processor
+        )
+        
+        self.resizebox = Settings(
+            "Reconstruction size", dtype=int, initial=100, layout=slayout, write_function=self.set_opt_processor
+        )
+
+        self.clipcirclebox = Settings(
+            "Clip to circle", dtype=bool, initial=False, layout=slayout, write_function=self.set_opt_processor
+        )
+
+        self.filterbox = Settings(
+            "Use filtering", dtype=bool, initial=False, layout=slayout, write_function=self.set_opt_processor
+        )
+
+        
 
         # create combobox for reconstruction method
         self.reconbox = Combo_box(

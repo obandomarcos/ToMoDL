@@ -446,6 +446,3 @@ class ReconstructionWidget(QWidget):
 @magic_factory
 def choose_layer(image: Image):
     pass  # TODO: substitute with a qtwidget without magic functions
-
-
-# %%

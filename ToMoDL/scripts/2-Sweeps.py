@@ -8,7 +8,7 @@ from config import *
 # Where am I asks where you are
 sys.path.append(where_am_i())
 
-import pytorch_lightning as pl
+import lightning as pl
 import argparse
 import numpy as np
 import matplotlib.pyplot as plt

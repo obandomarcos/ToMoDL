@@ -7,9 +7,9 @@ import os, sys
 
 sys.path.append('/home/obanmarcos/Balseiro/DeepOPT/')
 
-from pytorch_lightning.profiler import SimpleProfiler, PyTorchProfiler
+from lightning.profiler import SimpleProfiler, PyTorchProfiler
 from scripts import config
-import pytorch_lightning as pl
+import lightning as pl
 import argparse
 import numpy as np
 import matplotlib.pyplot as plt
@@ -22,8 +22,8 @@ from training import train_utilities as trutils
 from models.models_system import MoDLReconstructor
 import torch
 
-from pytorch_lightning.callbacks import ModelCheckpoint
-from pytorch_lightning.loggers import WandbLogger
+from lightning.callbacks import ModelCheckpoint
+from lightning.loggers import WandbLogger
 
 from torchvision import transforms as T
 from pytorch_msssim import SSIM

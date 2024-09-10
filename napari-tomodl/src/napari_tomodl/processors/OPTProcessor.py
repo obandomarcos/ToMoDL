@@ -485,7 +485,6 @@ class OPTProcessor:
         self.is_resize = False
         self.init_volume_rec = False
         self.iradon_functor = None
-        # self.tomodl =
         self.invert_color = False
         self.set_reconstruction_process()
 

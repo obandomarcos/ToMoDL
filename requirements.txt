@@ -10,4 +10,4 @@ opencv-python
 Pillow 
 scipy
 tqdm 
-pytorch_lightning
+lightning

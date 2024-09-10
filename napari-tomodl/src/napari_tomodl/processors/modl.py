@@ -37,7 +37,6 @@ try:
 except:
     print("Torch not available!")
 
-
 class dwLayer(nn.Module):
     """
     Creates denoiser singular layer

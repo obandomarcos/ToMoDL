@@ -17,8 +17,8 @@ from utilities import dataloading_utilities as dlutils
 from torch.utils.data import DataLoader
 import matplotlib.pyplot as plt
 import torch
-from pytorch_lightning.callbacks import ModelCheckpoint
-from pytorch_lightning.loggers import WandbLogger
+from lightning.callbacks import ModelCheckpoint
+from lightning.loggers import WandbLogger
 
 from torchvision import transforms as T
 from pytorch_msssim import SSIM

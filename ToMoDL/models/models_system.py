@@ -11,7 +11,8 @@ sys.path.append('~/DeepOPT/')
 
 import torch
 from . import modl
-import pytorch_lightning as pl
+# import lightning as pl
+import lightning as pl
 import torch.nn as nn
 import numpy as np
 # try:
@@ -55,6 +56,7 @@ class MoDLReconstructor(pl.LightningModule):
     def forward(self, x):
 
         return self.model(x)
+        
     
     def training_step(self, batch, batch_idx):
         '''

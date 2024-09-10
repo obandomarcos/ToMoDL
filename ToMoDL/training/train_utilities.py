@@ -18,9 +18,9 @@ from models import models_system as modsys
 
 from torch.utils.data import DataLoader, ConcatDataset, random_split
 
-import pytorch_lightning as pl
-from pytorch_lightning.loggers import WandbLogger
-from pytorch_lightning.callbacks import ModelCheckpoint, StochasticWeightAveraging, GradientAccumulationScheduler
+import lightning as pl
+from lightning.loggers import WandbLogger
+from lightning.callbacks import ModelCheckpoint, StochasticWeightAveraging, GradientAccumulationScheduler
 
 import wandb
 

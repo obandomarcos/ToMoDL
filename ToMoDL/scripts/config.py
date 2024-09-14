@@ -1,19 +1,21 @@
 import sys
 import socket
 
-marcos_computer_path = "/home/obanmarcos/Balseiro/DeepOPT"
-marcos_computer_path_datasets = "/home/obanmarcos/Balseiro/DeepOPT/datasets/"
-marcos_computer_path_metrics = "/home/obanmarcos/Balseiro/DeepOPT/metrics/"
-marcos_computer_path_models = "/home/obanmarcos/Balseiro/DeepOPT/models/"
+marcos_computer_path = "/home/nhattm/ToMoDL/ToMoDL/"
+# marcos_computer_path_datasets = "/home/obanmarcos/Balseiro/DeepOPT/datasets/"
+marcos_computer_path_datasets = "/home/nhattm/ToMoDL/datasets/"
+marcos_computer_path_metrics = "/home/nhattm/ToMoDL/ToMoDL/metrics/"
+marcos_computer_path_models = "/home/nhattm/ToMoDL/ToMoDL/models/"
+
 german_computer_path = "/home/marcos/DeepOPT/"
 german_computer_path_datasets = "/data/marcos/datasets/"
-ariel_computer_path = "/home/marcos/DeepOPT"
-ariel_computer_path_datasets = "/Datos/DeepOPT"
-
+ariel_computer_path = "/home/nhattm/ToMoDL"
+ariel_computer_path_datasets = "/home/nhattm/ToMoDL/datasets/"
+# print(socket.gethostname())
 
 def where_am_i(path=None):
 
-    if socket.gethostname() in ["copote", "copito"]:
+    if socket.gethostname() in ["copote", "copito", "qbi1"]:
         if path == "datasets":
             return marcos_computer_path_datasets
         elif path == "models":

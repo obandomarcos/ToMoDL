@@ -219,7 +219,7 @@ class DatasetProcessor:
         else:
 
             # Grab top and bottom sinograms (automate to grab non-empty sinograms)
-            top_index, bottom_index = self._grab_image_indexes()
+            top_index, bottom_index = self._grab_image_indexes(sample=sample)
 
             self.top_sino = np.copy(self.registered_volume[sample][:, :, top_index].T)
             self.bottom_sino = np.copy(self.registered_volume[sample][:, :, bottom_index].T)
@@ -342,7 +342,7 @@ class DatasetProcessor:
                 us_filtered_img_torch_path = us_filtered_dataset_folder + sinogram_slice + ".pt"
 
                 # Normalization of input sinogram - Undersampled
-                us_filtered_img = self.radon.backward(self.radon.filter_sinogram(us_sinogram))
+                us_filtered_img = self.radon_filter.filter_backprojection(us_sinogram)
                 us_filtered_img = self.normalize_image(us_filtered_img)
 
                 # Write undersampled filtered
@@ -360,7 +360,9 @@ class DatasetProcessor:
                 # Normalize 0-1 under sampled sinogram
                 us_sinogram = self.normalize_image(us_sinogram)
 
-                us_unfiltered_img = self.radon.backward(us_sinogram) * np.pi / self.number_projections_undersampled
+                us_unfiltered_img = (
+                    self.radon_unfilter.filter_backprojection(us_sinogram) * np.pi / self.number_projections_undersampled
+                )
                 us_unfiltered_img = self.normalize_image(us_unfiltered_img)
 
                 # Write undersampled filtered
@@ -377,7 +379,7 @@ class DatasetProcessor:
                 fs_filtered_img_torch_path = fs_filtered_dataset_folder + sinogram_slice + ".pt"
 
                 # Normalization of output sinogram - Fully sampled
-                fs_filtered_img = self.radon.backward(self.radon.filter_sinogram(full_sinogram))
+                fs_filtered_img = self.radon_filter.filter_backprojection(full_sinogram)
                 fs_filtered_img = self.normalize_image(fs_filtered_img)
                 # Write fully sampled filtered
                 thumbs = cv2.imwrite(fs_filtered_img_path, 255.0 * fs_filtered_img.cpu().detach().numpy())
@@ -389,7 +391,9 @@ class DatasetProcessor:
         """
         Grabs top and bottom non-empty indexes
         """
-        img_max = self.image_volume.min(axis=0)
+
+        # img_max = self.image_volume.min(axis=0)
+        img_max = self.registered_volume[sample].min(axis=0)
         img_max = (((img_max - img_max.min()) / (img_max.max() - img_max.min())) * 255.0).astype(np.uint8)
         img_max = ndi.gaussian_filter(img_max, (11, 11))
 
@@ -488,7 +492,9 @@ class DatasetProcessor:
         # Grab number of angles
         self.angles = np.linspace(0, 2 * np.pi, self.number_projections_total, endpoint=False)
 
-        self.radon = Radon(self.img_resize, self.angles, clip_to_circle=False, det_count=self.det_count)
+        # self.radon = Radon(self.img_resize, self.angles, clip_to_circle=False, det_count=self.det_count)
+        self.radon_filter = Radon(thetas=self.angles, circle=False, device=device, filter_name="ramp")
+        self.radon_unfilter = Radon(thetas=self.angles, circle=False, device=device, filter_name=None)
 
 
 # Multi-dataset to dataloader

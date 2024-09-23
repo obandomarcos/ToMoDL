@@ -32,7 +32,7 @@ def process_datasets(args_options):
         "number_projections_undersampled": 72,
         "batch_size": 5,
         "sampling_method": "equispaced-linear",
-        "acceleration_factor": 10,
+        "acceleration_factor": 20,
     }
 
     # 1 - Load datasets
@@ -44,6 +44,7 @@ def process_datasets(args_options):
 
         for folder in folder_paths:
 
+            # zebra_dataset_dict['dataset_folder'] = folder
             zebra_dataset_dict['folder_path'] = folder
             zebra_dataset_test = dlutils.DatasetProcessor(zebra_dataset_dict)
 

@@ -22,6 +22,7 @@ try:
     from torch_radon24 import Radon
 except ModuleNotFoundError:
     from skimage.transform import radon
+from skimage.transform import iradon
 import pickle
 from pathlib import Path
 import torch
@@ -51,7 +52,7 @@ class DatasetProcessor:
         for sample in self.fish_parts_available:
 
             self.load_images(sample)
-            self.correct_rotation_axis(sample=sample, max_shift=200, shift_step=1)
+            # self.correct_rotation_axis(sample=sample, max_shift=200, shift_step=1)
             self.dataset_resize(sample)
             self.write_dataset_reconstruction(sample)
 
@@ -342,8 +343,8 @@ class DatasetProcessor:
                 us_filtered_img_torch_path = us_filtered_dataset_folder + sinogram_slice + ".pt"
 
                 # Normalization of input sinogram - Undersampled
-                us_filtered_img = self.radon_filter.filter_backprojection(us_sinogram)
-                us_filtered_img = self.normalize_image(us_filtered_img)
+                us_filtered_img = self.radon_filter.filter_backprojection(us_sinogram[None, None])
+                us_filtered_img = self.normalize_image(us_filtered_img[0, 0])
 
                 # Write undersampled filtered
                 thumbs = cv2.imwrite(us_filtered_img_path, 255.0 * us_filtered_img.cpu().detach().numpy())
@@ -361,9 +362,11 @@ class DatasetProcessor:
                 us_sinogram = self.normalize_image(us_sinogram)
 
                 us_unfiltered_img = (
-                    self.radon_unfilter.filter_backprojection(us_sinogram) * np.pi / self.number_projections_undersampled
+                    self.radon_unfilter.filter_backprojection(us_sinogram[None, None])
+                    * np.pi
+                    / self.number_projections_undersampled
                 )
-                us_unfiltered_img = self.normalize_image(us_unfiltered_img)
+                us_unfiltered_img = self.normalize_image(us_unfiltered_img[0, 0])
 
                 # Write undersampled filtered
                 thumbs = cv2.imwrite(us_unfiltered_img_path, 255.0 * us_unfiltered_img.cpu().detach().numpy())
@@ -373,21 +376,21 @@ class DatasetProcessor:
 
             if write_fs_filtered == True:
 
-                print("Slice {sinogram_slice} escrita\n")
+                print(f"Slice {sinogram_slice} escrita\n")
                 # Fully sampled filtered reconstructed image path
                 fs_filtered_img_path = fs_filtered_dataset_folder + sinogram_slice + ".jpg"
                 fs_filtered_img_torch_path = fs_filtered_dataset_folder + sinogram_slice + ".pt"
 
                 # Normalization of output sinogram - Fully sampled
-                fs_filtered_img = self.radon_filter.filter_backprojection(full_sinogram)
-                fs_filtered_img = self.normalize_image(fs_filtered_img)
+                fs_filtered_img = self.radon_filter.filter_backprojection(full_sinogram[None, None])
+                fs_filtered_img = self.normalize_image(fs_filtered_img[0, 0])
                 # Write fully sampled filtered
                 thumbs = cv2.imwrite(fs_filtered_img_path, 255.0 * fs_filtered_img.cpu().detach().numpy())
 
                 torch.save(fs_filtered_img.unsqueeze(0), fs_filtered_img_torch_path)
                 print(thumbs)
 
-    def _grab_image_indexes(self, threshold=50):
+    def _grab_image_indexes(self, sample, threshold=50):
         """
         Grabs top and bottom non-empty indexes
         """
@@ -431,8 +434,8 @@ class DatasetProcessor:
             top_image_std.append(np.std(top_shift_iradon))
             bottom_image_std.append(np.std(bottom_shift_iradon))
 
-        plt.plot(top_shifts, top_image_std)
-        plt.plot(bottom_shifts, bottom_image_std)
+        # plt.plot(top_shifts, top_image_std)
+        # plt.plot(bottom_shifts, bottom_image_std)
 
         max_shift_top = top_shifts[np.argmax(top_image_std)]
         max_shift_bottom = bottom_shifts[np.argmax(bottom_image_std)]

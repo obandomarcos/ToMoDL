@@ -213,7 +213,7 @@ class ReconstructionWidget(QWidget):
             self.viewer.layers[fullname].scale = scale
 
         else:
-            layer = self.viewer.add_image(image_values, name=fullname, scale=scale, interpolation2d="linear")
+            layer = self.viewer.add_image(image_values, name=fullname, scale=scale, interpolation2d="linear", cache=False)
             return layer
 
     def select_layer(self, sinos: Image):

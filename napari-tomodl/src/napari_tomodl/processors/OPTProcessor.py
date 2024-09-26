@@ -485,7 +485,7 @@ class OPTProcessor:
         self.is_resize = False
         self.init_volume_rec = False
         self.iradon_functor = None
-        self.invert_color = False
+
         self.set_reconstruction_process()
 
     def set_reconstruction_process(self):
@@ -862,7 +862,6 @@ class OPTProcessor:
 
         reconstruction = self.iradon_function(sinogram)
 
-        if self.invert_color == True:
-            reconstruction = reconstruction.max() - reconstruction
-            
+
+
         return reconstruction

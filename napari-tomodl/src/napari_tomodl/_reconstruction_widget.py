@@ -42,7 +42,7 @@ import numpy as np
 
 
 def min_max_normalize(image):
-    return (image - image.min()) / (image.max() - image.min()) * 255
+    return (image - image.min()) / (image.max() - image.min())
 
 
 # this thread is used to update the progress bar
@@ -115,8 +115,6 @@ class ReconstructionWidget(QWidget):
 
     def createSettings(self, slayout):
 
-        
-
         self.is_half_rotation = Settings(
             "Half-rotation", dtype=bool, initial=False, layout=slayout, write_function=self.set_opt_processor
         )
@@ -138,11 +136,11 @@ class ReconstructionWidget(QWidget):
             layout=slayout,
             write_function=self.set_opt_processor,
         )
-        
+
         self.reshapebox = Settings(
             "Reshape volume", dtype=bool, initial=False, layout=slayout, write_function=self.set_opt_processor
         )
-        
+
         self.resizebox = Settings(
             "Reconstruction size", dtype=int, initial=100, layout=slayout, write_function=self.set_opt_processor
         )
@@ -154,8 +152,6 @@ class ReconstructionWidget(QWidget):
         self.filterbox = Settings(
             "Use filtering", dtype=bool, initial=False, layout=slayout, write_function=self.set_opt_processor
         )
-
-        
 
         # create combobox for reconstruction method
         self.reconbox = Combo_box(
@@ -170,6 +166,9 @@ class ReconstructionWidget(QWidget):
         # )
         self.invert_color = Settings(
             "Invert colors", dtype=bool, initial=False, layout=slayout, write_function=self.set_opt_processor
+        )
+        self.convert_to_uint16 = Settings(
+            "Convert to uint16", dtype=bool, initial=True, layout=slayout, write_function=self.set_opt_processor
         )
         self.fullvolume = Settings(
             "Reconstruct full volume", dtype=bool, initial=False, layout=slayout, write_function=self.set_opt_processor
@@ -213,7 +212,9 @@ class ReconstructionWidget(QWidget):
             self.viewer.layers[fullname].scale = scale
 
         else:
-            layer = self.viewer.add_image(image_values, name=fullname, scale=scale, interpolation2d="linear", cache=False)
+            layer = self.viewer.add_image(
+                image_values, name=fullname, scale=scale, interpolation2d="linear", cache=False
+            )
             return layer
 
     def select_layer(self, sinos: Image):
@@ -362,7 +363,8 @@ class ReconstructionWidget(QWidget):
                             )
                         elif self.orderbox.val == 1:
                             optVolume[:, :, zidx] = self.h.reconstruct(
-                                ndi.shift(sinos[:, :, zidx], (self.alignbox.val, 0, 0), mode="nearest"))
+                                ndi.shift(sinos[:, :, zidx], (self.alignbox.val, 0, 0), mode="nearest")
+                            )
                     else:
                         if self.orderbox.val == 0:
                             optVolume[:, :, zidx] = self.h.reconstruct(sinos[:, :, zidx].transpose(1, 0, 2))
@@ -381,10 +383,17 @@ class ReconstructionWidget(QWidget):
             self.bar_thread.run()
 
             self.bar_thread.quit()
+            if self.invert_color.val == True:
+                optVolume = optVolume.max() - optVolume
+            if self.convert_to_uint16.val == True:
+                optVolume = (optVolume - optVolume.min()) / (optVolume.max() - optVolume.min()) * (2**16 - 1)
+                optVolume = optVolume.astype(np.uint16)
+
             if self.is_reconstruct_one.val == True and self.fullvolume.val == False and self.input_type == "3D":
                 return optVolume[..., self.slices.val]
             elif self.input_type == "3D":
-                return np.rollaxis(optVolume, -1)
+                # return np.rollaxis(optVolume, -1)
+                return optVolume.transpose(2, 0, 1)
             else:
                 return optVolume[..., 0]
 
@@ -412,7 +421,6 @@ class ReconstructionWidget(QWidget):
             self.h.clip_to_circle = self.clipcirclebox.val
             self.h.use_filter = self.filterbox.val
             self.h.batch_size = self.batch_size.val
-            self.h.invert_color = self.invert_color.val
             self.h.is_half_rotation = self.is_half_rotation.val
             self.h.set_reconstruction_process()
 

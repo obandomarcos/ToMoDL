@@ -469,7 +469,8 @@ class OPTProcessor:
         Variables for OPT processor
         """
 
-        self.resize_val = 100
+        # self.resize_val = 100
+        self.downsample_factor = 2
         self.rec_process = Rec_Modes.FBP_CPU.value
         self.order_mode = Order_Modes.Vertical.value
         self.clip_to_circle = False
@@ -477,7 +478,7 @@ class OPTProcessor:
         self.batch_size = 1
         self.is_half_rotation = False
 
-        self.resize_bool = True
+
         self.register_bool = True
         self.max_shift = 200
         self.shift_step = 10
@@ -489,7 +490,7 @@ class OPTProcessor:
         self.set_reconstruction_process()
 
     def set_reconstruction_process(self):
-        
+
         if self.is_half_rotation == True:
             rotation_factor = 1
         else:
@@ -605,40 +606,48 @@ class OPTProcessor:
         """
 
         if self.order_mode == Order_Modes.Vertical.value:
-            self.theta, self.Q, self.Z = sinogram_volume.shape
+            self.theta, Q, Z = sinogram_volume.shape
         elif self.order_mode == Order_Modes.Horizontal.value:
-            self.Q, self.theta, self.Z = sinogram_volume.shape
+            Q, self.theta, Z = sinogram_volume.shape
+            
+        self.Q, self.Z = Q // self.downsample_factor, Z // self.downsample_factor
+        sinogram_size = self.Q if self.clip_to_circle == True else int(np.ceil(self.Q * np.sqrt(2)))
 
-        if self.clip_to_circle == True:
-            sinogram_size = self.resize_val
-        else:
-            sinogram_size = int(np.ceil(self.resize_val * np.sqrt(2)))
 
-        if self.resize_bool == True:
 
+        if self.order_mode == Order_Modes.Vertical.value:
+
+            sinogram_resize = np.zeros((self.theta, sinogram_size, self.Z), dtype=np.float32)
+
+        elif self.order_mode == Order_Modes.Horizontal.value:
+
+            sinogram_resize = np.zeros((sinogram_size, self.theta, self.Z), dtype=np.float32)
+        
+        for theta in tqdm.tqdm(range(self.theta)):
             if self.order_mode == Order_Modes.Vertical.value:
-
-                sinogram_resize = np.zeros((self.theta, sinogram_size, self.Z), dtype=np.float32)
-
+                sinogram_resize[theta] = cv2.resize(
+                    sinogram_volume[theta], (self.Z, sinogram_size), interpolation=cv2.INTER_NEAREST
+                )
+                
             elif self.order_mode == Order_Modes.Horizontal.value:
+                sinogram_resize[:, theta] = cv2.resize(
+                    sinogram_volume[:, theta], (self.Z, sinogram_size), interpolation=cv2.INTER_NEAREST
+                )
+            # for idx in tqdm.tqdm(range(self.Z)):
 
-                sinogram_resize = np.zeros((sinogram_size, self.theta, self.Z), dtype=np.float32)
+            #     if self.order_mode == Order_Modes.Vertical.value:
+            #         sinogram_resize[:, :, idx] = cv2.resize(
+            #             sinogram_volume[:, :, idx],
+            #             (sinogram_size, self.theta),
+            #             interpolation=cv2.INTER_NEAREST,
+            #         )
 
-            for idx in tqdm.tqdm(range(self.Z)):
-
-                if self.order_mode == Order_Modes.Vertical.value:
-                    sinogram_resize[:, :, idx] = cv2.resize(
-                        sinogram_volume[:, :, idx],
-                        (sinogram_size, self.theta),
-                        interpolation=cv2.INTER_NEAREST,
-                    )
-
-                elif self.order_mode == Order_Modes.Horizontal.value:
-                    sinogram_resize[:, :, idx] = cv2.resize(
-                        sinogram_volume[:, :, idx],
-                        (self.theta, sinogram_size),
-                        interpolation=cv2.INTER_NEAREST,
-                    )
+            #     elif self.order_mode == Order_Modes.Horizontal.value:
+            #         sinogram_resize[:, :, idx] = cv2.resize(
+            #             sinogram_volume[:, :, idx],
+            #             (self.theta, sinogram_size),
+            #             interpolation=cv2.INTER_NEAREST,
+            #         ) 
 
         return sinogram_resize
 
@@ -861,7 +870,5 @@ class OPTProcessor:
             self.iradon_function = _iradon
 
         reconstruction = self.iradon_function(sinogram)
-
-
 
         return reconstruction

@@ -141,8 +141,11 @@ class ReconstructionWidget(QWidget):
             "Reshape volume", dtype=bool, initial=False, layout=slayout, write_function=self.set_opt_processor
         )
 
-        self.resizebox = Settings(
-            "Reconstruction size", dtype=int, initial=100, layout=slayout, write_function=self.set_opt_processor
+        # self.resizebox = Settings(
+        #     "Reconstruction size", dtype=int, initial=100, layout=slayout, write_function=self.set_opt_processor
+        # )
+        self.downsamplebox = Settings(
+            "Downsampling", dtype=int, initial=2, layout=slayout, write_function=self.set_opt_processor
         )
 
         self.clipcirclebox = Settings(
@@ -272,8 +275,12 @@ class ReconstructionWidget(QWidget):
                 self.h.Q, self.h.theta, self.h.Z = sinos.shape
 
             if self.reshapebox.val == True:
+                self.h.Q = self.h.Q // self.h.downsample_factor
+                self.h.Z = self.h.Z // self.h.downsample_factor
+                # optVolume = np.zeros([self.resizebox.val, self.resizebox.val, self.h.Z], np.float32)
 
-                optVolume = np.zeros([self.resizebox.val, self.resizebox.val, self.h.Z], np.float32)
+                optVolume = np.zeros([self.h.Q, self.h.Q, self.h.Z], np.float32)
+            
                 sinos = self.h.resize(sinos, type_sino=self.input_type)
 
             elif self.clipcirclebox.val == False:
@@ -413,7 +420,7 @@ class ReconstructionWidget(QWidget):
 
         if hasattr(self, "h"):
 
-            self.h.resize_val = self.resizebox.val
+            # self.h.resize_val = self.resizebox.val
             self.h.resize_bool = self.reshapebox.val
             self.h.register_bool = self.registerbox.val
             self.h.rec_process = self.reconbox.val
@@ -422,6 +429,7 @@ class ReconstructionWidget(QWidget):
             self.h.use_filter = self.filterbox.val
             self.h.batch_size = self.batch_size.val
             self.h.is_half_rotation = self.is_half_rotation.val
+            self.h.downsample_factor = self.downsamplebox.val
             self.h.set_reconstruction_process()
 
     def start_opt_processor(self):

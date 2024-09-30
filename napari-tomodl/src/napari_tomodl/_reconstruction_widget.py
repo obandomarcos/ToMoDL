@@ -145,7 +145,7 @@ class ReconstructionWidget(QWidget):
         #     "Reconstruction size", dtype=int, initial=100, layout=slayout, write_function=self.set_opt_processor
         # )
         self.downsamplebox = Settings(
-            "Downsampling", dtype=int, initial=2, layout=slayout, write_function=self.set_opt_processor
+            "Downsample Factor", dtype=float, initial=2, layout=slayout, write_function=self.set_opt_processor
         )
 
         self.clipcirclebox = Settings(
@@ -275,12 +275,12 @@ class ReconstructionWidget(QWidget):
                 self.h.Q, self.h.theta, self.h.Z = sinos.shape
 
             if self.reshapebox.val == True:
-                self.h.Q = self.h.Q // self.h.downsample_factor
-                self.h.Z = self.h.Z // self.h.downsample_factor
+                self.h.Q = int(self.h.Q / self.h.downsample_factor)
+                self.h.Z = int(self.h.Z / self.h.downsample_factor)
                 # optVolume = np.zeros([self.resizebox.val, self.resizebox.val, self.h.Z], np.float32)
 
                 optVolume = np.zeros([self.h.Q, self.h.Q, self.h.Z], np.float32)
-            
+
                 sinos = self.h.resize(sinos, type_sino=self.input_type)
 
             elif self.clipcirclebox.val == False:
@@ -437,6 +437,7 @@ class ReconstructionWidget(QWidget):
 
         if hasattr(self, "h"):
             self.stop_opt_processor()
+
             self.start_opt_processor()
         else:
             print("Reset")

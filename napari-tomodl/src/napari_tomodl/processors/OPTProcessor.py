@@ -478,7 +478,6 @@ class OPTProcessor:
         self.batch_size = 1
         self.is_half_rotation = False
 
-
         self.register_bool = True
         self.max_shift = 200
         self.shift_step = 10
@@ -609,11 +608,9 @@ class OPTProcessor:
             self.theta, Q, Z = sinogram_volume.shape
         elif self.order_mode == Order_Modes.Horizontal.value:
             Q, self.theta, Z = sinogram_volume.shape
-            
-        self.Q, self.Z = Q // self.downsample_factor, Z // self.downsample_factor
+
+        self.Q, self.Z = int(Q / self.downsample_factor), int(Z / self.downsample_factor)
         sinogram_size = self.Q if self.clip_to_circle == True else int(np.ceil(self.Q * np.sqrt(2)))
-
-
 
         if self.order_mode == Order_Modes.Vertical.value:
 
@@ -622,13 +619,13 @@ class OPTProcessor:
         elif self.order_mode == Order_Modes.Horizontal.value:
 
             sinogram_resize = np.zeros((sinogram_size, self.theta, self.Z), dtype=np.float32)
-        
+
         for theta in tqdm.tqdm(range(self.theta)):
             if self.order_mode == Order_Modes.Vertical.value:
                 sinogram_resize[theta] = cv2.resize(
                     sinogram_volume[theta], (self.Z, sinogram_size), interpolation=cv2.INTER_NEAREST
                 )
-                
+
             elif self.order_mode == Order_Modes.Horizontal.value:
                 sinogram_resize[:, theta] = cv2.resize(
                     sinogram_volume[:, theta], (self.Z, sinogram_size), interpolation=cv2.INTER_NEAREST
@@ -647,7 +644,7 @@ class OPTProcessor:
             #             sinogram_volume[:, :, idx],
             #             (self.theta, sinogram_size),
             #             interpolation=cv2.INTER_NEAREST,
-            #         ) 
+            #         )
 
         return sinogram_resize
 
@@ -666,7 +663,7 @@ class OPTProcessor:
         else:
             rotation_factor = 2
         self.angles_torch = np.linspace(0, rotation_factor * np.pi, self.theta, endpoint=False)
-        self.angles = np.linspace(0, rotation_factor* 180, self.theta, endpoint=False)
+        self.angles = np.linspace(0, rotation_factor * 180, self.theta, endpoint=False)
 
         ## Es un enriedo, pero inicializa los generadores de ángulos. Poco claro
 
@@ -757,6 +754,7 @@ class OPTProcessor:
             )
             self.iradon_functor.eval()
 
+            self.iradon_functor.lam = torch.nn.Parameter(torch.tensor([0.1], requires_grad=True, device=device))
             radon24 = radon_thrad(self.angles_torch, circle=self.clip_to_circle, filter_name=None, device=device)
 
             # the self.iradon_functor receive a reconstructed image (B, 1, Q, Q)

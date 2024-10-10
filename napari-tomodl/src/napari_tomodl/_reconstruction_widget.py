@@ -45,6 +45,33 @@ def min_max_normalize(image):
     return (image - image.min()) / (image.max() - image.min())
 
 
+def flat_field_estimate(img, ratio_corners=0.03):
+
+    height, width = img.shape
+    # get corner size as 2% of the  dimension
+    corner_size = int(min(height, width) * ratio_corners)
+
+    # Extract the four corner regions (top-left, top-right, bottom-left, bottom-right)
+    top_left = img[:corner_size, :corner_size]
+    top_right = img[:corner_size, -corner_size:]
+    bottom_left = img[-corner_size:, :corner_size]
+    bottom_right = img[-corner_size:, -corner_size:]
+    middle_left = img[height//2-corner_size//2:height//2+corner_size//2, :corner_size]
+    middle_right = img[height//2-corner_size//2:height//2+corner_size//2, -corner_size:]
+    corner_means = np.array([top_left.mean(), top_right.mean(), bottom_left.mean(), bottom_right.mean(), middle_left.mean(), middle_right.mean()])
+    valid_corners = corner_means[(corner_means > np.percentile(corner_means, 10)) & (corner_means < np.percentile(corner_means, 90))]
+    flat_field_estimate = valid_corners.mean()
+
+    return flat_field_estimate
+
+
+def linearize_transmission(sinos):
+    # sinos_normalized = sinos / flat_field_estimate
+    sinos = -np.log(sinos + 1e-4)
+    sinos = (sinos - sinos.min()) / (sinos.max() - sinos.min())
+    return sinos
+
+
 # this thread is used to update the progress bar
 class BarThread(QThread):
     progressChanged = Signal(int)
@@ -167,8 +194,8 @@ class ReconstructionWidget(QWidget):
         # self.lambda_modl = Settings(
         #     "Lambda_MODL", dtype=float, initial=0.7, layout=slayout, write_function=self.set_opt_processor
         # )
-        self.invert_color = Settings(
-            "Invert colors", dtype=bool, initial=False, layout=slayout, write_function=self.set_opt_processor
+        self.flat_correction = Settings(
+            "Flat-field correction", dtype=bool, initial=False, layout=slayout, write_function=self.set_opt_processor
         )
         self.convert_to_uint16 = Settings(
             "Convert to uint16", dtype=bool, initial=True, layout=slayout, write_function=self.set_opt_processor
@@ -225,6 +252,8 @@ class ReconstructionWidget(QWidget):
         sinos = self.choose_layer_widget.image.value
 
         if sinos.data.ndim == 3 and sinos.data.shape[2] > 1:
+            self.flat_field = flat_field_estimate(sinos.data[0])
+            print(f"Flat-field estimate: {self.flat_field}")
             self.input_type = "3D"
             self.imageRaw_name = sinos.name
             sz, sy, sx = sinos.data.shape
@@ -264,9 +293,11 @@ class ReconstructionWidget(QWidget):
             if self.orderbox.val == 0 and self.input_type == "3D":
                 sinos = np.moveaxis(np.float32(self.get_sinos()), 1, 2)
                 self.h.theta, self.h.Q, self.h.Z = sinos.shape
+
             elif self.orderbox.val == 1 and self.input_type == "3D":
                 sinos = np.moveaxis(np.float32(self.get_sinos()), 0, 1)
                 self.h.Q, self.h.theta, self.h.Z = sinos.shape
+                # flat_field = flat_field_estimate(sinos[:, 0])
             elif self.orderbox.val == 0 and self.input_type == "2D":
                 sinos = np.float32(self.get_sinos().T)[..., None]
                 self.h.theta, self.h.Q, self.h.Z = sinos.shape
@@ -289,7 +320,12 @@ class ReconstructionWidget(QWidget):
                 )
             else:
                 optVolume = np.zeros([self.h.Q, self.h.Q, self.h.Z], np.float32)
-
+                
+            if self.flat_correction.val == True and self.input_type == "3D":
+                sinos = sinos / self.flat_field
+            # sinos = min_max_normalize(sinos)
+            
+            
             # Reconstruction process
             # if reconstructing only one slice
             if self.is_reconstruct_one.val == True and self.fullvolume.val == False and self.input_type == "3D":
@@ -390,8 +426,8 @@ class ReconstructionWidget(QWidget):
             self.bar_thread.run()
 
             self.bar_thread.quit()
-            if self.invert_color.val == True:
-                optVolume = optVolume.max() - optVolume
+            # if self.invert_color.val == True:
+            #     optVolume = optVolume.max() - optVolume
             if self.convert_to_uint16.val == True:
                 optVolume = (optVolume - optVolume.min()) / (optVolume.max() - optVolume.min()) * (2**16 - 1)
                 optVolume = optVolume.astype(np.uint16)

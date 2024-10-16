@@ -625,20 +625,20 @@ class OPTProcessor:
 
         for theta in tqdm.tqdm(range(self.theta)):
             if self.order_mode == Order_Modes.Vertical.value:
-                # sinogram_resize[theta] = cv2.resize(
-                #     sinogram_volume[theta], (self.Z, sinogram_size), interpolation=cv2.INTER_NEAREST
-                # )
-                sinogram_size[theta] = transform.resize(
-                    sinogram_volume[theta], (sinogram_size, self.Z), anti_aliasing=True
+                sinogram_resize[theta] = cv2.resize(
+                    sinogram_volume[theta], (self.Z, sinogram_size), interpolation=cv2.INTER_NEAREST
                 )
+                # sinogram_size[theta] = transform.resize(
+                #     sinogram_volume[theta], (sinogram_size, self.Z), anti_aliasing=True
+                # )
 
             elif self.order_mode == Order_Modes.Horizontal.value:
-                # sinogram_resize[:, theta] = cv2.resize(
-                #     sinogram_volume[:, theta], (self.Z, sinogram_size), interpolation=cv2.INTER_NEAREST
-                # )
-                sinogram_resize[:, theta] = transform.resize(
-                    sinogram_volume[:, theta], (sinogram_size, self.Z), anti_aliasing=True
+                sinogram_resize[:, theta] = cv2.resize(
+                    sinogram_volume[:, theta], (self.Z, sinogram_size), interpolation=cv2.INTER_NEAREST
                 )
+                # sinogram_resize[:, theta] = transform.resize(
+                #     sinogram_volume[:, theta], (sinogram_size, self.Z), anti_aliasing=True
+                # )
             # for idx in tqdm.tqdm(range(self.Z)):
 
             #     if self.order_mode == Order_Modes.Vertical.value:
@@ -763,7 +763,7 @@ class OPTProcessor:
             )
             self.iradon_functor.eval()
 
-            self.iradon_functor.lam = torch.nn.Parameter(torch.tensor([0.1], requires_grad=True, device=device))
+            # self.iradon_functor.lam = torch.nn.Parameter(torch.tensor([0.1], requires_grad=True, device=device))
             radon24 = radon_thrad(self.angles_torch, circle=self.clip_to_circle, filter_name=None, device=device)
 
             # the self.iradon_functor receive a reconstructed image (B, 1, Q, Q)

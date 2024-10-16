@@ -42,7 +42,7 @@ import numpy as np
 
 
 def min_max_normalize(image):
-    return (image - image.min()) / (image.max() - image.min()) * 255
+    return (image - image.min()) / (image.max() - image.min())
 
 
 # this thread is used to update the progress bar
@@ -140,7 +140,7 @@ class ReconstructionWidget(QWidget):
         self.reshapebox = Settings(
             "Reshape volume", dtype=bool, initial=False, layout=slayout, write_function=self.set_opt_processor
         )
-        
+
         self.resizebox = Settings(
             "Reconstruction size", dtype=int, initial=100, layout=slayout, write_function=self.set_opt_processor
         )
@@ -168,11 +168,8 @@ class ReconstructionWidget(QWidget):
         # self.lambda_modl = Settings(
         #     "Lambda_MODL", dtype=float, initial=0.7, layout=slayout, write_function=self.set_opt_processor
         # )
-        self.flat_correction = Settings(
-            "Flat-field correction", dtype=bool, initial=True, layout=slayout, write_function=self.set_opt_processor
-        )
-        self.convert_to_uint16 = Settings(
-            "Convert to uint16", dtype=bool, initial=True, layout=slayout, write_function=self.set_opt_processor
+        self.invert_color = Settings(
+            "Invert colors", dtype=bool, initial=False, layout=slayout, write_function=self.set_opt_processor
         )
         self.fullvolume = Settings(
             "Reconstruct full volume", dtype=bool, initial=False, layout=slayout, write_function=self.set_opt_processor
@@ -226,7 +223,6 @@ class ReconstructionWidget(QWidget):
         sinos = self.choose_layer_widget.image.value
 
         if sinos.data.ndim == 3 and sinos.data.shape[2] > 1:
-
             self.input_type = "3D"
             self.imageRaw_name = sinos.name
             sz, sy, sx = sinos.data.shape
@@ -266,11 +262,9 @@ class ReconstructionWidget(QWidget):
             if self.orderbox.val == 0 and self.input_type == "3D":
                 sinos = np.moveaxis(np.float32(self.get_sinos()), 1, 2)
                 self.h.theta, self.h.Q, self.h.Z = sinos.shape
-
             elif self.orderbox.val == 1 and self.input_type == "3D":
                 sinos = np.moveaxis(np.float32(self.get_sinos()), 0, 1)
                 self.h.Q, self.h.theta, self.h.Z = sinos.shape
-                # flat_field = flat_field_estimate(sinos[:, 0])
             elif self.orderbox.val == 0 and self.input_type == "2D":
                 sinos = np.float32(self.get_sinos().T)[..., None]
                 self.h.theta, self.h.Q, self.h.Z = sinos.shape
@@ -278,20 +272,13 @@ class ReconstructionWidget(QWidget):
                 sinos = np.float32(self.get_sinos().T)[..., None]
                 self.h.Q, self.h.theta, self.h.Z = sinos.shape
 
-            if self.reshapebox.val == True:
+            original_size = self.h.Q if self.clipcirclebox.val else int(np.floor(self.h.Q / np.sqrt(2)))
 
+            if self.reshapebox.val:
                 optVolume = np.zeros([self.resizebox.val, self.resizebox.val, self.h.Z], np.float32)
                 sinos = self.h.resize(sinos, type_sino=self.input_type)
             else:
                 optVolume = np.zeros([original_size, original_size, self.h.Z], np.float32)
-
-            sinos = sinos - sinos.min() + 1e-4
-            if self.flat_correction.val == True and self.input_type == "3D":
-                flat_field = flat_field_estimate(sinos[0])
-                sinos = sinos / flat_field
-                sinos = linearize_transmission(sinos)
-                print("Min max sinos: ", sinos.min(), sinos.max())
-            sinos = min_max_normalize(sinos)
 
             # Reconstruction process
             # if reconstructing only one slice
@@ -325,15 +312,15 @@ class ReconstructionWidget(QWidget):
                         # sinos[:, :, zidx] = cv2.normalize(
                         #     sinos[:, :, zidx], None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F
                         # )
-                        # sinos[:, :, zidx] = min_max_normalize(sinos[:, :, zidx])
+                        sinos[:, :, zidx] = min_max_normalize(sinos[:, :, zidx])
                         if self.orderbox.val == 0:
                             optVolume[:, :, zidx] = self.h.correct_and_reconstruct(sinos[:, :, zidx].transpose(1, 0, 2))
                         elif self.orderbox.val == 1:
                             optVolume[:, :, zidx] = self.h.correct_and_reconstruct(sinos[:, :, zidx])
-                        # sinos[:, :, zidx] = min_max_normalize(sinos[:, :, zidx])
+                        sinos[:, :, zidx] = min_max_normalize(sinos[:, :, zidx])
 
                     elif self.manualalignbox.val == True:
-                        # sinos[:, :, zidx] = min_max_normalize(sinos[:, :, zidx])
+                        sinos[:, :, zidx] = min_max_normalize(sinos[:, :, zidx])
                         if self.orderbox.val == 0:
                             optVolume[:, :, zidx] = self.h.reconstruct(
                                 ndi.shift(sinos[:, :, zidx], (0, self.alignbox.val, 0), mode="nearest").transpose(
@@ -344,16 +331,16 @@ class ReconstructionWidget(QWidget):
                             optVolume[:, :, zidx] = self.h.reconstruct(
                                 ndi.shift(sinos[:, :, zidx], (self.alignbox.val, 0, 0), mode="nearest")
                             )
-                        # sinos[:, :, zidx] = min_max_normalize(sinos[:, :, zidx])
+                        sinos[:, :, zidx] = min_max_normalize(sinos[:, :, zidx])
 
                     else:
-                        # sinos[:, :, zidx] = min_max_normalize(sinos[:, :, zidx])
+                        sinos[:, :, zidx] = min_max_normalize(sinos[:, :, zidx])
                         if self.orderbox.val == 0:
                             optVolume[:, :, zidx] = self.h.reconstruct(sinos[:, :, zidx].transpose(1, 0, 2))
 
                         elif self.orderbox.val == 1:
                             optVolume[:, :, zidx] = self.h.reconstruct(sinos[:, :, zidx])
-                        # sinos[:, :, zidx] = min_max_normalize(sinos[:, :, zidx])
+                        sinos[:, :, zidx] = min_max_normalize(sinos[:, :, zidx])
 
                 ####################### 2D reconstruction ############################
                 elif self.input_type == "2D":
@@ -410,10 +397,18 @@ class ReconstructionWidget(QWidget):
             self.bar_thread.value = 0
             self.bar_thread.run()
             self.bar_thread.quit()
+            min_val = optVolume.min()
+            max_val = optVolume.max()
+            print("min: ", min_val, "max: ", max_val)
+            # convert to uint16
+            optVolume = (optVolume - min_val) / (max_val - min_val) * (2**16 - 1)
+            print("done normalizing")
+            optVolume = optVolume.astype(np.uint16, copy=False)
+            print("done converting to uint16")
             if self.is_reconstruct_one.val == True and self.fullvolume.val == False and self.input_type == "3D":
                 return optVolume[self.slices.val]
             elif self.input_type == "3D":
-                return np.rollaxis(optVolume, -1)
+                return optVolume
             else:
                 return optVolume[0]
 
@@ -433,7 +428,7 @@ class ReconstructionWidget(QWidget):
 
         if hasattr(self, "h"):
 
-            # self.h.resize_val = self.resizebox.val
+            self.h.resize_val = self.resizebox.val
             self.h.resize_bool = self.reshapebox.val
             self.h.register_bool = self.registerbox.val
             self.h.rec_process = self.reconbox.val
@@ -441,9 +436,9 @@ class ReconstructionWidget(QWidget):
             self.h.clip_to_circle = self.clipcirclebox.val
             self.h.use_filter = self.filterbox.val
             self.h.batch_size = self.batch_size.val
+            self.h.invert_color = self.invert_color.val
             self.h.is_half_rotation = self.is_half_rotation.val
             self.h.iterations = self.iterations.val
-            self.h.downsample_factor = self.downsamplebox.val
             self.h.set_reconstruction_process()
 
     def start_opt_processor(self):
@@ -451,7 +446,6 @@ class ReconstructionWidget(QWidget):
 
         if hasattr(self, "h"):
             self.stop_opt_processor()
-
             self.start_opt_processor()
         else:
             print("Reset")

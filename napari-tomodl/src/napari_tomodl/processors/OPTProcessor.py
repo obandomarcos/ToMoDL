@@ -10,6 +10,7 @@ import torch.nn.functional as F
 
 from skimage.transform import radon as radon_scikit
 from skimage.transform import iradon as iradon_scikit
+from skimage.transform import resize as resize_scikit
 import torch
 from skimage import transform
 
@@ -493,6 +494,7 @@ class OPTProcessor:
 
     def set_reconstruction_process(self):
 
+
         if self.is_half_rotation == True:
             rotation_factor = 1
         else:
@@ -632,28 +634,19 @@ class OPTProcessor:
                 #     sinogram_volume[theta], (sinogram_size, self.Z), anti_aliasing=True
                 # )
 
-            elif self.order_mode == Order_Modes.Horizontal.value:
-                sinogram_resize[:, theta] = cv2.resize(
-                    sinogram_volume[:, theta], (self.Z, sinogram_size), interpolation=cv2.INTER_NEAREST
-                )
-                # sinogram_resize[:, theta] = transform.resize(
-                #     sinogram_volume[:, theta], (sinogram_size, self.Z), anti_aliasing=True
-                # )
-            # for idx in tqdm.tqdm(range(self.Z)):
+                    # sinogram_resize[:, :, idx] = resize_scikit(
+                    #     sinogram_volume[:, :, idx], (self.theta, sinogram_size), anti_aliasing=True
+                    # )
 
-            #     if self.order_mode == Order_Modes.Vertical.value:
-            #         sinogram_resize[:, :, idx] = cv2.resize(
-            #             sinogram_volume[:, :, idx],
-            #             (sinogram_size, self.theta),
-            #             interpolation=cv2.INTER_NEAREST,
-            #         )
-
-            #     elif self.order_mode == Order_Modes.Horizontal.value:
-            #         sinogram_resize[:, :, idx] = cv2.resize(
-            #             sinogram_volume[:, :, idx],
-            #             (self.theta, sinogram_size),
-            #             interpolation=cv2.INTER_NEAREST,
-            #         )
+                elif self.order_mode == Order_Modes.Horizontal.value:
+                    sinogram_resize[:, :, idx] = cv2.resize(
+                        sinogram_volume[:, :, idx],
+                        (self.theta, sinogram_size),
+                        interpolation=cv2.INTER_NEAREST,
+                    )
+                    # sinogram_resize[:, :, idx] = resize_scikit(
+                    #     sinogram_volume[:, :, idx], (self.theta, sinogram_size), anti_aliasing=True
+                    # )
 
         return sinogram_resize
 
@@ -672,6 +665,7 @@ class OPTProcessor:
         else:
             rotation_factor = 2
         self.angles_torch = np.linspace(0, rotation_factor * np.pi, self.theta, endpoint=False)
+        self.angles = np.linspace(0, rotation_factor * 180, self.theta, endpoint=False)
         self.angles = np.linspace(0, rotation_factor * 180, self.theta, endpoint=False)
 
         ## Es un enriedo, pero inicializa los generadores de ángulos. Poco claro
@@ -877,5 +871,8 @@ class OPTProcessor:
             self.iradon_function = _iradon
 
         reconstruction = self.iradon_function(sinogram)
+
+        if self.invert_color == True:
+            reconstruction = reconstruction.max() - reconstruction
 
         return reconstruction

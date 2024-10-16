@@ -37,50 +37,12 @@ from time import time
 import scipy.ndimage as ndi
 from enum import Enum
 import cv2
-import tqdm
+from tqdm import tqdm
 import numpy as np
 
 
 def min_max_normalize(image):
-    return (image - image.min()) / (image.max() - image.min())
-
-
-def flat_field_estimate(img, ratio_corners=0.03):
-
-    height, width = img.shape
-    # get corner size as 2% of the  dimension
-    corner_size = int(min(height, width) * ratio_corners)
-
-    # Extract the four corner regions (top-left, top-right, bottom-left, bottom-right)
-    top_left = img[:corner_size, :corner_size]
-    top_right = img[:corner_size, -corner_size:]
-    bottom_left = img[-corner_size:, :corner_size]
-    bottom_right = img[-corner_size:, -corner_size:]
-    middle_left = img[height // 2 - corner_size // 2 : height // 2 + corner_size // 2, :corner_size]
-    middle_right = img[height // 2 - corner_size // 2 : height // 2 + corner_size // 2, -corner_size:]
-    corner_means = np.array(
-        [
-            top_left.mean(),
-            top_right.mean(),
-            bottom_left.mean(),
-            bottom_right.mean(),
-            middle_left.mean(),
-            middle_right.mean(),
-        ]
-    )
-    valid_corners = corner_means[
-        (corner_means > np.percentile(corner_means, 10)) & (corner_means < np.percentile(corner_means, 90))
-    ]
-    flat_field_estimate = valid_corners.mean()
-
-    return flat_field_estimate
-
-
-def linearize_transmission(sinos):
-    # sinos_normalized = sinos / flat_field_estimate
-    sinos = -np.log10(sinos)
-    sinos = (sinos - sinos.min()) / (sinos.max() - sinos.min())
-    return sinos
+    return (image - image.min()) / (image.max() - image.min()) * 255
 
 
 # this thread is used to update the progress bar
@@ -178,12 +140,9 @@ class ReconstructionWidget(QWidget):
         self.reshapebox = Settings(
             "Reshape volume", dtype=bool, initial=False, layout=slayout, write_function=self.set_opt_processor
         )
-
-        # self.resizebox = Settings(
-        #     "Reconstruction size", dtype=int, initial=100, layout=slayout, write_function=self.set_opt_processor
-        # )
-        self.downsamplebox = Settings(
-            "Downsample Factor", dtype=float, initial=2, layout=slayout, write_function=self.set_opt_processor
+        
+        self.resizebox = Settings(
+            "Reconstruction size", dtype=int, initial=100, layout=slayout, write_function=self.set_opt_processor
         )
 
         self.iterations = Settings(
@@ -320,20 +279,11 @@ class ReconstructionWidget(QWidget):
                 self.h.Q, self.h.theta, self.h.Z = sinos.shape
 
             if self.reshapebox.val == True:
-                self.h.Q = int(self.h.Q / self.h.downsample_factor)
-                self.h.Z = int(self.h.Z / self.h.downsample_factor)
-                # optVolume = np.zeros([self.resizebox.val, self.resizebox.val, self.h.Z], np.float32)
 
-                optVolume = np.zeros([self.h.Q, self.h.Q, self.h.Z], np.float32)
-
+                optVolume = np.zeros([self.resizebox.val, self.resizebox.val, self.h.Z], np.float32)
                 sinos = self.h.resize(sinos, type_sino=self.input_type)
-
-            elif self.clipcirclebox.val == False:
-                optVolume = np.zeros(
-                    [int(np.floor(self.h.Q / np.sqrt(2))), int(np.floor(self.h.Q / np.sqrt(2))), self.h.Z], np.float32
-                )
             else:
-                optVolume = np.zeros([self.h.Q, self.h.Q, self.h.Z], np.float32)
+                optVolume = np.zeros([original_size, original_size, self.h.Z], np.float32)
 
             sinos = sinos - sinos.min() + 1e-4
             if self.flat_correction.val == True and self.input_type == "3D":
@@ -441,21 +391,31 @@ class ReconstructionWidget(QWidget):
 
             self.bar_thread.value = 0
             self.bar_thread.run()
+            optVolume = np.rollaxis(optVolume, -1)
+            # convert resize volume to original size
+            if self.reshapebox.val:
+                print("Resizing volume to original size")
+                optVolume_resized = np.zeros([self.h.Z, original_size, original_size], np.float32)
+                self.bar_thread.max = self.h.Z
+                for i in tqdm(range(optVolume.shape[0])):
+                    optVolume_resized[i] = cv2.resize(
+                        optVolume[i], (original_size, original_size), interpolation=cv2.INTER_LINEAR
+                    )
+                    self.bar_thread.value = i + 1
+                    self.bar_thread.run()
 
+                optVolume = optVolume_resized
+                del optVolume_resized, sinos
+
+            self.bar_thread.value = 0
+            self.bar_thread.run()
             self.bar_thread.quit()
-            # if self.invert_color.val == True:
-            #     optVolume = optVolume.max() - optVolume
-            if self.convert_to_uint16.val == True:
-                optVolume = (optVolume - optVolume.min()) / (optVolume.max() - optVolume.min()) * (2**16 - 1)
-                optVolume = optVolume.astype(np.uint16)
-
             if self.is_reconstruct_one.val == True and self.fullvolume.val == False and self.input_type == "3D":
-                return optVolume[..., self.slices.val]
+                return optVolume[self.slices.val]
             elif self.input_type == "3D":
-                # return np.rollaxis(optVolume, -1)
-                return optVolume.transpose(2, 0, 1)
+                return np.rollaxis(optVolume, -1)
             else:
-                return optVolume[..., 0]
+                return optVolume[0]
 
         _reconstruct()
 

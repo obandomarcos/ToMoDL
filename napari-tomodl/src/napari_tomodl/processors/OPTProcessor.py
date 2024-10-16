@@ -486,6 +486,7 @@ class OPTProcessor:
         self.init_volume_rec = False
         self.iradon_functor = None
         self.invert_color = False
+        self.iterations = 8
         self.set_reconstruction_process()
 
     def set_reconstruction_process(self):
@@ -719,7 +720,7 @@ class OPTProcessor:
             self.tomodl_dictionary = {
                 "use_torch_radon": True,
                 "metric": "psnr",
-                "K_iterations": 8,
+                "K_iterations": self.iterations,
                 "number_projections_total": sinogram.shape[0],
                 "acceleration_factor": 10,
                 "image_size": sinogram.shape[1],
@@ -781,7 +782,7 @@ class OPTProcessor:
             self.tomodl_dictionary = {
                 "use_torch_radon": True,
                 "metric": "psnr",
-                "K_iterations": 8,
+                "K_iterations": self.iterations,
                 "number_projections_total": sinogram.shape[0],
                 "acceleration_factor": 10,
                 "image_size": sinogram.shape[1],

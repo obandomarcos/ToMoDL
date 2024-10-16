@@ -147,6 +147,10 @@ class ReconstructionWidget(QWidget):
             "Reconstruction size", dtype=int, initial=100, layout=slayout, write_function=self.set_opt_processor
         )
 
+        self.iterations = Settings(
+            "ToMoDL iterations", dtype=int, initial=8, layout=slayout, write_function=self.set_opt_processor
+        )
+
         self.clipcirclebox = Settings(
             "Clip to circle", dtype=bool, initial=False, layout=slayout, write_function=self.set_opt_processor
         )
@@ -414,6 +418,7 @@ class ReconstructionWidget(QWidget):
             self.h.batch_size = self.batch_size.val
             self.h.invert_color = self.invert_color.val
             self.h.is_half_rotation = self.is_half_rotation.val
+            self.h.iterations = self.iterations.val
             self.h.set_reconstruction_process()
 
     def start_opt_processor(self):

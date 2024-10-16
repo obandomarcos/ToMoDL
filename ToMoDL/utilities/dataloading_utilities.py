@@ -225,7 +225,7 @@ class DatasetProcessor:
             self.top_sino = np.copy(self.registered_volume[sample][:, :, top_index].T)
             self.bottom_sino = np.copy(self.registered_volume[sample][:, :, bottom_index].T)
             self.angles = np.linspace(0, 2 * 180, self.top_sino.shape[1], endpoint=False)
-
+            print("Hola")
             # Iteratively sweep from -maxShift pixels to maxShift pixels
             (top_shift_max, bottom_shift_max) = self._search_shifts(
                 max_shift, shift_step, center_shift_top, center_shift_bottom
@@ -335,6 +335,7 @@ class DatasetProcessor:
         # Inputs
         for sinogram_slice, (us_sinogram, full_sinogram) in tqdm(enumerate(zip(undersampled_sinograms, full_sinogram))):
 
+            
             sinogram_slice = str(sinogram_slice)
 
             if write_us_filtered == True:
@@ -343,7 +344,7 @@ class DatasetProcessor:
                 us_filtered_img_torch_path = us_filtered_dataset_folder + sinogram_slice + ".pt"
 
                 # Normalization of input sinogram - Undersampled
-                us_filtered_img = self.radon_filter.filter_backprojection(us_sinogram[None, None])
+                us_filtered_img = self.radon_filter.filter_backprojection(us_sinogram.T[None, None])
                 us_filtered_img = self.normalize_image(us_filtered_img[0, 0])
 
                 # Write undersampled filtered
@@ -362,7 +363,7 @@ class DatasetProcessor:
                 us_sinogram = self.normalize_image(us_sinogram)
 
                 us_unfiltered_img = (
-                    self.radon_unfilter.filter_backprojection(us_sinogram[None, None])
+                    self.radon_unfilter.filter_backprojection(us_sinogram.T[None, None])
                     * np.pi
                     / self.number_projections_undersampled
                 )
@@ -382,7 +383,7 @@ class DatasetProcessor:
                 fs_filtered_img_torch_path = fs_filtered_dataset_folder + sinogram_slice + ".pt"
 
                 # Normalization of output sinogram - Fully sampled
-                fs_filtered_img = self.radon_filter.filter_backprojection(full_sinogram[None, None])
+                fs_filtered_img = self.radon_filter.filter_backprojection(full_sinogram.T[None, None])
                 fs_filtered_img = self.normalize_image(fs_filtered_img[0, 0])
                 # Write fully sampled filtered
                 thumbs = cv2.imwrite(fs_filtered_img_path, 255.0 * fs_filtered_img.cpu().detach().numpy())
@@ -418,7 +419,7 @@ class DatasetProcessor:
 
         top_image_std = []
         bottom_image_std = []
-
+        print("Hola", top_shifts, bottom_shifts)
         for i, (top_shift, bottom_shift) in enumerate(zip(top_shifts, bottom_shifts)):
 
             print("Shift {}, top shift {}, bottom shift {}".format(i, top_shift, bottom_shift))
@@ -427,6 +428,7 @@ class DatasetProcessor:
             bottom_shift_sino = ndi.shift(self.bottom_sino, (bottom_shift, 0), mode="nearest")
 
             # Get image reconstruction
+            print(self.angles, "angle")
             top_shift_iradon = iradon(top_shift_sino, self.angles, circle=False)
             bottom_shift_iradon = iradon(bottom_shift_sino, self.angles, circle=False)
 

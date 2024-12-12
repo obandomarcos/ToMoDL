@@ -143,6 +143,11 @@ trainer_dict = {'lightning_trainer_dict': lightning_trainer_dict,
                 'resume': False}
 
 ```
+## 📚 Citation
+
+If you use any ideas from the paper or code from this repo, consider citing:
+
+Obando, M., Bassi, A., Ducros, N. et al. Model-based deep learning framework for accelerated optical projection tomography. Sci Rep 13, 21735 (2023). https://doi.org/10.1038/s41598-023-47650-3
 
 ## 📚 References
 

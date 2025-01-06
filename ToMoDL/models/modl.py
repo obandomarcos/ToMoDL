@@ -214,23 +214,22 @@ class Aclass:
                     return reconstruction
 
             self.radon = Radon(self.number_projections, circle=False)
-
+    @torch.no_grad()
     def forward(self, img):
         """
         Applies the operator (A^H A + lam*I) to image, where A is the forward Radon transform.
         Params:
             - img (torch.Tensor): Input tensor
         """
-        if use_torch_radon:
-            sinogram = self.radon(img) / self.img_size
-            iradon = self.radon.filter_backprojection(sinogram) * np.pi / self.number_projections
-            output = iradon + self.lam * img
 
-        else:
-            sinogram = self.radon.forward(img) / self.img_size
-            iradon = self.radon.backprojection(sinogram) * np.pi / self.number_projections
-            output = iradon.to(device) + self.lam * img
-        del sinogram
+        # sinogram = self.radon.forward(img)/self.img_size
+        # iradon = self.radon.backprojection(sinogram)*np.pi/self.number_projections
+        # del sinogram
+        # output = iradon+self.lam*img
+
+        sinogram = self.radon(img) / self.img_size
+        iradon = self.radon.filter_backprojection(sinogram) * np.pi / self.number_projections
+        output = iradon + self.lam * img
 
         # print('output forward: {} {}'.format(output.max(), output.min()))
         # print('Term z max {}, min {}'.format((iradon/self.lam).max(), (iradon/self.lam).min()))
@@ -240,18 +239,51 @@ class Aclass:
 
     def inverse(self, rhs):
         """
-        Applies CG on each image on the batch
+        Applies CG on the batch
         Params:
             - rhs (torch.Tensor): Right-hand side tensor for applying inversion of (A^H A + lam*I) operator
         """
-
-        y = torch.zeros_like(rhs)
-
-        for i in range(rhs.shape[0]):
-
-            y = self.conjugate_gradients(self.forward, rhs)  # This indexing may fail
+        y = self.conjugate_gradients(self.forward, rhs)  # This indexing may fail
 
         return y
+
+    # def forward(self, img):
+    #     """
+    #     Applies the operator (A^H A + lam*I) to image, where A is the forward Radon transform.
+    #     Params:
+    #         - img (torch.Tensor): Input tensor
+    #     """
+    #     if use_torch_radon:
+    #         sinogram = self.radon(img) / self.img_size
+    #         iradon = self.radon.filter_backprojection(sinogram) * np.pi / self.number_projections
+    #         output = iradon + self.lam * img
+
+    #     else:
+    #         sinogram = self.radon.forward(img) / self.img_size
+    #         iradon = self.radon.backprojection(sinogram) * np.pi / self.number_projections
+    #         output = iradon.to(device) + self.lam * img
+    #     del sinogram
+
+    #     # print('output forward: {} {}'.format(output.max(), output.min()))
+    #     # print('Term z max {}, min {}'.format((iradon/self.lam).max(), (iradon/self.lam).min()))
+    #     # print('Term input max {}, min {}'.format(img.max(), img.min()))
+    #     # print('Term output max {}, min {}'.format(output.max(), output.min()))
+    #     return output
+
+    # def inverse(self, rhs):
+    #     """
+    #     Applies CG on each image on the batch
+    #     Params:
+    #         - rhs (torch.Tensor): Right-hand side tensor for applying inversion of (A^H A + lam*I) operator
+    #     """
+
+    #     y = torch.zeros_like(rhs)
+
+    #     for i in range(rhs.shape[0]):
+
+    #         y = self.conjugate_gradients(self.forward, rhs)  # This indexing may fail
+
+    #     return y
 
     @staticmethod
     def conjugate_gradients(A, rhs):

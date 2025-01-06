@@ -52,7 +52,7 @@ class DatasetProcessor:
         for sample in self.fish_parts_available:
 
             self.load_images(sample)
-            # self.correct_rotation_axis(sample=sample, max_shift=200, shift_step=1)
+            self.correct_rotation_axis(sample=sample, max_shift=200, shift_step=1)
             self.dataset_resize(sample)
             self.write_dataset_reconstruction(sample)
 
@@ -190,7 +190,7 @@ class DatasetProcessor:
                 }
             )
 
-            # Create Registered Dataset - empty till reggistering
+            # Create Registered Dataset - empty till registering
             self.registered_dataset = pd.DataFrame(columns=["Image", "Angle", "Sample"])
 
             # Sort dataset by sample and angle
@@ -274,9 +274,10 @@ class DatasetProcessor:
         self.registered_volume[sample] = np.array(
             [cv2.resize(img, (self.det_count, self.number_projections_total)) for img in self.registered_volume[sample]]
         )
-        print("Finished")
 
+        print("Finished")
         self.registered_volume[sample] = np.moveaxis(self.registered_volume[sample], 0, -1)
+
 
     def write_dataset_reconstruction(self, sample):
         """
@@ -335,7 +336,6 @@ class DatasetProcessor:
         # Inputs
         for sinogram_slice, (us_sinogram, full_sinogram) in tqdm(enumerate(zip(undersampled_sinograms, full_sinogram))):
 
-            
             sinogram_slice = str(sinogram_slice)
 
             if write_us_filtered == True:
@@ -354,7 +354,7 @@ class DatasetProcessor:
                 print(thumbs)
 
             if write_us_unfiltered == True:
-                print("Slice {sinogram_slice} escrita\n")
+                print("Processing slice {sinogram_slice} \n")
                 # Undersampled unfiltered reconstructed image path
                 us_unfiltered_img_path = us_unfiltered_dataset_folder + sinogram_slice + ".jpg"
                 us_unfiltered_img_torch_path = us_unfiltered_dataset_folder + sinogram_slice + ".pt"
@@ -428,10 +428,10 @@ class DatasetProcessor:
             bottom_shift_sino = ndi.shift(self.bottom_sino, (bottom_shift, 0), mode="nearest")
 
             # Get image reconstruction
-            print(self.angles, "angle")
+            # print(self.angles, "angle")
             top_shift_iradon = iradon(top_shift_sino, self.angles, circle=False)
             bottom_shift_iradon = iradon(bottom_shift_sino, self.angles, circle=False)
-
+            print(top_shift_iradon.shape, "shape")
             # Calculate variance
             top_image_std.append(np.std(top_shift_iradon))
             bottom_image_std.append(np.std(bottom_shift_iradon))
@@ -759,6 +759,73 @@ class ZebraDataloader:
         return (image - image.min()) / (image.max() - image.min())
 
 
+# class ReconstructionDataset(Dataset):
+
+#     def __init__(self, root_folder, acceleration_factor, transform=None):
+#         """
+#         Params:
+#           - root_folder (string): root folder contains code for dataset + sample
+#           - acceleration_factor (int): acceleration factor
+#         """
+#         self.root_folder = root_folder + "/"
+#         self.acceleration_factor = str(acceleration_factor)
+#         self.transform = transform
+
+#         self.fs_filt_folder = "fs_filtered/"
+#         self.us_filt_folder = "us_{}_filtered/".format(self.acceleration_factor)
+#         self.us_unfilt_folder = "us_{}_unfiltered/".format(self.acceleration_factor)
+
+#         self.unfiltered_us_recs_len = len(
+#             [f for f in os.listdir(self.root_folder + self.us_unfilt_folder) if ".pt" in f]
+#         )
+#         self.filtered_us_recs_len = len([f for f in os.listdir(self.root_folder + self.us_filt_folder) if ".pt" in f])
+#         self.filtered_fs_recs_len = len([f for f in os.listdir(self.root_folder + self.fs_filt_folder) if ".pt" in f])
+
+#         self.unfiltered_us_recs = torch.stack(
+#             [
+#                 torch.load(self.root_folder + self.us_unfilt_folder + str(index) + ".pt")
+#                 for index in range(self.unfiltered_us_recs_len)
+#             ],
+#             0,
+#         )
+#         self.filtered_us_recs = torch.stack(
+#             [
+#                 torch.load(self.root_folder + self.us_filt_folder + str(index) + ".pt")
+#                 for index in range(self.filtered_us_recs_len)
+#             ],
+#             0,
+#         )
+#         self.filtered_fs_recs = torch.stack(
+#             [
+#                 torch.load(self.root_folder + self.fs_filt_folder + str(index) + ".pt")
+#                 for index in range(self.filtered_fs_recs_len)
+#             ],
+#             0,
+#         )
+
+#     def __len__(self):
+
+#         return self.filtered_us_recs_len
+
+#     def __getitem__(self, index):
+#         """
+#         Retrieves undersampled unfiltered reconstruction (unfiltered_us_rec), undersampled filtered reconstruction (filtered_us_rec) and fully sampled filtered reconstruction (filtered_fs_rec), used as Input, FBP benchmark and Output respectively.
+#         """
+#         print(self.unfiltered_us_recs)
+#         unfiltered_us_rec = self.normalize_image(self.unfiltered_us_recs[index, ...])
+#         filtered_us_rec = self.normalize_image(self.filtered_us_recs[index, ...])
+#         filtered_fs_rec = self.normalize_image(self.filtered_fs_recs[index, ...])
+
+#         return (unfiltered_us_rec, filtered_us_rec, filtered_fs_rec)
+
+#     @staticmethod
+#     def normalize_image(image):
+#         """
+#         Normalizes image to
+#         """
+#         return (image - image.min()) / (image.max() - image.min())
+
+
 class ReconstructionDataset(Dataset):
 
     def __init__(self, root_folder, acceleration_factor, transform=None):
@@ -779,29 +846,29 @@ class ReconstructionDataset(Dataset):
             [f for f in os.listdir(self.root_folder + self.us_unfilt_folder) if ".pt" in f]
         )
         self.filtered_us_recs_len = len([f for f in os.listdir(self.root_folder + self.us_filt_folder) if ".pt" in f])
-        self.filtered_fs_recs_len = len([f for f in os.listdir(self.root_folder + self.fs_filt_folder) if ".pt" in f])
+        # self.filtered_fs_recs_len = len([f for f in os.listdir(self.root_folder + self.fs_filt_folder) if ".pt" in f])
 
-        self.unfiltered_us_recs = torch.stack(
-            [
-                torch.load(self.root_folder + self.us_unfilt_folder + str(index) + ".pt")
-                for index in range(self.unfiltered_us_recs_len)
-            ],
-            0,
-        )
-        self.filtered_us_recs = torch.stack(
-            [
-                torch.load(self.root_folder + self.us_filt_folder + str(index) + ".pt")
-                for index in range(self.filtered_us_recs_len)
-            ],
-            0,
-        )
-        self.filtered_fs_recs = torch.stack(
-            [
-                torch.load(self.root_folder + self.fs_filt_folder + str(index) + ".pt")
-                for index in range(self.filtered_fs_recs_len)
-            ],
-            0,
-        )
+        # self.unfiltered_us_recs = torch.stack(
+        #     [
+        #         torch.load(self.root_folder + self.us_unfilt_folder + str(index) + ".pt")
+        #         for index in range(self.unfiltered_us_recs_len)
+        #     ],
+        #     0,
+        # )
+        # self.filtered_us_recs = torch.stack(
+        #     [
+        #         torch.load(self.root_folder + self.us_filt_folder + str(index) + ".pt")
+        #         for index in range(self.filtered_us_recs_len)
+        #     ],
+        #     0,
+        # )
+        # self.filtered_fs_recs = torch.stack(
+        #     [
+        #         torch.load(self.root_folder + self.fs_filt_folder + str(index) + ".pt")
+        #         for index in range(self.filtered_fs_recs_len)
+        #     ],
+        #     0,
+        # )
 
     def __len__(self):
 
@@ -811,10 +878,24 @@ class ReconstructionDataset(Dataset):
         """
         Retrieves undersampled unfiltered reconstruction (unfiltered_us_rec), undersampled filtered reconstruction (filtered_us_rec) and fully sampled filtered reconstruction (filtered_fs_rec), used as Input, FBP benchmark and Output respectively.
         """
-        unfiltered_us_rec = self.normalize_image(self.unfiltered_us_recs[index, ...])
-        filtered_us_rec = self.normalize_image(self.filtered_us_recs[index, ...])
-        filtered_fs_rec = self.normalize_image(self.filtered_fs_recs[index, ...])
 
+        unfiltered_us_rec = torch.load(
+            self.root_folder + self.us_unfilt_folder + str(index) + ".pt", map_location="cpu",
+            weights_only=True
+        )
+
+        unfiltered_us_rec = self.normalize_image(unfiltered_us_rec)
+
+        filtered_us_rec = torch.load(
+            self.root_folder + self.us_filt_folder + str(index) + ".pt", map_location="cpu",
+            weights_only=True
+        )
+        filtered_us_rec = self.normalize_image(filtered_us_rec)
+
+
+        filtered_fs_rec = torch.load(self.root_folder + self.fs_filt_folder + str(index) + ".pt", map_location="cpu",
+                                     weights_only=True)
+        filtered_fs_rec = self.normalize_image(filtered_fs_rec)
         return (unfiltered_us_rec, filtered_us_rec, filtered_fs_rec)
 
     @staticmethod

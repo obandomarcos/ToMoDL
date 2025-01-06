@@ -20,12 +20,12 @@ from torch.utils.data import DataLoader, ConcatDataset
 
 def process_datasets(args_options):
 
-    folder_paths = ["/home/nhattm/ToMoDL/datasets/DataOPT/140415_5dpf_4X"]
+    folder_paths = ["/home/nhattm/ToMoDL/datasets/DataOPT/140827_5dpf_4x"]
 
     zebra_dataset_dict = {
-        "dataset_folder": "/home/nhattm/ToMoDL/datasets/full_fish",
+        "dataset_folder": "/home/nhattm/ToMoDL/datasets/full_fish_512",
         "experiment_name": "Bassi",
-        "img_resize": 100,
+        "img_resize": 512,
         "load_shifts": False,
         "save_shifts": True,
         "number_projections_total": 720,

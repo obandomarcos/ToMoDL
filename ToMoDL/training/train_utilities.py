@@ -19,8 +19,8 @@ from models import models_system as modsys
 from torch.utils.data import DataLoader, ConcatDataset, random_split
 
 import lightning as pl
-from lightning.loggers import WandbLogger
-from lightning.callbacks import ModelCheckpoint, StochasticWeightAveraging, GradientAccumulationScheduler
+from lightning.pytorch.loggers import WandbLogger
+from lightning.pytorch.callbacks import ModelCheckpoint, StochasticWeightAveraging, GradientAccumulationScheduler
 
 import wandb
 
@@ -36,7 +36,7 @@ class TrainerSystem():
         self.process_trainer_kwdictionary(trainer_kwdict)
         self.process_dataloader_kwdictionary(dataloader_kwdict)
         self.process_model_system_kwdictionary(model_system_kwdict)
-    
+
     def process_trainer_kwdictionary(self, kwdict):
         '''
         Process kwdictionary for training parameters
@@ -48,11 +48,11 @@ class TrainerSystem():
         self.kfold_monitor_dict = {}
 
         if self.use_k_folding == True:
-            
+
             # Number of datasets for testing
             self.k_fold_number_datasets = kwdict['k_fold_number_datasets']
             self.current_fold = 0 
-        
+
         self.restore_fold = kwdict['restore_fold']
         if self.restore_fold == True:
             self.fold_number_restore = kwdict['fold_number_restore']
@@ -61,7 +61,7 @@ class TrainerSystem():
         self.use_logger = kwdict['use_logger']
         self.lightning_trainer_dict = kwdict['lightning_trainer_dict']
         self.track_checkpoints = kwdict['track_checkpoints']
-        
+
         self.lightning_trainer_dict['callbacks'] = []
         self.use_swa = kwdict['use_swa']
         self.use_accumulate_batches = kwdict['use_accumulate_batches']
@@ -70,20 +70,20 @@ class TrainerSystem():
         self.profiler = kwdict['profiler'] 
 
         if self.use_accumulate_batches == True:
-            
+
             self.batch_accumulate_number = kwdict['batch_accumulate_number']
             self.batch_accumulation_start_epoch = kwdict['batch_accumulation_start_epoch']
 
             self.lightning_trainer_dict['callbacks'] += [GradientAccumulationScheduler(scheduling={self.batch_accumulation_start_epoch: 2})]
-            
-        if self.use_swa == True:
 
+        if self.use_swa == True:
+            
             self.lightning_trainer_dict['callbacks'] +=[StochasticWeightAveraging(swa_lrs=1e-2)]
 
         if self.use_mixed_precision == True:
 
             self.lightning_trainer_dict['precision'] = 16
-            
+
         if self.use_auto_lr_find == True:
 
             self.lightning_trainer_dict['auto_lr_find'] = True
@@ -94,44 +94,43 @@ class TrainerSystem():
             self.logger_dict = kwdict['logger_dict']
 
             self.run_base_name = names.get_last_name()
-            
-        # Callbacks 
+
+        # Callbacks
         if self.track_checkpoints == True:
-            
+
             # Default checkpoints
             val_psnr_checkpoint_callback = ModelCheckpoint(monitor='val/psnr', mode='max')
             val_ssim_checkpoint_callback = ModelCheckpoint(monitor='val/ssim', mode='max')
 
             self.lightning_trainer_dict['callbacks'] += [val_psnr_checkpoint_callback,
                                                         val_ssim_checkpoint_callback]
-            
-        
+
         self.create_trainer()
-            
+
     def reinitialize_logger(self):
         '''
         Reinitializes logger, meant for reloading K-folding
         
         '''
         if self.use_logger == True:              
-            
-            self.logger_dict['project'] = 'deepopt'
+
+            self.logger_dict['project'] = 'ToMoDL'
 
             if self.use_k_folding == True:
-                
+
                 self.logger_dict['group'] = self.run_base_name
                 self.logger_dict['name'] = f'x{self.acceleration_factor} - {self.loss_method} - K-Fold {self.current_fold}/{self.k_fold_max-1}'
 
-            id_ = wandb.util.generate_id()
-            self.logger_dict['id'] = id_
-             
+            # id_ = wandb.util.generate_id()
+            # self.logger_dict['id'] = id_
+
             self.logger_dict['resume'] = self.resume
-            
+
             # Logger parameters
             self.wandb_logger = WandbLogger(**self.logger_dict) 
 
             self.lightning_trainer_dict['logger'] = self.wandb_logger
-         
+
     def create_trainer(self):
         '''
         Create trainer based on current trainer_dict
@@ -165,23 +164,23 @@ class TrainerSystem():
         self.test_factor = kwdict['test_factor']
 
         self.batch_size = kwdict['batch_size']
-        
+
         self.sampling_method= kwdict['sampling_method']
         self.shuffle_data = kwdict['shuffle_data']
 
         self.data_transform = kwdict['data_transform']
-        
+
         self.number_volumes = kwdict['number_volumes']
         self.num_workers = kwdict['num_workers']
-        
+
         # To-Do: Option for non-available acceleration factors (RUN ProcessDatasets)
         self.folders_datasets_list = [self.datasets_folder+'x{}/'.format(self.acceleration_factor)+x for x in os.listdir(self.datasets_folder+'x{}'.format(self.acceleration_factor))]
         # Same for all acc factors
         self.folders_datasets_list.sort()
-
+        print(self.folders_datasets_list)
         # wandb.log({'datasets_folders_list': [x.split('/') for x in self.folders_datasets_list]})
         if self.use_subset_by_part == True:
-            
+
             self.subset_part = kwdict['subset_part']
             self.folders_datasets_list = [x for x in self.folders_datasets_list if self.subset_part in x]
             print(self.folders_datasets_list)
@@ -189,16 +188,16 @@ class TrainerSystem():
         if self.number_volumes != 0:
 
             self.folders_datasets_list = self.folders_datasets_list[:self.number_volumes]
-        
+
         else:
             self.number_volumes = len(self.folders_datasets_list)
         # Number of datasets defines splitting number between train/val and test datasets
         if self.use_k_folding == True:
-            
+
             self.datasets_number = len(self.folders_datasets_list)
 
             self.k_fold_max = self.datasets_number//self.k_fold_number_datasets
-            
+
     def process_model_system_kwdictionary(self, kwdict):
         '''
         Process kwdictionary and creates dataloader
@@ -239,16 +238,16 @@ class TrainerSystem():
         '''
         Monitor K-Fold datasets, parsing its structure
         '''
-        
+
         self.kfold_monitor_dict[self.current_fold] = {'k_fold':self.current_fold, 
                                                       'train/val' : self.__parse_dataset_list(train_val_datasets),
                                                       'test' : self.__parse_dataset_list(test_datasets)}
 
-        # print(self.kfold_monitor_dict[self.current_fold])
+        print(self.kfold_monitor_dict[self.current_fold])
         # wandb.log({'dataset_monitor': self.kfold_monitor_dict[self.current_fold]})
 
     def __parse_dataset_list(self, dataset_list):
-        
+
         # Remove root path
         dataset_names_list = [dataset.split('/')[-1] for dataset in dataset_list]
 
@@ -269,7 +268,7 @@ class TrainerSystem():
 
         for i in items:
             counts[i] = counts.get(i, 0) + 1
-        
+
         return counts
 
     def generate_K_folding_dataloader(self):
@@ -300,21 +299,21 @@ class TrainerSystem():
 
         self.kfold_monitor(train_val_datasets_folders, test_datasets_folders)
 
-        # Train and validation dataloader  
+        # Train and validation dataloader
         train_val_datasets = []
-        
+
         for enum, folder in enumerate(train_val_datasets_folders):
-            
+
             dataset_dict = {'root_folder' : folder, 
                             'acceleration_factor' : self.acceleration_factor,
                             'transform' : self.data_transform}
 
             train_val_datasets.append(dlutils.ReconstructionDataset(**dataset_dict))
-        
+
         train_val_datasets = ConcatDataset(train_val_datasets)
-        
+
         train_val_lengths = [int(len(train_val_datasets)*self.train_factor), int(len(train_val_datasets)*self.val_factor)]
-        
+
         # Possible non-zero sum
         if sum(train_val_lengths) != len(train_val_datasets):
 
@@ -331,17 +330,17 @@ class TrainerSystem():
                                 batch_size = self.batch_size,
                                 shuffle = False,
                                 num_workers = self.num_workers)
-        
+
         test_datasets = []
-        
+
         for enum, folder in enumerate(test_datasets_folders):
-            
+
             dataset_dict = {'root_folder' : folder, 
                                 'acceleration_factor' : self.acceleration_factor,
                                 'transform' : self.data_transform}
 
             test_datasets.append(dlutils.ReconstructionDataset(**dataset_dict))
-        
+
         test_dataset = ConcatDataset(test_datasets)
 
         test_dataloader = DataLoader(test_dataset, 
@@ -350,7 +349,7 @@ class TrainerSystem():
                                 num_workers = self.num_workers)
 
         return train_dataloader, val_dataloader, test_dataloader
-    
+
     @staticmethod
     def rotate_list(lst, n, direction = 'backwards'):
         '''
@@ -368,7 +367,7 @@ class TrainerSystem():
         '''
         Train model based on Pytorch Lightning
         '''
-        
+
         # Create dataloaders
         train_dataloader, val_dataloader, test_dataloader = self.generate_K_folding_dataloader()
 
@@ -384,9 +383,9 @@ class TrainerSystem():
         self.model.log('k_fold', self.current_fold)
         # W&B logger
         # wandb.watch(self.model)
-        
+
         print(trainer.profiler.summary())
-        
+
         # Train model
         trainer.fit(model=self.model, 
                     train_dataloaders= train_dataloader,
@@ -395,7 +394,7 @@ class TrainerSystem():
         self.model.save_model(self.current_fold)
 
         del train_dataloader, val_dataloader, test_dataloader, self.model, trainer
-        
+
         self.wandb_logger.finalize('success')
 
         wandb.finish()
@@ -408,9 +407,9 @@ class TrainerSystem():
         assert(self.use_k_folding == True)
 
         for k_fold in range(self.k_fold_max):
-            
+
             if (self.restore_fold == True) and (self.acceleration_factor == self.acc_factor_restore) and (self.current_fold < self.fold_number_restore):
-                
+
                 print('Fold {} for acceleration factor x{} already done...'.format(self.current_fold, self.acceleration_factor))
                 self.reinitialize_logger()
                 # Create dataloaders
@@ -419,7 +418,7 @@ class TrainerSystem():
                 self.wandb_logger.finalize('success')
 
                 continue
-            
+
             self.reinitialize_logger()
             print('{} fold started...'.format(self.current_fold))
             self.train_model()
@@ -427,7 +426,3 @@ class TrainerSystem():
             self.wandb_logger.finalize('success')
             print('{} fold finished succesfully!'.format(self.current_fold))
             self.current_fold += 1
-        
-            
-
-        

@@ -21,19 +21,19 @@ from torch.utils.data import DataLoader, ConcatDataset
 def process_datasets(args_options):
 
     folder_paths = [
-        # "/home/nhattm/ToMoDL/datasets/DataOPT/140114_5dpf",
-        # "/home/nhattm/ToMoDL/datasets/DataOPT/140117_3dpf",
-        "/home/nhattm/ToMoDL/datasets/DataOPT/140315_1dpf",
-        "/home/nhattm/ToMoDL/datasets/DataOPT/140315_3dpf",
-        "/home/nhattm/ToMoDL/datasets/DataOPT/140415_5dpf_4X",
-        "/home/nhattm/ToMoDL/datasets/DataOPT/140519_5dpf",
-        "/home/nhattm/ToMoDL/datasets/DataOPT/140714_5dpf",
-        "/home/nhattm/ToMoDL/datasets/DataOPT/140827_3dpf_4x",
-        "/home/nhattm/ToMoDL/datasets/DataOPT/140827_5dpf_4x",
+        f"{where_am_i("datasets")}DataOPT/140114_5dpf",
+        f"{where_am_i("datasets")}DataOPT/140117_3dpf",
+        f"{where_am_i("datasets")}DataOPT/140315_1dpf",
+        f"{where_am_i("datasets")}DataOPT/140315_3dpf",
+        f"{where_am_i("datasets")}DataOPT/140415_5dpf_4X",
+        f"{where_am_i("datasets")}DataOPT/140519_5dpf",
+        f"{where_am_i("datasets")}DataOPT/140714_5dpf",
+        f"{where_am_i("datasets")}DataOPT/140827_3dpf_4x",
+        f"{where_am_i("datasets")}DataOPT/140827_5dpf_4x",
     ]
 
     zebra_dataset_dict = {
-        "dataset_folder": "/home/nhattm/ToMoDL/datasets/full_fish_256",
+        "dataset_folder": f"{where_am_i("datasets")}full_fish_256",
         "experiment_name": "Bassi",
         "img_resize": 256,
         "load_shifts": False,

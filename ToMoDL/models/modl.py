@@ -29,9 +29,10 @@ import matplotlib.pyplot as plt
 import numpy as np
 from . import unet
 
+device_id = 0
 try:
     # Modify for multi-gpu
-    device = torch.device("cuda:0" if use_torch_radon == True and torch.cuda.is_available() else "cpu")
+    device = torch.device(f"cuda:{device_id}" if use_torch_radon == True and torch.cuda.is_available() else "cpu")
 
 except:
     print("Torch not available!")
@@ -54,7 +55,9 @@ class dwLayer(nn.Module):
         super().__init__()
 
         self.process_kwdictionary(kw_dictionary)
-        self.conv = nn.Conv2d(*self.weights_size, padding=(int(self.weights_size[2] / 2), int(self.weights_size[2] / 2)))
+        self.conv = nn.Conv2d(
+            *self.weights_size, padding=(int(self.weights_size[2] / 2), int(self.weights_size[2] / 2))
+        )
 
         self.initialize_layer(method=self.init_method)
 
@@ -161,11 +164,17 @@ class dw(nn.Module):
         self.init_method = kw_dictionary["init_method"]
 
         # Intermediate layers (in_channels, out_channels, kernel_size_x, kernel_size_y)
-        self.weights_size = {key: (self.features, self.features, self.kernel_size, self.stride) for key in range(2, self.number_layers)}
+        self.weights_size = {
+            key: (self.features, self.features, self.kernel_size, self.stride) for key in range(2, self.number_layers)
+        }
         self.weights_size[1] = (self.in_channels, self.features, self.kernel_size, self.stride)
         self.weights_size[self.number_layers] = (self.features, self.out_channels, self.kernel_size, self.stride)
 
-        self.dw_layer_dict = {"use_batch_norm": self.use_batch_norm, "is_last_layer": False, "init_method": self.init_method}
+        self.dw_layer_dict = {
+            "use_batch_norm": self.use_batch_norm,
+            "is_last_layer": False,
+            "init_method": self.init_method,
+        }
 
 
 class Aclass:
@@ -209,12 +218,14 @@ class Aclass:
                 def backprojection(self, sinogram):
                     # Compute the backprojection of the sinogram
                     sinogram = sinogram.detach().numpy()
-                    reconstruction = iradon(sinogram, theta=np.linspace(0, 2 * 180, self.num_angles), circle=self.circle, filter_name=None)
+                    reconstruction = iradon(
+                        sinogram, theta=np.linspace(0, 2 * 180, self.num_angles), circle=self.circle, filter_name=None
+                    )
                     reconstruction = torch.tensor(reconstruction).to(device)
                     return reconstruction
 
             self.radon = Radon(self.number_projections, circle=False)
-    @torch.no_grad()
+
     def forward(self, img):
         """
         Applies the operator (A^H A + lam*I) to image, where A is the forward Radon transform.
@@ -230,6 +241,7 @@ class Aclass:
         sinogram = self.radon(img) / self.img_size
         iradon = self.radon.filter_backprojection(sinogram) * np.pi / self.number_projections
         output = iradon + self.lam * img
+        del sinogram
 
         # print('output forward: {} {}'.format(output.max(), output.min()))
         # print('Term z max {}, min {}'.format((iradon/self.lam).max(), (iradon/self.lam).min()))
@@ -386,7 +398,14 @@ class ToMoDL(nn.Module):
         elif self.denoiser_method == "resnet":
             self.resnet_options = kw_dictionary["resnet_options"]
 
-        self.AtA_dictionary = {"image_size": self.image_size, "number_projections": self.number_projections_total, "lambda": self.lam, "use_torch_radon": self.use_torch_radon, "use_scikit": self.use_scikit, "use_tomopy": self.use_tomopy}
+        self.AtA_dictionary = {
+            "image_size": self.image_size,
+            "number_projections": self.number_projections_total,
+            "lambda": self.lam,
+            "use_torch_radon": self.use_torch_radon,
+            "use_scikit": self.use_scikit,
+            "use_tomopy": self.use_tomopy,
+        }
 
         self.AtA = Aclass(self.AtA_dictionary)
 

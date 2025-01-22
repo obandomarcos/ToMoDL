@@ -278,7 +278,6 @@ class DatasetProcessor:
         print("Finished")
         self.registered_volume[sample] = np.moveaxis(self.registered_volume[sample], 0, -1)
 
-
     def write_dataset_reconstruction(self, sample):
         """
         Mask datasets in order to undersample sinograms, obtaining undersampled and full_y reconstruction datasets for training. Then saves images in folder
@@ -880,21 +879,19 @@ class ReconstructionDataset(Dataset):
         """
 
         unfiltered_us_rec = torch.load(
-            self.root_folder + self.us_unfilt_folder + str(index) + ".pt", map_location="cpu",
-            weights_only=True
+            self.root_folder + self.us_unfilt_folder + str(index) + ".pt", map_location="cpu", weights_only=True
         )
 
         unfiltered_us_rec = self.normalize_image(unfiltered_us_rec)
 
         filtered_us_rec = torch.load(
-            self.root_folder + self.us_filt_folder + str(index) + ".pt", map_location="cpu",
-            weights_only=True
+            self.root_folder + self.us_filt_folder + str(index) + ".pt", map_location="cpu", weights_only=True
         )
         filtered_us_rec = self.normalize_image(filtered_us_rec)
 
-
-        filtered_fs_rec = torch.load(self.root_folder + self.fs_filt_folder + str(index) + ".pt", map_location="cpu",
-                                     weights_only=True)
+        filtered_fs_rec = torch.load(
+            self.root_folder + self.fs_filt_folder + str(index) + ".pt", map_location="cpu", weights_only=True
+        )
         filtered_fs_rec = self.normalize_image(filtered_fs_rec)
         return (unfiltered_us_rec, filtered_us_rec, filtered_fs_rec)
 

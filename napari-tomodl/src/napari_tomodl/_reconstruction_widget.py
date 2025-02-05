@@ -45,6 +45,37 @@ def min_max_normalize(image):
     return (image - image.min()) / (image.max() - image.min())
 
 
+def flat_field_estimate(img, ratio_corners=0.03):
+
+    height, width = img.shape
+    # get corner size as 2% of the  dimension
+    corner_size = int(min(height, width) * ratio_corners)
+
+    # Extract the four corner regions (top-left, top-right, bottom-left, bottom-right)
+    top_left = img[:corner_size, :corner_size]
+    top_right = img[:corner_size, -corner_size:]
+    bottom_left = img[-corner_size:, :corner_size]
+    bottom_right = img[-corner_size:, -corner_size:]
+    middle_left = img[height // 2 - corner_size // 2 : height // 2 + corner_size // 2, :corner_size]
+    middle_right = img[height // 2 - corner_size // 2 : height // 2 + corner_size // 2, -corner_size:]
+    corner_means = np.array(
+        [
+            top_left.mean(),
+            top_right.mean(),
+            bottom_left.mean(),
+            bottom_right.mean(),
+            middle_left.mean(),
+            middle_right.mean(),
+        ]
+    )
+    valid_corners = corner_means[
+        (corner_means > np.percentile(corner_means, 10)) & (corner_means < np.percentile(corner_means, 90))
+    ]
+    flat_field_estimate = valid_corners.mean()
+
+    return flat_field_estimate
+
+
 # this thread is used to update the progress bar
 class BarThread(QThread):
     progressChanged = Signal(int)
@@ -114,7 +145,6 @@ class ReconstructionWidget(QWidget):
         self.createSettings(settings_layout)
 
     def createSettings(self, slayout):
-
         self.is_half_rotation = Settings(
             "Half-rotation", dtype=bool, initial=False, layout=slayout, write_function=self.set_opt_processor
         )
@@ -168,6 +198,9 @@ class ReconstructionWidget(QWidget):
         # self.lambda_modl = Settings(
         #     "Lambda_MODL", dtype=float, initial=0.7, layout=slayout, write_function=self.set_opt_processor
         # )
+        self.flat_correction = Settings(
+            "Flat-field correction", dtype=bool, initial=False, layout=slayout, write_function=self.set_opt_processor
+        )
         self.invert_color = Settings(
             "Invert colors", dtype=bool, initial=False, layout=slayout, write_function=self.set_opt_processor
         )
@@ -223,6 +256,8 @@ class ReconstructionWidget(QWidget):
         sinos = self.choose_layer_widget.image.value
 
         if sinos.data.ndim == 3 and sinos.data.shape[2] > 1:
+            self.flat_field = flat_field_estimate(sinos.data[0])
+            print(f"Flat-field estimate: {self.flat_field}")
             self.input_type = "3D"
             self.imageRaw_name = sinos.name
             sz, sy, sx = sinos.data.shape
@@ -280,6 +315,8 @@ class ReconstructionWidget(QWidget):
             else:
                 optVolume = np.zeros([original_size, original_size, self.h.Z], np.float32)
 
+            if self.flat_correction.val == True and self.input_type == "3D":
+                sinos = sinos / self.flat_field
             # Reconstruction process
             # if reconstructing only one slice
             if self.is_reconstruct_one.val == True and self.fullvolume.val == False and self.input_type == "3D":
@@ -381,16 +418,21 @@ class ReconstructionWidget(QWidget):
             optVolume = np.rollaxis(optVolume, -1)
             # convert resize volume to original size
             if self.reshapebox.val:
-                print("Resizing volume to original size")
                 optVolume_resized = np.zeros([self.h.Z, original_size, original_size], np.float32)
-                self.bar_thread.max = self.h.Z
-                for i in tqdm(range(optVolume.shape[0])):
-                    optVolume_resized[i] = cv2.resize(
-                        optVolume[i], (original_size, original_size), interpolation=cv2.INTER_LINEAR
+                print("Resizing volume to original size")
+                if self.fullvolume.val == False and self.is_reconstruct_one.val == True:
+                    optVolume_resized[self.slices.val] = cv2.resize(
+                        optVolume[self.slices.val], (original_size, original_size), interpolation=cv2.INTER_LINEAR
                     )
-                    self.bar_thread.value = i + 1
-                    self.bar_thread.run()
-
+                else:
+                    slices_resize = self.h.Z if self.fullvolume.val == True else self.slices.val
+                    self.bar_thread.max = slices_resize
+                    for i in tqdm(range(slices_resize)):
+                        optVolume_resized[i] = cv2.resize(
+                            optVolume[i], (original_size, original_size), interpolation=cv2.INTER_LINEAR
+                        )
+                        self.bar_thread.value = i + 1
+                        self.bar_thread.run()
                 optVolume = optVolume_resized
                 del optVolume_resized, sinos
 

@@ -64,7 +64,7 @@ def runs(testing_options):
         modl_dict = {
             "use_torch_radon": False,
             "metric": "psnr",
-            "K_iterations": 6,
+            "K_iterations": 4,
             "number_projections_total": 720,
             "acceleration_factor": 10,
             "image_size": image_size_train,
@@ -85,8 +85,8 @@ def runs(testing_options):
         }
 
         # Optimizer parameters
-        optimizer_dict = {"optimizer_name": "Adam+Tanh", "lr": 1e-4}
-        # optimizer_dict = {"optimizer_name": "NAdam", "lr": 5e-5}
+        # optimizer_dict = {"optimizer_name": "Adam+Tanh", "lr": 1e-4}
+        optimizer_dict = {"optimizer_name": "NAdam", "lr": 1e-5}
 
         # System parameters
         model_system_dict = {

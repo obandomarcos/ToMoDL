@@ -756,7 +756,7 @@ class OPTProcessor:
                 dict(filter(my_filtering_function, tomodl_checkpoint["state_dict"].items()))
             )
             self.iradon_functor.eval()
-
+            self.iradon_functor.lam = torch.nn.Parameter(torch.tensor([0.5], requires_grad=True, device=device))
             radon24 = radon_thrad(self.angles_torch, circle=self.clip_to_circle, filter_name=None, device=device)
 
             # the self.iradon_functor receive a reconstructed image (B, 1, Q, Q)

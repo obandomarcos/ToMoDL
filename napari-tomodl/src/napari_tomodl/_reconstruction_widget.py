@@ -45,6 +45,7 @@ def min_max_normalize(image):
     return (image - image.min()) / (image.max() - image.min())
 
 
+
 def flat_field_estimate(img, ratio_corners=0.03):
 
     height, width = img.shape
@@ -176,7 +177,7 @@ class ReconstructionWidget(QWidget):
         )
 
         self.iterations = Settings(
-            "ToMoDL iterations", dtype=int, initial=8, layout=slayout, write_function=self.set_opt_processor
+            "ToMoDL iterations", dtype=int, initial=6, layout=slayout, write_function=self.set_opt_processor
         )
 
         self.clipcirclebox = Settings(

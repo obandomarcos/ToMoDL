@@ -62,9 +62,9 @@ def runs(testing_options):
 
         # Model parameters
         modl_dict = {
-            "use_torch_radon": False,
+            "use_torch_radon": True,
             "metric": "psnr",
-            "K_iterations": 4,
+            "K_iterations": 6,
             "number_projections_total": 720,
             "acceleration_factor": 10,
             "image_size": image_size_train,

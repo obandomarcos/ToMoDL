@@ -487,7 +487,7 @@ class OPTProcessor:
         self.init_volume_rec = False
         self.iradon_functor = None
         self.invert_color = False
-        self.iterations = 8
+        self.iterations = 6
         self.set_reconstruction_process()
 
     def set_reconstruction_process(self):
@@ -756,7 +756,9 @@ class OPTProcessor:
                 dict(filter(my_filtering_function, tomodl_checkpoint["state_dict"].items()))
             )
             self.iradon_functor.eval()
-            self.iradon_functor.lam = torch.nn.Parameter(torch.tensor([0.5], requires_grad=True, device=device))
+            # print(sinogram.shape)
+            # print("lamdba is: ", self.iradon_functor.lam)
+            # self.iradon_functor.lam = torch.nn.Parameter(torch.tensor([0.2], requires_grad=True, device=device))
             radon24 = radon_thrad(self.angles_torch, circle=self.clip_to_circle, filter_name=None, device=device)
 
             # the self.iradon_functor receive a reconstructed image (B, 1, Q, Q)
@@ -769,6 +771,7 @@ class OPTProcessor:
                     output = self.iradon_functor(reconstruction)[
                         "dc" + str(self.tomodl_dictionary["K_iterations"])
                     ].cpu()
+                    output = normalize_images(output)
                     output = np.asarray(output.numpy())
                     return output.transpose(1, 2, 3, 0)[0]
 
@@ -806,7 +809,7 @@ class OPTProcessor:
 
             self.iradon_functor = ToMoDL(self.tomodl_dictionary)
             __location__ = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)))
-            artifact_path = os.path.join(__location__, "model.ckpt")
+            artifact_path = os.path.join(__location__, "model256_1.ckpt")
             tomodl_checkpoint = torch.load(artifact_path, map_location=torch.device("cpu"))
 
             tomodl_checkpoint["state_dict"] = {

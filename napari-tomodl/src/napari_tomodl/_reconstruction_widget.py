@@ -318,6 +318,7 @@ class ReconstructionWidget(QWidget):
 
             if self.flat_correction.val == True and self.input_type == "3D":
                 sinos = sinos / self.flat_field
+            print(sinos.min(), sinos.max())
             # Reconstruction process
             # if reconstructing only one slice
             if self.is_reconstruct_one.val == True and self.fullvolume.val == False and self.input_type == "3D":

@@ -745,7 +745,7 @@ class OPTProcessor:
             self.iradon_functor = ToMoDL(self.tomodl_dictionary)
 
             __location__ = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)))
-            artifact_path = os.path.join(__location__, "model.ckpt")
+            artifact_path = os.path.join(__location__, "model256_1.ckpt")
             tomodl_checkpoint = torch.load(artifact_path, map_location=torch.device("cuda:0"))
 
             tomodl_checkpoint["state_dict"] = {
@@ -771,7 +771,8 @@ class OPTProcessor:
                     output = self.iradon_functor(reconstruction)[
                         "dc" + str(self.tomodl_dictionary["K_iterations"])
                     ].cpu()
-                    output = normalize_images(output)
+                    # output = normalize_images(output)
+                    # output = normalize_image_std(output)
                     output = np.asarray(output.numpy())
                     return output.transpose(1, 2, 3, 0)[0]
 
@@ -823,6 +824,7 @@ class OPTProcessor:
 
             def _iradon(sino):
                 with torch.inference_mode():
+
                     sino = iradon_scikit(sino[..., 0], self.angles, circle=self.clip_to_circle, filter_name=None)
                     sino = torch.Tensor(sino[None, None])
                     reconstruction = self.iradon_functor(sino)["dc" + str(self.tomodl_dictionary["K_iterations"])]

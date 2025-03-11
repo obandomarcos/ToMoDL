@@ -1,12 +1,11 @@
 import numpy as np
-import k3d
 
 # impoer resize 3D image
 import tifffile as tiff
 import glob
 import tqdm
 from natsort import natsorted
-
+import os
 from skimage.exposure import match_histograms
 from skimage.transform import resize
 
@@ -46,14 +45,21 @@ def flat_field_estimate(img, ratio_corners=0.03):
     return flat_field_estimate
 
 
+from skimage import exposure
+
 ctf3 = natsorted(glob.glob("datasets/ctf3/*.tif"))
+os.makedirs("datasets/stitched_2X_acc10x_vs2", exist_ok=True)
 for image_path1 in tqdm.tqdm(ctf3[::10]):
     image1 = tiff.imread(image_path1)
     image2 = tiff.imread(image_path1.replace("ctf3", "ctf2"))
     image3 = tiff.imread(image_path1.replace("ctf3", "ctf1"))
-
+    # increase the contrast by skimage
+    # image1 = exposure.equalize_adapthist(image1, clip_limit=0.03)
+    # image2 = exposure.equalize_adapthist(image2, clip_limit=0.03)
+    # image3 = exposure.equalize_adapthist(image3, clip_limit=0.03)
     image2 = match_histograms(image2, image1, channel_axis=-1)
     image3 = match_histograms(image3, image1, channel_axis=-1)
+
     y_offset = 0
     img_height = image1.shape[0]
     stitched_image = np.zeros((img_height * 3, image1.shape[1]))
@@ -69,13 +75,17 @@ for image_path1 in tqdm.tqdm(ctf3[::10]):
         if i == 1:
             y_offset += img_height - y
 
-    stitched_image = stitched_image[100 : -x - y - 450, :]
-    stitched_image = stitched_image / flat_field_estimate(stitched_image)
+    stitched_image = stitched_image[80 : -x - y - 450, :]
+    # stitched_image = stitched_image / flat_field_estimate(stitched_image)
+
     # downscale the image to 1/2
     stitched_image = resize(
         stitched_image, (stitched_image.shape[0] // 2, stitched_image.shape[1] // 2), anti_aliasing=True
     )
     stitched_image = normalize_01(stitched_image)
+    stitched_image = exposure.equalize_adapthist(stitched_image, clip_limit=0.03)
+    stitched_image = stitched_image.max() - stitched_image
+
     # convert to 16 bit
     stitched_image = (stitched_image * 65535).astype(np.uint16, copy=False)
-    tiff.imsave(image_path1.replace("ctf3", "stitched_2X_acc10x"), stitched_image)
+    tiff.imsave(image_path1.replace("ctf3", "stitched_2X_acc10x_vs2"), stitched_image)

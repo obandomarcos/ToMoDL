@@ -33,14 +33,14 @@ resnet_options_dict = {
     "init_method": "xavier",
     "device": device,
 }
-labmda = 7.0
+labmda = 0.5
 tomodl_dictionary = {
     "use_torch_radon": True,
     "metric": "psnr",
-    "K_iterations": 8,
+    "K_iterations": 6,
     "number_projections_total": 100,
     "acceleration_factor": 20,
-    "image_size": 100,
+    "image_size": 256,
     "lambda": labmda,
     "use_shared_weights": True,
     "denoiser_method": "resnet",
@@ -55,18 +55,17 @@ model_tomodl = ToMoDL(tomodl_dictionary)
 
 # __location__ = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)))
 # artifact_path = os.path.join(__location__, "model.ckpt")
-artifact_path = "./napari-tomodl/src/napari_tomodl/processors/model.ckpt"
+artifact_path = "napari-tomodl/src/napari_tomodl/processors/model256_lambda0.4.ckpt"
 tomodl_checkpoint = torch.load(artifact_path, map_location=torch.device("cuda:0"))
 
-tomodl_checkpoint["state_dict"] = {k.replace("model.", ""): v for (k, v) in tomodl_checkpoint["state_dict"].items()}
-
-model_tomodl.load_state_dict(dict(filter(my_filtering_function, tomodl_checkpoint["state_dict"].items())))
-model_tomodl.eval()
-model_tomodl.lam = torch.nn.Parameter(torch.tensor([labmda], requires_grad=True, device=device))
-
+tomodl_checkpoint["state_dict"] = {k.replace("model.", ""): v for k, v in tomodl_checkpoint["state_dict"].items()}
+# tomodl_checkpoint["state_dict"] = dict(filter(my_filtering_function, tomodl_checkpoint["state_dict"].items()))
+model_tomodl.load_state_dict(tomodl_checkpoint["state_dict"], strict=False)
+# model_tomodl.lam = torch.nn.Parameter(torch.tensor([labmda], requires_grad=True, device=device))
+print(model_tomodl.lam)
 # Load dataset
 dataset_dict = {
-    "root_folder": "datasets/x20/140114_5dpf_body_20",  # In our case, datasets/x20/140114_5dpf_body_20
+    "root_folder": "datasets/full_fish_256/x20/140114_5dpf_body_20",  # In our case, datasets/x20/140114_5dpf_body_20
     "acceleration_factor": 20,
     "transform": None,
 }

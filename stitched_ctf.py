@@ -48,8 +48,8 @@ def flat_field_estimate(img, ratio_corners=0.03):
 from skimage import exposure
 
 ctf3 = natsorted(glob.glob("datasets/ctf3/*.tif"))
-os.makedirs("datasets/stitched_2X_acc10x_vs2", exist_ok=True)
-for image_path1 in tqdm.tqdm(ctf3[::10]):
+os.makedirs("datasets/stitched_2X_acc5x_vs2", exist_ok=True)
+for image_path1 in tqdm.tqdm(ctf3[::5]):
     image1 = tiff.imread(image_path1)
     image2 = tiff.imread(image_path1.replace("ctf3", "ctf2"))
     image3 = tiff.imread(image_path1.replace("ctf3", "ctf1"))
@@ -88,4 +88,4 @@ for image_path1 in tqdm.tqdm(ctf3[::10]):
 
     # convert to 16 bit
     stitched_image = (stitched_image * 65535).astype(np.uint16, copy=False)
-    tiff.imsave(image_path1.replace("ctf3", "stitched_2X_acc10x_vs2"), stitched_image)
+    tiff.imsave(image_path1.replace("ctf3", "stitched_2X_acc5x_vs2"), stitched_image)

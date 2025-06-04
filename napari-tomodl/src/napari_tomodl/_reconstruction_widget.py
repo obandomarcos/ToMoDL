@@ -9,7 +9,7 @@ from .processors.OPTProcessor import OPTProcessor
 from .widget_settings import Settings, Combo_box
 import gc
 import torch
-
+import tifffile as tif
 # import processors
 import napari
 from qtpy.QtWidgets import (
@@ -43,7 +43,6 @@ import numpy as np
 
 def min_max_normalize(image):
     return (image - image.min()) / (image.max() - image.min())
-
 
 
 def flat_field_estimate(img, ratio_corners=0.03):
@@ -318,7 +317,8 @@ class ReconstructionWidget(QWidget):
 
             if self.flat_correction.val == True and self.input_type == "3D":
                 sinos = sinos / self.flat_field
-            print(sinos.min(), sinos.max())
+
+            # sinos = min_max_normalize(sinos)
             # Reconstruction process
             # if reconstructing only one slice
             if self.is_reconstruct_one.val == True and self.fullvolume.val == False and self.input_type == "3D":
@@ -373,13 +373,25 @@ class ReconstructionWidget(QWidget):
                         sinos[:, :, zidx] = min_max_normalize(sinos[:, :, zidx])
 
                     else:
-                        sinos[:, :, zidx] = min_max_normalize(sinos[:, :, zidx])
+
+                        # sinos[:, :, zidx] = min_max_normalize(sinos[:, :, zidx])
+
                         if self.orderbox.val == 0:
                             optVolume[:, :, zidx] = self.h.reconstruct(sinos[:, :, zidx].transpose(1, 0, 2))
+                            # save optVolume slice to see
+                            # apply threshold to the image to make background black
+                            # tif_image = optVolume[:, :, zidx]
+                            # flat_field_estimate_tif = flat_field_estimate(tif_image[..., 0])
+                            # percentile = 2
 
+                            # tif_image = np.where(tif_image < flat_field_estimate_tif, 0, tif_image)
+                            # # tif_image = np.where(tif_image > np.percentile(tif_image, 99), 1, tif_image)
+                            # optVolume[:, :, zidx] = tif_image
+                            # tif.imwrite(f"optVolume_slice_{zidx}.tif", tif_image)
+                            # tif.imwrite("optVolume_slice.tif", optVolume[:, :, zidx])
                         elif self.orderbox.val == 1:
                             optVolume[:, :, zidx] = self.h.reconstruct(sinos[:, :, zidx])
-                        sinos[:, :, zidx] = min_max_normalize(sinos[:, :, zidx])
+                        # sinos[:, :, zidx] = min_max_normalize(sinos[:, :, zidx])
 
                 ####################### 2D reconstruction ############################
                 elif self.input_type == "2D":
@@ -450,6 +462,7 @@ class ReconstructionWidget(QWidget):
             optVolume = optVolume.astype(np.uint16, copy=False)
             print("done converting to uint16")
             if self.is_reconstruct_one.val == True and self.fullvolume.val == False and self.input_type == "3D":
+
                 return optVolume[self.slices.val]
             elif self.input_type == "3D":
                 return optVolume

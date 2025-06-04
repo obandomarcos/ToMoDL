@@ -42,6 +42,10 @@ from . import unet
 # Modify for multi-gpu
 device = torch.device("cuda:0" if use_torch_radon == True else "cpu")
 
+def min_max_normalize_save_factor(image):
+    new_image = (image - image.min()) / (image.max() - image.min())
+    min_image, max_image = image.min(), image.max()
+    return new_image, min_image, max_image
 
 class dwLayer(nn.Module):
     """
@@ -354,7 +358,7 @@ class ToMoDL(nn.Module):
         self.image_size = kw_dictionary["image_size"]
 
         self.lam = kw_dictionary["lambda"]
-        self.lam = torch.nn.Parameter(torch.tensor([self.lam], requires_grad=True, device=self.device))
+        self.lam = torch.nn.Parameter(torch.tensor([self.lam], requires_grad=False, device=self.device))
 
         self.use_shared_weights = kw_dictionary["use_shared_weights"]
         self.denoiser_method = kw_dictionary["denoiser_method"]
@@ -699,6 +703,7 @@ class OPTProcessor:
                 sino = torch.from_numpy(sino[:, None, :, :]).to(device)
                 reconstruction = self.iradon_functor.filter_backprojection(sino).permute(1, 2, 3, 0)[0].cpu()
                 reconstruction = np.asarray(reconstruction.numpy())
+                print("reconstruction min, max: ", reconstruction.min(), reconstruction.max())
                 return reconstruction
 
             self.iradon_function = _iradon
@@ -732,7 +737,7 @@ class OPTProcessor:
                 "number_projections_total": sinogram.shape[0],
                 "acceleration_factor": 10,
                 "image_size": sinogram.shape[1],
-                "lambda": 0.7170,
+                "lambda": 0.5,
                 "use_shared_weights": True,
                 "denoiser_method": "resnet",
                 "resnet_options": resnet_options_dict,
@@ -745,21 +750,33 @@ class OPTProcessor:
             self.iradon_functor = ToMoDL(self.tomodl_dictionary)
 
             __location__ = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)))
-            artifact_path = os.path.join(__location__, "model256_1.ckpt")
+            artifact_path = os.path.join(__location__, "model100_dark3.ckpt")
             tomodl_checkpoint = torch.load(artifact_path, map_location=torch.device("cuda:0"))
 
-            tomodl_checkpoint["state_dict"] = {
-                k.replace("model.", ""): v for (k, v) in tomodl_checkpoint["state_dict"].items()
-            }
+            ########################### old weight loading ############################
+            # tomodl_checkpoint["state_dict"] = {
+            #     k.replace("model.", ""): v for (k, v) in tomodl_checkpoint["state_dict"].items()
+            # }
 
-            self.iradon_functor.load_state_dict(
-                dict(filter(my_filtering_function, tomodl_checkpoint["state_dict"].items()))
-            )
+            # self.iradon_functor.load_state_dict(
+            #     dict(filter(my_filtering_function, tomodl_checkpoint["state_dict"].items()))
+            # )
+            ############################# fix lambda weight loading ############################
+            tomodl_checkpoint["state_dict"] = {
+                k.replace("model.", ""): v for k, v in tomodl_checkpoint["state_dict"].items()
+            }
+            # tomodl_checkpoint["state_dict"] = dict(filter(my_filtering_function, tomodl_checkpoint["state_dict"].items()))
+            self.iradon_functor.load_state_dict(tomodl_checkpoint["state_dict"], strict=False)
             self.iradon_functor.eval()
             # print(sinogram.shape)
-            # print("lamdba is: ", self.iradon_functor.lam)
-            # self.iradon_functor.lam = torch.nn.Parameter(torch.tensor([0.2], requires_grad=True, device=device))
+            #######################################################################################
+
+            self.iradon_functor.lam = torch.nn.Parameter(torch.tensor([0.2], requires_grad=False, device=device))
+            print("lamdba is: ", self.iradon_functor.lam)
+
             radon24 = radon_thrad(self.angles_torch, circle=self.clip_to_circle, filter_name=None, device=device)
+            # radon24_2 = radon_thrad(self.angles_torch, circle=self.clip_to_circle, filter_name="ramp", device=device)
+            # print("lamdba is: ", self.iradon_functor.lam)
 
             # the self.iradon_functor receive a reconstructed image (B, 1, Q, Q)
             # the input is a sinogram (B, 1, Q, theta)
@@ -768,12 +785,24 @@ class OPTProcessor:
                     sino = sino.transpose(2, 0, 1)
                     sino = torch.from_numpy(sino[:, None, :, :]).to(device)
                     reconstruction = radon24.filter_backprojection(sino)
+                    print("reconstruction min, max: ", reconstruction.min(), reconstruction.max())
+                    reconstruction, min_original, max_original = min_max_normalize_save_factor(reconstruction)
                     output = self.iradon_functor(reconstruction)[
                         "dc" + str(self.tomodl_dictionary["K_iterations"])
                     ].cpu()
-                    # output = normalize_images(output)
-                    # output = normalize_image_std(output)
+                    # output shape (B, 1, Q, Q)
                     output = np.asarray(output.numpy())
+                    
+                    # # radon forward
+                    # output = output.to(device)
+                    # sino_forward = radon24_2(output)
+                    # output2 = radon24_2.filter_backprojection(sino_forward)
+                    # output2 = np.asarray(output2.cpu().numpy())
+                    # turn min_original and max_original to numpy array
+                    min_original = min_original.detach().cpu().numpy()
+                    max_original = max_original.detach().cpu().numpy()
+                    # unnormalize the output
+                    output= output * (max_original - min_original) + min_original
                     return output.transpose(1, 2, 3, 0)[0]
 
             self.iradon_function = _iradon

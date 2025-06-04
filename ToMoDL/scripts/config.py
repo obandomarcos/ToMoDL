@@ -40,4 +40,4 @@ def where_am_i(path=None):
         sys.exit(0)
 
 
-# where_am_i()
+print(where_am_i("datasets"))

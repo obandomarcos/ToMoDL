@@ -172,8 +172,9 @@ class DatasetProcessor:
             time = re.compile("t\d+")
 
             for f in tqdm(load_list):
-
-                load_images.append(np.array(Image.open(f)))
+                image = np.array(Image.open(f))
+                image = image.max() - image #### invert image for vs2
+                load_images.append(image)
                 loaded_angles.append(float(angle.findall(str(f))[0][1:]))
                 loaded_sample.append(float(sample_re.findall(str(f))[0][1:]))
                 loaded_channel.append(float(channel.findall(str(f))[0][1:]))
@@ -221,7 +222,6 @@ class DatasetProcessor:
 
             # Grab top and bottom sinograms (automate to grab non-empty sinograms)
             top_index, bottom_index = self._grab_image_indexes(sample=sample)
-
             self.top_sino = np.copy(self.registered_volume[sample][:, :, top_index].T)
             self.bottom_sino = np.copy(self.registered_volume[sample][:, :, bottom_index].T)
             self.angles = np.linspace(0, 2 * 180, self.top_sino.shape[1], endpoint=False)
@@ -399,11 +399,16 @@ class DatasetProcessor:
         img_max = self.registered_volume[sample].min(axis=0)
         img_max = (((img_max - img_max.min()) / (img_max.max() - img_max.min())) * 255.0).astype(np.uint8)
         img_max = ndi.gaussian_filter(img_max, (11, 11))
-
-        top_index, bottom_index = (
-            np.where(img_max.std(axis=0) > threshold)[0][0],
-            np.where(img_max.std(axis=0) > threshold)[0][-1],
-        )
+        indexes = np.where(img_max.std(axis=0) > threshold)[0]
+        if len(indexes) == 0:
+            return 0, 0
+        elif len(indexes) == 1:
+            return indexes[0], indexes[0]
+        else:
+            top_index, bottom_index = (
+                indexes[0],
+                indexes[-1],
+            )
 
         print("Top index:", top_index)
         print("Bottom index:", bottom_index)

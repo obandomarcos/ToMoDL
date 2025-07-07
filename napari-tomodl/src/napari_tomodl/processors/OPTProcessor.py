@@ -12,7 +12,7 @@ from skimage.transform import radon as radon_scikit
 from skimage.transform import iradon as iradon_scikit
 from skimage.transform import resize as resize_scikit
 import torch
-
+import tifffile as tif
 # from .modl import ToMoDL
 
 from .unet import UNet
@@ -47,6 +47,31 @@ def min_max_normalize_save_factor(image):
     min_image, max_image = image.min(), image.max()
     return new_image, min_image, max_image
 
+def ramp_filter_torch(sinogram, device="cpu"):
+    """
+    Apply ramp filter to a batched sinogram tensor: [B, 1, D, A]
+    Returns: filtered sinogram of same shape
+    """
+    B, C, D, A = sinogram.shape
+    n = int(2 ** torch.ceil(torch.log2(torch.tensor(D, dtype=torch.float32))))  # padded size
+    freqs = torch.fft.fftfreq(n, device=device).abs()  # [n]
+    ramp = 2 * freqs  # [n]
+
+    # Pad detector axis (dim=2)
+    pad_size = n - D
+    sino_padded = torch.nn.functional.pad(sinogram, (0, 0, 0, pad_size))  # [B, 1, n, A]
+
+    # FFT along detector axis
+    sino_fft = torch.fft.fft(sino_padded, dim=2)
+
+    # Apply ramp filter
+    ramp = ramp.view(1, 1, -1, 1)  # reshape for broadcasting
+    filtered_fft = sino_fft * ramp.to(sinogram.device)
+
+    # Inverse FFT and crop back to original detector size
+    filtered_sino = torch.real(torch.fft.ifft(filtered_fft, dim=2))[:, :, :D, :]
+
+    return filtered_sino
 class dwLayer(nn.Module):
     """
     Creates denoiser singular layer
@@ -87,7 +112,9 @@ class dwLayer(nn.Module):
 
         if self.is_last_layer != True:
 
-            output = F.relu(output)
+            # output = F.relu(output)
+            # use swish activation function
+            output = F.silu(output)
 
         return output
 
@@ -203,7 +230,12 @@ class Aclass:
         self.lam = kw_dictionary["lambda"]
         self.use_torch_radon = kw_dictionary["use_torch_radon"]
         self.use_scikit = kw_dictionary["use_scikit"]
-        self.angles = np.linspace(0, 2 * np.pi, self.number_projections, endpoint=False)
+
+        self.is_half_rotation = kw_dictionary["is_half_rotation"]
+        if self.is_half_rotation == True:
+            self.angles = np.linspace(0, np.pi, self.number_projections, endpoint=False)
+        else:
+            self.angles = np.linspace(0, 2 * np.pi, self.number_projections, endpoint=False)
         self.det_count = int(np.ceil(np.sqrt(2) * self.img_size))
         self.device = kw_dictionary["device"]
         self.iter_conjugate = kw_dictionary["iter_conjugate"]
@@ -323,17 +355,25 @@ class ToMoDL(nn.Module):
             - x (torch.Tensor) : Backprojected sinogram, in image space
         """
 
-        self.out["dc0"] = normalize_images(x)
+        self.out["dc0"] = x
 
+        # for i in range(1, self.K + 1):
+
+        #     j = str(i)
+
+        #     self.out["dw" + j] = normalize_images(self.dw.forward(self.out["dc" + str(i - 1)]))
+        #     rhs = self.out["dc0"] / self.lam + self.out["dw" + j]
+
+        #     self.out["dc" + j] = normalize_images(self.AtA.inverse(rhs))
+
+        #     del rhs
+        ############################### version 2 #######################################
         for i in range(1, self.K + 1):
-
             j = str(i)
+            self.out["dw" + j] = self.dw.forward(self.out["dc" + str(i - 1)])
+            rhs = x / self.lam + self.out["dw" + j]
 
-            self.out["dw" + j] = normalize_images(self.dw.forward(self.out["dc" + str(i - 1)]))
-            rhs = self.out["dc0"] / self.lam + self.out["dw" + j]
-
-            self.out["dc" + j] = normalize_images(self.AtA.inverse(rhs))
-
+            self.out["dc" + j] = self.AtA.inverse(rhs)
             del rhs
 
         return self.out
@@ -379,6 +419,7 @@ class ToMoDL(nn.Module):
             "use_tomopy": self.use_tomopy,
             "device": self.device,
             "iter_conjugate": self.iter_conjugate,
+            "is_half_rotation": kw_dictionary["is_half_rotation"],
         }
 
         self.AtA = Aclass(self.AtA_dictionary)
@@ -417,10 +458,24 @@ def normalize_images(images):
 
         # print(image.max())
         image = (image - image.mean()) / image.std()
-        image_norm[i, ...] = (image - image.min()) / (image.max() - image.min())
+        # image_norm[i, ...] = (image - image.min()) / (image.max() - image.min())
+        image_norm[i, ...] = image
+
 
     return image_norm
 
+def normalize_images_11(images):
+    """
+    Normalizes images between -1 and 1.
+    Params:
+     - images (torch.Tensor): Tensor of 1-channel images
+    """
+    image_norm = torch.zeros_like(images)
+    for i, image in enumerate(images):
+
+        image_norm[i, ...] = (image - image.min()) / (image.max() - image.min()) * 2 - 1
+
+    return image_norm
 
 """
 Process sinograms in 2D
@@ -703,7 +758,9 @@ class OPTProcessor:
                 sino = torch.from_numpy(sino[:, None, :, :]).to(device)
                 reconstruction = self.iradon_functor.filter_backprojection(sino).permute(1, 2, 3, 0)[0].cpu()
                 reconstruction = np.asarray(reconstruction.numpy())
-                print("reconstruction min, max: ", reconstruction.min(), reconstruction.max())
+
+                # save reconstruction to tif file
+                # tif.imwrite("reconstruction_FBP_GPU.tif", reconstruction)
                 return reconstruction
 
             self.iradon_function = _iradon
@@ -738,6 +795,7 @@ class OPTProcessor:
                 "acceleration_factor": 10,
                 "image_size": sinogram.shape[1],
                 "lambda": 0.5,
+                "is_half_rotation": self.is_half_rotation,
                 "use_shared_weights": True,
                 "denoiser_method": "resnet",
                 "resnet_options": resnet_options_dict,
@@ -750,7 +808,8 @@ class OPTProcessor:
             self.iradon_functor = ToMoDL(self.tomodl_dictionary)
 
             __location__ = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)))
-            artifact_path = os.path.join(__location__, "model100_dark3.ckpt")
+            # artifact_path = os.path.join(__location__, "modl_dark_unnormal.ckpt")
+            artifact_path = os.path.join(__location__, "modl100_vs2_lam0.67.ckpt")
             tomodl_checkpoint = torch.load(artifact_path, map_location=torch.device("cuda:0"))
 
             ########################### old weight loading ############################
@@ -771,11 +830,11 @@ class OPTProcessor:
             # print(sinogram.shape)
             #######################################################################################
 
-            self.iradon_functor.lam = torch.nn.Parameter(torch.tensor([0.2], requires_grad=False, device=device))
+            # self.iradon_functor.lam = torch.nn.Parameter(torch.tensor([0.5], requires_grad=False, device=device))
             print("lamdba is: ", self.iradon_functor.lam)
 
             radon24 = radon_thrad(self.angles_torch, circle=self.clip_to_circle, filter_name=None, device=device)
-            # radon24_2 = radon_thrad(self.angles_torch, circle=self.clip_to_circle, filter_name="ramp", device=device)
+            # radon24_filter = radon_thrad(self.angles_torch, circle=self.clip_to_circle, filter_name="ramp", device=device)
             # print("lamdba is: ", self.iradon_functor.lam)
 
             # the self.iradon_functor receive a reconstructed image (B, 1, Q, Q)
@@ -784,26 +843,24 @@ class OPTProcessor:
                 with torch.inference_mode():
                     sino = sino.transpose(2, 0, 1)
                     sino = torch.from_numpy(sino[:, None, :, :]).to(device)
+                    sino = ramp_filter_torch(sino, device=device)
                     reconstruction = radon24.filter_backprojection(sino)
-                    print("reconstruction min, max: ", reconstruction.min(), reconstruction.max())
-                    reconstruction, min_original, max_original = min_max_normalize_save_factor(reconstruction)
+                    # reconstruction_filter = radon24_filter.filter_backprojection(sino)
+
+                    # min_original, max_original = reconstruction.min(), reconstruction.max()
+                    # save reconstruction to tif file
+                    
+                    reconstruction = normalize_images(reconstruction)
                     output = self.iradon_functor(reconstruction)[
                         "dc" + str(self.tomodl_dictionary["K_iterations"])
                     ].cpu()
+                    output = normalize_images(output)
                     # output shape (B, 1, Q, Q)
                     output = np.asarray(output.numpy())
-                    
-                    # # radon forward
-                    # output = output.to(device)
-                    # sino_forward = radon24_2(output)
-                    # output2 = radon24_2.filter_backprojection(sino_forward)
-                    # output2 = np.asarray(output2.cpu().numpy())
-                    # turn min_original and max_original to numpy array
-                    min_original = min_original.detach().cpu().numpy()
-                    max_original = max_original.detach().cpu().numpy()
-                    # unnormalize the output
-                    output= output * (max_original - min_original) + min_original
-                    return output.transpose(1, 2, 3, 0)[0]
+                    output = output.transpose(1, 2, 3, 0)[0]
+
+
+                    return output
 
             self.iradon_function = _iradon
 

@@ -102,7 +102,7 @@ class TrainerSystem:
         if self.track_checkpoints == True:
 
             # Default checkpoints
-            val_psnr_checkpoint_callback = ModelCheckpoint(monitor="val_psnr", mode="max")
+            val_psnr_checkpoint_callback = ModelCheckpoint(monitor="val_psnr", mode="max", save_last=True)
             val_ssim_checkpoint_callback = ModelCheckpoint(monitor="val/ssim", mode="max")
 
             self.lightning_trainer_dict["callbacks"] += [val_psnr_checkpoint_callback, val_ssim_checkpoint_callback]

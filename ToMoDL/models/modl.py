@@ -78,7 +78,9 @@ class dwLayer(nn.Module):
 
         if self.is_last_layer != True:
 
-            output = F.relu(output)
+            # output = F.relu(output)
+            # use swish activation function
+            output = F.silu(output)
 
         return output
 
@@ -357,14 +359,24 @@ class ToMoDL(nn.Module):
         for i in range(1, self.K + 1):
 
             j = str(i)
-
+            
             self.out["dw" + j] = normalize_images(self.dw.forward(self.out["dc" + str(i - 1)]))
             rhs = x / self.lam + self.out["dw" + j]
 
             self.out["dc" + j] = normalize_images(self.AtA.inverse(rhs))
 
             del rhs
+        
+        ###############333 version 2 #######################################33
+        # for i in range(1, self.K + 1):
+        #     j = str(i)
+        #     self.out["dw" + j] = self.dw.forward(self.out["dc" + str(i - 1)])
+        #     rhs = x / self.lam + self.out["dw" + j]
 
+        #     self.out["dc" + j] = self.AtA.inverse(rhs)
+        #     del rhs
+        
+        #####################################################################################
         return self.out
 
     def process_kwdictionary(self, kw_dictionary):
@@ -442,6 +454,9 @@ def normalize_images(images):
     for i, image in enumerate(images):
         # print(image.max())
         image = (image - image.mean()) / image.std()
-        image_norm[i, ...] = (image - image.min()) / (image.max() - image.min())
+        # image_norm[i, ...] = (image - image.min()) / (image.max() - image.min())
+        # test  normalize image to be between -1 and 1
+        # image_norm[i, ...] = (image - image.min()) / (image.max() - image.min()) * 2 - 1
+        image_norm[i, ...] = image
 
     return image_norm

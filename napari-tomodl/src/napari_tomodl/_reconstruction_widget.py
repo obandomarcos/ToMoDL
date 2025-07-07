@@ -379,13 +379,6 @@ class ReconstructionWidget(QWidget):
                         if self.orderbox.val == 0:
                             optVolume[:, :, zidx] = self.h.reconstruct(sinos[:, :, zidx].transpose(1, 0, 2))
                             # save optVolume slice to see
-                            # apply threshold to the image to make background black
-                            # tif_image = optVolume[:, :, zidx]
-                            # flat_field_estimate_tif = flat_field_estimate(tif_image[..., 0])
-                            # percentile = 2
-
-                            # tif_image = np.where(tif_image < flat_field_estimate_tif, 0, tif_image)
-                            # # tif_image = np.where(tif_image > np.percentile(tif_image, 99), 1, tif_image)
                             # optVolume[:, :, zidx] = tif_image
                             # tif.imwrite(f"optVolume_slice_{zidx}.tif", tif_image)
                             # tif.imwrite("optVolume_slice.tif", optVolume[:, :, zidx])
@@ -455,6 +448,8 @@ class ReconstructionWidget(QWidget):
             self.bar_thread.quit()
             min_val = optVolume.min()
             max_val = optVolume.max()
+            # save optVolume to tif file
+            tif.imwrite("optVolume_FBP_GPU.tif", optVolume)
             print("min: ", min_val, "max: ", max_val)
             # convert to uint16
             optVolume = (optVolume - min_val) / (max_val - min_val) * (2**16 - 1)

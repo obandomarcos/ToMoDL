@@ -28,6 +28,8 @@ from lightning.pytorch.loggers import WandbLogger
 
 from torchvision import transforms as T
 from pytorch_msssim import SSIM
+from torchmetrics.image import PeakSignalNoiseRatio as PSNR
+
 
 # from torchmetrics import StructuralSimilarityIndexMeasure as SSIM
 from torchmetrics.image import MultiScaleStructuralSimilarityIndexMeasure as MSSSIM
@@ -40,7 +42,7 @@ use_default_model_dict = True
 use_default_dataloader_dict = True
 use_default_trainer_dict = True
 device_id = 0
-max_epochs = 30
+max_epochs = 50
 image_size_train = 100
 print(where_am_i("datasets"))
 
@@ -66,9 +68,9 @@ def runs(testing_options):
             "metric": "psnr",
             "K_iterations": 6,
             "number_projections_total": 720,
-            "acceleration_factor": 10,
+            "acceleration_factor": 20,
             "image_size": image_size_train,
-            "lambda": 0.025,
+            "lambda": 0.1,
             "use_shared_weights": True,
             "denoiser_method": "resnet",
             "resnet_options": resnet_options_dict,
@@ -79,14 +81,14 @@ def runs(testing_options):
         # Training parameters
         loss_dict = {
             "loss_name": "psnr",
-            "psnr_loss": torch.nn.MSELoss(reduction="mean"),
+            "psnr_loss": PSNR(),
             "ssim_loss": SSIM(data_range=1, size_average=True, channel=1),
             "msssim_loss": MSSSIM(kernel_size=1),
         }
 
         # Optimizer parameters
         # optimizer_dict = {"optimizer_name": "Adam+Tanh", "lr": 1e-4}
-        optimizer_dict = {"optimizer_name": "NAdam", "lr": 1e-5}
+        optimizer_dict = {"optimizer_name": "NAdam", "lr": 2e-5}
 
         # System parameters
         model_system_dict = {
@@ -164,7 +166,7 @@ def runs(testing_options):
         data_transform = None
 
         dataloader_dict = {
-            "datasets_folder": f"{where_am_i('datasets')}full_fish_{image_size_train}/",
+            "datasets_folder": f"{where_am_i('datasets')}full_fish_{image_size_train}_vs5/",
             "number_volumes": 0,
             "experiment_name": "Bassi",
             # "img_resize": 256,
@@ -172,11 +174,11 @@ def runs(testing_options):
             "save_shifts": False,
             "number_projections_total": 720,
             "number_projections_undersampled": 72,
-            "acceleration_factor": 10,
+            "acceleration_factor": 20,
             "train_factor": 0.8,
             "val_factor": 0.2,
             "test_factor": 0.2,
-            "batch_size": 4,
+            "batch_size": 8,
             "sampling_method": "equispaced-linear",
             "shuffle_data": True,
             "data_transform": data_transform,

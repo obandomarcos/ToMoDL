@@ -35,6 +35,8 @@ import wandb
 import timm.optim
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 from timm.scheduler import TanhLRScheduler
+from torchmetrics.image import PeakSignalNoiseRatio
+
 
 # Modify for multi-gpu
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -61,7 +63,6 @@ class MoDLReconstructor(pl.LightningModule):
 
         self.save_hyperparameters(self.hparams)
         self.validation_step_outputs = []
-
     def forward(self, x):
 
         return self.model(x)
@@ -87,22 +88,26 @@ class MoDLReconstructor(pl.LightningModule):
         self.log("train/ssim_fbp", 1 - ssim_fbp_loss, on_step=True, on_epoch=False, prog_bar=True)
         self.log("train/ssim", 1 - ssim_loss, on_step=True, on_epoch=False, prog_bar=True)
 
+        ####################### test not normalize ######################################
         filtered_us_rec = self.normalize_image_std(filtered_us_rec)
         filtered_fs_rec = self.normalize_image_std(filtered_fs_rec)
         modl_rec["dc" + str(self.model.K)] = self.normalize_image_std(modl_rec["dc" + str(self.model.K)])
+        self.loss_dict["psnr_loss"] = self.loss_dict["psnr_loss"].to(filtered_us_rec.device)
 
-        psnr_fbp_loss = self.loss_dict["psnr_loss"](filtered_us_rec, filtered_fs_rec)
-        psnr_loss = self.loss_dict["psnr_loss"](modl_rec["dc" + str(self.model.K)], filtered_fs_rec)
+        psnr_fbp= self.loss_dict["psnr_loss"](filtered_us_rec, filtered_fs_rec)
+        psnr = self.loss_dict["psnr_loss"](modl_rec["dc" + str(self.model.K)], filtered_fs_rec)
+
+        psnr_loss = 1 - psnr
         self.log(
             "train/psnr_fbp",
-            self.psnr(psnr_fbp_loss, range_max_min=[filtered_fs_rec.min(), filtered_fs_rec.max()]),
+            psnr_fbp,
             on_step=True,
             on_epoch=False,
             prog_bar=True,
         )
         self.log(
             "train/psnr",
-            self.psnr(psnr_loss, range_max_min=[filtered_fs_rec.min(), filtered_fs_rec.max()]),
+            psnr,
             on_step=True,
             on_epoch=False,
             prog_bar=True,
@@ -153,22 +158,21 @@ class MoDLReconstructor(pl.LightningModule):
         self.log("val/ssim_fbp", 1 - ssim_fbp_loss)
         self.log("val/ssim", 1 - ssim_loss)
 
+        ###############################  test not normalize ######################################
         filtered_us_rec = self.normalize_image_std(filtered_us_rec)
         filtered_fs_rec = self.normalize_image_std(filtered_fs_rec)
         modl_rec["dc" + str(self.model.K)] = self.normalize_image_std(modl_rec["dc" + str(self.model.K)])
+        self.loss_dict["psnr_loss"] = self.loss_dict["psnr_loss"].to(filtered_us_rec.device)
+        psnr_fbp = self.loss_dict["psnr_loss"](filtered_us_rec, filtered_fs_rec)
+        psnr = self.loss_dict["psnr_loss"](modl_rec["dc" + str(self.model.K)], filtered_fs_rec)
 
-        psnr_fbp_loss = self.loss_dict["psnr_loss"](filtered_us_rec, filtered_fs_rec)
-        psnr_loss = self.loss_dict["psnr_loss"](modl_rec["dc" + str(self.model.K)], filtered_fs_rec)
-        # self.log("val/psnr_fbp", self.psnr(psnr_fbp_loss, range_max_min=[filtered_fs_rec.min(), filtered_fs_rec.max()]))
-        # self.log("val/psnr", self.psnr(psnr_loss, range_max_min=[filtered_fs_rec.min(), filtered_fs_rec.max()]))
-        metrics = {
-            "val_psnr_fbp_step": self.psnr(psnr_fbp_loss, range_max_min=[filtered_fs_rec.min(), filtered_fs_rec.max()]),
-            "val_psnr_step": self.psnr(psnr_loss, range_max_min=[filtered_fs_rec.min(), filtered_fs_rec.max()]),
-        }
+
+        metrics = {"val_psnr_fbp": psnr_fbp,
+                   "val_psnr": psnr,}
         self.validation_step_outputs.append(metrics)
         if self.loss_dict["loss_name"] == "psnr":
 
-            return metrics
+            return psnr
 
         elif self.loss_dict["loss_name"] == "ssim":
 
@@ -180,10 +184,9 @@ class MoDLReconstructor(pl.LightningModule):
             self.log("val/msssim", msssim_loss)
 
             return msssim_loss
-
     def on_validation_epoch_end(self):
-        avg_psnr_fbp = torch.mean(torch.stack([x["val_psnr_fbp_step"] for x in self.validation_step_outputs]))
-        avg_psnr = torch.mean(torch.stack([x["val_psnr_step"] for x in self.validation_step_outputs]))
+        avg_psnr_fbp = torch.mean(torch.stack([x["val_psnr_fbp"] for x in self.validation_step_outputs])).item()
+        avg_psnr = torch.mean(torch.stack([x["val_psnr"] for x in self.validation_step_outputs])).item()
         metrics = {"val_psnr_fbp": avg_psnr_fbp, "val_psnr": avg_psnr}
         self.log_dict(metrics)
         self.validation_step_outputs = []
@@ -215,17 +218,17 @@ class MoDLReconstructor(pl.LightningModule):
         filtered_fs_rec = self.normalize_image_std(filtered_fs_rec)
         modl_rec["dc" + str(self.model.K)] = self.normalize_image_std(modl_rec["dc" + str(self.model.K)])
 
-        psnr_fbp_loss = self.loss_dict["psnr_loss"](filtered_us_rec, filtered_fs_rec)
-        psnr_loss = self.loss_dict["psnr_loss"](modl_rec["dc" + str(self.model.K)], filtered_fs_rec)
+        psnr_fbp = self.loss_dict["psnr_loss"](filtered_us_rec, filtered_fs_rec).item()
+        psnr = self.loss_dict["psnr_loss"](modl_rec["dc" + str(self.model.K)], filtered_fs_rec).item()
         self.log(
-            "test/psnr_fbp", self.psnr(psnr_fbp_loss, range_max_min=[filtered_fs_rec.min(), filtered_fs_rec.max()])
+            "test/psnr_fbp", psnr_fbp
         )
-        self.log("test/psnr", self.psnr(psnr_loss, range_max_min=[filtered_fs_rec.min(), filtered_fs_rec.max()]))
+        self.log("test/psnr", psnr)
 
         self.log("lambda", self.model.lam)
         if self.loss_dict["loss_name"] == "psnr":
 
-            return psnr_loss
+            return psnr
 
         elif self.loss_dict["loss_name"] == "ssim":
 
@@ -256,16 +259,22 @@ class MoDLReconstructor(pl.LightningModule):
 
         if self.optimizer_dict["optimizer_name"] == "NAdam":
             optimizer = torch.optim.NAdam(self.parameters(), lr=self.optimizer_dict["lr"])
-            scheduler = TanhLRScheduler(optimizer, self.max_epochs - 1)
-            return [optimizer], [{"scheduler": scheduler, "interval": "epoch"}]
-            # scheduler = ReduceLROnPlateau(optimizer, mode="max", factor=0.5, patience=5, verbose=True)
-            # return [optimizer], [{"scheduler": scheduler, "monitor": "val_psnr", "strict": False}]
-            
-    def lr_scheduler_step(self, scheduler, metric):
-        """
-        Lr scheduler step
-        """
-        scheduler.step(epoch=self.current_epoch)
+            # scheduler = TanhLRScheduler(optimizer, self.max_epochs - 1)
+            # return [optimizer], [{"scheduler": scheduler, "interval": "epoch"}]
+
+            # def lr_scheduler_step(self, scheduler, metric):
+            #     """
+            #     Lr scheduler step
+            #     """
+            #     scheduler.step(epoch=self.current_epoch)
+            scheduler = ReduceLROnPlateau(optimizer, mode="max", factor=0.5, patience=5, verbose=True)
+            return [optimizer], [{"scheduler": scheduler, "monitor": "val_psnr", "strict": False}]
+
+    # def lr_scheduler_step(self, scheduler, metric):
+    #     """
+    #     Lr scheduler step
+    #     """
+    #     scheduler.step(epoch=self.current_epoch)
 
     def process_kwdictionary(self, kw_dict):
         """

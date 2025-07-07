@@ -29,10 +29,36 @@ import torch
 import cv2
 import scipy.ndimage as ndi
 from torch.utils.data import Dataset
+from natsort import natsorted
 
 # Modify for multi-gpu
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
+def ramp_filter_torch(sinogram, device="cpu"):
+    """
+    Apply ramp filter to a batched sinogram tensor: [B, 1, D, A]
+    Returns: filtered sinogram of same shape
+    """
+    B, C, D, A = sinogram.shape
+    n = int(2 ** torch.ceil(torch.log2(torch.tensor(D, dtype=torch.float32))))  # padded size
+    freqs = torch.fft.fftfreq(n, device=device).abs()  # [n]
+    ramp = 2 * freqs  # [n]
+
+    # Pad detector axis (dim=2)
+    pad_size = n - D
+    sino_padded = torch.nn.functional.pad(sinogram, (0, 0, 0, pad_size))  # [B, 1, n, A]
+
+    # FFT along detector axis
+    sino_fft = torch.fft.fft(sino_padded, dim=2)
+
+    # Apply ramp filter
+    ramp = ramp.view(1, 1, -1, 1)  # reshape for broadcasting
+    filtered_fft = sino_fft * ramp.to(sinogram.device)
+
+    # Inverse FFT and crop back to original detector size
+    filtered_sino = torch.real(torch.fft.ifft(filtered_fft, dim=2))[:, :, :D, :]
+
+    return filtered_sino
 
 class DatasetProcessor:
     """
@@ -171,9 +197,10 @@ class DatasetProcessor:
             channel = re.compile("c\d+")
             time = re.compile("t\d+")
 
-            for f in tqdm(load_list):
+            for f in tqdm(natsorted(load_list)):
                 image = np.array(Image.open(f))
-                image = image.max() - image #### invert image for vs2
+
+
                 load_images.append(image)
                 loaded_angles.append(float(angle.findall(str(f))[0][1:]))
                 loaded_sample.append(float(sample_re.findall(str(f))[0][1:]))
@@ -200,6 +227,7 @@ class DatasetProcessor:
             self.registered_volume[sample] = np.stack(
                 self.dataset[self.dataset.Sample == sample2idx]["Image"].to_numpy()
             )
+            
 
             del self.dataset, self.registered_dataset
 
@@ -225,7 +253,7 @@ class DatasetProcessor:
             self.top_sino = np.copy(self.registered_volume[sample][:, :, top_index].T)
             self.bottom_sino = np.copy(self.registered_volume[sample][:, :, bottom_index].T)
             self.angles = np.linspace(0, 2 * 180, self.top_sino.shape[1], endpoint=False)
-            print("Hola")
+            # print("Hola")
             # Iteratively sweep from -maxShift pixels to maxShift pixels
             (top_shift_max, bottom_shift_max) = self._search_shifts(
                 max_shift, shift_step, center_shift_top, center_shift_bottom
@@ -265,7 +293,12 @@ class DatasetProcessor:
         """
         Resizes sinograms according to reconstruction image size
         """
+        print("Inverting image")
+        for idx, image in enumerate(self.registered_volume[sample]):
+            image = image.max() - image
+            self.registered_volume[sample][idx] = image
 
+        
         print("Resizing in progress...")
         # Move axis to (N_projections, n_detector, n_slices)
         self.registered_volume[sample] = np.rollaxis(self.registered_volume[sample], 2)
@@ -321,36 +354,21 @@ class DatasetProcessor:
 
         print(write_us_filtered, us_filtered_dataset_folder)
         # Grab full sinogram
-        full_sinogram = self.registered_volume[sample].astype(float)
-
+        full_sinogram_subject = self.registered_volume[sample].astype(float)
+        # full_sinogram_subject = self.normalize_image(full_sinogram_subject)
         # Using boolean mask, keep values sampled and clamp to zero others
         # Masking dataset has to be on its own
         print("Masking with {} method".format(self.sampling_method))
-        undersampled_sinograms = self.subsample_sinogram(full_sinogram, self.sampling_method)
+        undersampled_sinograms = self.subsample_sinogram(full_sinogram_subject, self.sampling_method)
 
         # Grab random slices and roll axis so to sample slices
         undersampled_sinograms = torch.FloatTensor(np.rollaxis(undersampled_sinograms, 2)).to(device)
-        full_sinogram = torch.FloatTensor(np.rollaxis(full_sinogram, 2)).to(device)
+        full_sinogram_subject = torch.FloatTensor(np.rollaxis(full_sinogram_subject, 2)).to(device)
 
         # Inputs
-        for sinogram_slice, (us_sinogram, full_sinogram) in tqdm(enumerate(zip(undersampled_sinograms, full_sinogram))):
+        for sinogram_slice, (us_sinogram, full_sinogram) in tqdm(enumerate(zip(undersampled_sinograms, full_sinogram_subject))):
 
             sinogram_slice = str(sinogram_slice)
-
-            if write_us_filtered == True:
-                # Undersampled filtered reconstructed image path
-                us_filtered_img_path = us_filtered_dataset_folder + sinogram_slice + ".jpg"
-                us_filtered_img_torch_path = us_filtered_dataset_folder + sinogram_slice + ".pt"
-
-                # Normalization of input sinogram - Undersampled
-                us_filtered_img = self.radon_filter.filter_backprojection(us_sinogram.T[None, None])
-                us_filtered_img = self.normalize_image(us_filtered_img[0, 0])
-
-                # Write undersampled filtered
-                thumbs = cv2.imwrite(us_filtered_img_path, 255.0 * us_filtered_img.cpu().detach().numpy())
-
-                torch.save(us_filtered_img.unsqueeze(0), us_filtered_img_torch_path)
-                print(thumbs)
 
             if write_us_unfiltered == True:
                 print("Processing slice {sinogram_slice} \n")
@@ -359,20 +377,40 @@ class DatasetProcessor:
                 us_unfiltered_img_torch_path = us_unfiltered_dataset_folder + sinogram_slice + ".pt"
 
                 # Normalize 0-1 under sampled sinogram
-                us_sinogram = self.normalize_image(us_sinogram)
-
+                # us_sinogram = self.normalize_image(us_sinogram)
+                us_filtered_sinogram = ramp_filter_torch(us_sinogram.T[None, None], device=device)
                 us_unfiltered_img = (
-                    self.radon_unfilter.filter_backprojection(us_sinogram.T[None, None])
+                    self.radon_unfilter.filter_backprojection(us_filtered_sinogram)
                     * np.pi
                     / self.number_projections_undersampled
                 )
-                us_unfiltered_img = self.normalize_image(us_unfiltered_img[0, 0])
-
+                us_unfiltered_img = self.normalize_mean_std(us_unfiltered_img[0, 0])
+                us_unfiltered_img_cv2 = self.normalize_image_01(us_unfiltered_img)
                 # Write undersampled filtered
-                thumbs = cv2.imwrite(us_unfiltered_img_path, 255.0 * us_unfiltered_img.cpu().detach().numpy())
+                thumbs = cv2.imwrite(us_unfiltered_img_path, 255.0 * us_unfiltered_img_cv2.cpu().detach().numpy())
 
                 torch.save(us_unfiltered_img.unsqueeze(0), us_unfiltered_img_torch_path)
                 print(thumbs)
+
+            if write_us_filtered == True:
+                # Undersampled filtered reconstructed image path
+                us_filtered_img_path = us_filtered_dataset_folder + sinogram_slice + ".jpg"
+                us_filtered_img_torch_path = us_filtered_dataset_folder + sinogram_slice + ".pt"
+
+                # Normalization of input sinogram - Undersampled
+                us_filtered_img = self.radon_filter.filter_backprojection(us_sinogram.T[None, None])
+                us_filtered_img = self.normalize_mean_std(us_filtered_img[0, 0])
+                us_filtered_img_cv2 = self.normalize_image_01(us_filtered_img)
+                # invert the image and normalize to -1 to 1
+                ######################## normalize mean and std here instead of -1 and 1 ########################
+                # Write undersampled filtered
+                thumbs = cv2.imwrite(us_filtered_img_path, 255.0 * us_filtered_img_cv2.cpu().detach().numpy())
+
+                torch.save(us_filtered_img.unsqueeze(0), us_filtered_img_torch_path)
+                
+                print(thumbs)
+
+
 
             if write_fs_filtered == True:
 
@@ -383,9 +421,11 @@ class DatasetProcessor:
 
                 # Normalization of output sinogram - Fully sampled
                 fs_filtered_img = self.radon_filter.filter_backprojection(full_sinogram.T[None, None])
-                fs_filtered_img = self.normalize_image(fs_filtered_img[0, 0])
+                fs_filtered_img = self.normalize_mean_std(fs_filtered_img[0, 0])
+                
+                fs_filtered_img_cv2 = self.normalize_image_01(fs_filtered_img)
                 # Write fully sampled filtered
-                thumbs = cv2.imwrite(fs_filtered_img_path, 255.0 * fs_filtered_img.cpu().detach().numpy())
+                thumbs = cv2.imwrite(fs_filtered_img_path, 255.0 * fs_filtered_img_cv2.cpu().detach().numpy())
 
                 torch.save(fs_filtered_img.unsqueeze(0), fs_filtered_img_torch_path)
                 print(thumbs)
@@ -397,6 +437,7 @@ class DatasetProcessor:
 
         # img_max = self.image_volume.min(axis=0)
         img_max = self.registered_volume[sample].min(axis=0)
+
         img_max = (((img_max - img_max.min()) / (img_max.max() - img_max.min())) * 255.0).astype(np.uint8)
         img_max = ndi.gaussian_filter(img_max, (11, 11))
         indexes = np.where(img_max.std(axis=0) > threshold)[0]
@@ -435,7 +476,7 @@ class DatasetProcessor:
             # print(self.angles, "angle")
             top_shift_iradon = iradon(top_shift_sino, self.angles, circle=False)
             bottom_shift_iradon = iradon(bottom_shift_sino, self.angles, circle=False)
-            print(top_shift_iradon.shape, "shape")
+            # print(top_shift_iradon.shape, "shape")
             # Calculate variance
             top_image_std.append(np.std(top_shift_iradon))
             bottom_image_std.append(np.std(bottom_shift_iradon))
@@ -484,7 +525,7 @@ class DatasetProcessor:
         return undersampled_sinogram
 
     @staticmethod
-    def normalize_image(img):
+    def normalize_image_01(img):
         """
         Normalizes images between 0 and 1.
         Params:
@@ -493,6 +534,17 @@ class DatasetProcessor:
         img = (img - img.min()) / (img.max() - img.min())
 
         return img
+    @staticmethod
+    def normalize_mean_std(img, mean=None, std=None):
+        """
+        Normalizes images between mean and std.
+        Params:
+          - img (ndarray): Image to normalize
+        """
+        if mean is None or std is None:
+            mean = img.mean()
+            std = img.std()
+        return (img - mean) / std
 
     def _create_radon(self):
         """
@@ -887,17 +939,17 @@ class ReconstructionDataset(Dataset):
             self.root_folder + self.us_unfilt_folder + str(index) + ".pt", map_location="cpu", weights_only=True
         )
 
-        unfiltered_us_rec = self.normalize_image(unfiltered_us_rec)
+        # unfiltered_us_rec = self.normalize_image(unfiltered_us_rec)
 
         filtered_us_rec = torch.load(
             self.root_folder + self.us_filt_folder + str(index) + ".pt", map_location="cpu", weights_only=True
         )
-        filtered_us_rec = self.normalize_image(filtered_us_rec)
+        # filtered_us_rec = self.normalize_image(filtered_us_rec)
 
         filtered_fs_rec = torch.load(
             self.root_folder + self.fs_filt_folder + str(index) + ".pt", map_location="cpu", weights_only=True
         )
-        filtered_fs_rec = self.normalize_image(filtered_fs_rec)
+        # filtered_fs_rec = self.normalize_image(filtered_fs_rec)
         return (unfiltered_us_rec, filtered_us_rec, filtered_fs_rec)
 
     @staticmethod
@@ -905,4 +957,4 @@ class ReconstructionDataset(Dataset):
         """
         Normalizes image to
         """
-        return (image - image.min()) / (image.max() - image.min())
+        return (image - image.min()) / (image.max() - image.min()) * 2 - 1

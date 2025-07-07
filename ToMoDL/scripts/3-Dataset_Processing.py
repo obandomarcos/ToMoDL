@@ -33,7 +33,7 @@ def process_datasets(args_options):
     ]
 
     zebra_dataset_dict = {
-        "dataset_folder": f"{dataset_path}full_fish_100_vs2",
+        "dataset_folder": f"{dataset_path}full_fish_100_vs6_unfiltered_sino",
         "experiment_name": "Bassi",
         "img_resize": 100,
         "load_shifts": False,

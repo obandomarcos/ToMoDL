@@ -348,18 +348,13 @@ class ReconstructionWidget(QWidget):
                 if self.input_type == "3D":
                     if self.registerbox.val == True:
 
-                        # sinos[:, :, zidx] = cv2.normalize(
-                        #     sinos[:, :, zidx], None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F
-                        # )
-                        sinos[:, :, zidx] = min_max_normalize(sinos[:, :, zidx])
+
                         if self.orderbox.val == 0:
                             optVolume[:, :, zidx] = self.h.correct_and_reconstruct(sinos[:, :, zidx].transpose(1, 0, 2))
                         elif self.orderbox.val == 1:
                             optVolume[:, :, zidx] = self.h.correct_and_reconstruct(sinos[:, :, zidx])
-                        sinos[:, :, zidx] = min_max_normalize(sinos[:, :, zidx])
 
                     elif self.manualalignbox.val == True:
-                        sinos[:, :, zidx] = min_max_normalize(sinos[:, :, zidx])
                         if self.orderbox.val == 0:
                             optVolume[:, :, zidx] = self.h.reconstruct(
                                 ndi.shift(sinos[:, :, zidx], (0, self.alignbox.val, 0), mode="nearest").transpose(
@@ -370,11 +365,9 @@ class ReconstructionWidget(QWidget):
                             optVolume[:, :, zidx] = self.h.reconstruct(
                                 ndi.shift(sinos[:, :, zidx], (self.alignbox.val, 0, 0), mode="nearest")
                             )
-                        sinos[:, :, zidx] = min_max_normalize(sinos[:, :, zidx])
 
                     else:
 
-                        # sinos[:, :, zidx] = min_max_normalize(sinos[:, :, zidx])
 
                         if self.orderbox.val == 0:
                             optVolume[:, :, zidx] = self.h.reconstruct(sinos[:, :, zidx].transpose(1, 0, 2))
@@ -384,7 +377,6 @@ class ReconstructionWidget(QWidget):
                             # tif.imwrite("optVolume_slice.tif", optVolume[:, :, zidx])
                         elif self.orderbox.val == 1:
                             optVolume[:, :, zidx] = self.h.reconstruct(sinos[:, :, zidx])
-                        # sinos[:, :, zidx] = min_max_normalize(sinos[:, :, zidx])
 
                 ####################### 2D reconstruction ############################
                 elif self.input_type == "2D":
@@ -449,7 +441,7 @@ class ReconstructionWidget(QWidget):
             min_val = optVolume.min()
             max_val = optVolume.max()
             # save optVolume to tif file
-            tif.imwrite("optVolume_FBP_GPU.tif", optVolume)
+            # tif.imwrite("optVolume_FBP_GPU.tif", optVolume)
             print("min: ", min_val, "max: ", max_val)
             # convert to uint16
             optVolume = (optVolume - min_val) / (max_val - min_val) * (2**16 - 1)

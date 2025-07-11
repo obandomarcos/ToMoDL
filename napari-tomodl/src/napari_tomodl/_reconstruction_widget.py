@@ -277,11 +277,12 @@ class ReconstructionWidget(QWidget):
             print(f"Selected image layer: {sinos.name}")
 
     def stack_reconstruction(self):
-
+        self.scale_image = self.viewer.layers[self.imageRaw_name].scale
+        
         def update_opt_image(stack):
 
             imname = "stack_" + self.imageRaw_name
-            self.show_image(stack, fullname=imname)
+            self.show_image(stack, fullname=imname, scale=self.scale_image)
             print("Stack reconstruction completed")
             gc.collect()
             torch.cuda.empty_cache()
@@ -415,25 +416,27 @@ class ReconstructionWidget(QWidget):
             self.bar_thread.value = 0
             self.bar_thread.run()
             optVolume = np.rollaxis(optVolume, -1)
-            # convert resize volume to original size
+            # # convert resize volume to original size
             if self.reshapebox.val:
-                optVolume_resized = np.zeros([self.h.Z, original_size, original_size], np.float32)
-                print("Resizing volume to original size")
-                if self.fullvolume.val == False and self.is_reconstruct_one.val == True:
-                    optVolume_resized[self.slices.val] = cv2.resize(
-                        optVolume[self.slices.val], (original_size, original_size), interpolation=cv2.INTER_LINEAR
-                    )
-                else:
-                    slices_resize = self.h.Z if self.fullvolume.val == True else self.slices.val
-                    self.bar_thread.max = slices_resize
-                    for i in tqdm(range(slices_resize)):
-                        optVolume_resized[i] = cv2.resize(
-                            optVolume[i], (original_size, original_size), interpolation=cv2.INTER_LINEAR
-                        )
-                        self.bar_thread.value = i + 1
-                        self.bar_thread.run()
-                optVolume = optVolume_resized
-                del optVolume_resized, sinos
+                self.scale_image = [self.scale_image[0], self.scale_image[1] * original_size / self.resizebox.val, self.scale_image[2]* original_size / self.resizebox.val]
+            # # change the scale instead of resizing ################################### TODO: change this to resizing
+            #     optVolume_resized = np.zeros([self.h.Z, original_size, original_size], np.float32)
+            #     print("Resizing volume to original size")
+            #     if self.fullvolume.val == False and self.is_reconstruct_one.val == True:
+            #         optVolume_resized[self.slices.val] = cv2.resize(
+            #             optVolume[self.slices.val], (original_size, original_size), interpolation=cv2.INTER_LINEAR
+            #         )
+            #     else:
+            #         slices_resize = self.h.Z if self.fullvolume.val == True else self.slices.val
+            #         self.bar_thread.max = slices_resize
+            #         for i in tqdm(range(slices_resize)):
+            #             optVolume_resized[i] = cv2.resize(
+            #                 optVolume[i], (original_size, original_size), interpolation=cv2.INTER_LINEAR
+            #             )
+            #             self.bar_thread.value = i + 1
+            #             self.bar_thread.run()
+            #     optVolume = optVolume_resized
+            #     del optVolume_resized, sinos
 
             self.bar_thread.value = 0
             self.bar_thread.run()

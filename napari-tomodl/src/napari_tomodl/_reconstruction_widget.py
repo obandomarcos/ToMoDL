@@ -176,7 +176,7 @@ class ReconstructionWidget(QWidget):
         )
 
         self.iterations = Settings(
-            "ToMoDL iterations", dtype=int, initial=6, layout=slayout, write_function=self.set_opt_processor
+            "ToMoDL iterations", dtype=int, initial=3, layout=slayout, write_function=self.set_opt_processor
         )
 
         self.clipcirclebox = Settings(
@@ -223,6 +223,9 @@ class ReconstructionWidget(QWidget):
             choices=Order_Modes,
             layout=slayout,
             write_function=self.set_opt_processor,
+        )
+        self.output_conversion = Settings(
+            "16-bit conversion", dtype=bool, initial=True, layout=slayout, write_function=self.set_opt_processor
         )
 
         # add calculate psf button
@@ -418,7 +421,10 @@ class ReconstructionWidget(QWidget):
             optVolume = np.rollaxis(optVolume, -1)
             # # convert resize volume to original size
             if self.reshapebox.val:
-                self.scale_image = [self.scale_image[0], self.scale_image[1] * original_size / self.resizebox.val, self.scale_image[2]* original_size / self.resizebox.val]
+                if self.is_reconstruct_one.val == True and self.fullvolume.val == False and self.input_type == "3D":
+                    self.scale_image = [self.scale_image[0] * original_size / self.resizebox.val, self.scale_image[1]* original_size / self.resizebox.val]
+                elif self.fullvolume.val == True and self.input_type == "3D":
+                    self.scale_image = [self.scale_image[0], self.scale_image[1] * original_size / self.resizebox.val, self.scale_image[2]* original_size / self.resizebox.val]
             # # change the scale instead of resizing ################################### TODO: change this to resizing
             #     optVolume_resized = np.zeros([self.h.Z, original_size, original_size], np.float32)
             #     print("Resizing volume to original size")
@@ -447,12 +453,12 @@ class ReconstructionWidget(QWidget):
             # tif.imwrite("optVolume_FBP_GPU.tif", optVolume)
             print("min: ", min_val, "max: ", max_val)
             # convert to uint16
-            optVolume = (optVolume - min_val) / (max_val - min_val) * (2**16 - 1)
-            print("done normalizing")
-            optVolume = optVolume.astype(np.uint16, copy=False)
-            print("done converting to uint16")
-            if self.is_reconstruct_one.val == True and self.fullvolume.val == False and self.input_type == "3D":
+            if self.output_conversion.val == True:
+                optVolume = (optVolume - min_val) / (max_val - min_val) * (2**16 - 1)
+                optVolume = optVolume.astype(np.uint16, copy=False)
+                print("done converting to uint16")
 
+            if self.is_reconstruct_one.val == True and self.fullvolume.val == False and self.input_type == "3D":
                 return optVolume[self.slices.val]
             elif self.input_type == "3D":
                 return optVolume

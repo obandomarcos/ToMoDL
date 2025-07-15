@@ -18,7 +18,7 @@ from qtpy.QtWidgets import (
     QHBoxLayout,
     QWidget,
     QPushButton,
-    QLineEdit,
+    QTabWidget,
     QSpinBox,
     QDoubleSpinBox,
     QFormLayout,
@@ -105,7 +105,7 @@ class Order_Modes(Enum):
     Horizontal = 1
 
 
-class ReconstructionWidget(QWidget):
+class ReconstructionWidget(QTabWidget):
 
     name = "Reconstructor"
 
@@ -113,36 +113,52 @@ class ReconstructionWidget(QWidget):
         self.viewer = viewer
         super().__init__()
         self.setup_ui()
+
         # self.viewer.dims.events.current_step.connect(self.select_index)
         self.bar_thread = BarThread(self)
         self.bar_thread.progressChanged.connect(self.progressBar.setValue)
 
     def setup_ui(self):
 
-        # initialize layout
-        self.layout = QVBoxLayout()
-        self.setLayout(self.layout)
 
         def add_section(_layout, _title):
             splitter = QSplitter(Qt.Vertical)
             _layout.addWidget(splitter)
-            # _layout.addWidget(QLabel(_title))
-
-        image_layout = QVBoxLayout()
-        add_section(image_layout, "Image selection")
-        self.layout.addLayout(image_layout)
-
+            _layout.addWidget(QLabel(_title))
+        
+        # Tab 1 - Basic settings and reconstruction
+        
+        # i) add a tab widget
+        self.acquisition_params_widget = QWidget()
+        self.addTab(self.acquisition_params_widget, "Basic setup")
+        
+        # ii) layout
+        self.basic_reconstruction_layout = QVBoxLayout()
+        self.basic_reconstruction_widget = QWidget()
+        self.basic_reconstruction_layout.addWidget(QLabel("Basic reconstruction"))
+        self.basic_reconstruction_layout.addWidget(self.basic_reconstruction_widget)
+        
         self.choose_layer_widget = choose_layer()
         self.choose_layer_widget.call_button.visible = False
-        self.add_magic_function(self.choose_layer_widget, image_layout)
+        self.add_magic_function(self.choose_layer_widget, self.basic_reconstruction_layout)
         select_button = QPushButton("Select image layer")
         select_button.clicked.connect(self.select_layer)
-        image_layout.addWidget(select_button)
-
+        self.basic_reconstruction_layout.addWidget(select_button)
+        
         settings_layout = QVBoxLayout()
         add_section(settings_layout, "Settings")
-        self.layout.addLayout(settings_layout)
+        self.basic_reconstruction_layout.addLayout(settings_layout)
         self.createSettings(settings_layout)
+        self.acquisition_params_widget.setLayout(self.basic_reconstruction_layout)
+
+        # Tab 2 - Advanced settings
+        self.advanced_reconstruction_params_widget = QWidget()
+        self.advanced_reconstruction_params_layout = QVBoxLayout()
+        self.addTab(self.advanced_reconstruction_params_widget, "Advanced reconstruction options")
+        
+        add_section(self.advanced_reconstruction_params_layout, "Settings")
+        self.acquisition_params_widget.setLayout(self.advanced_reconstruction_params_layout)
+
 
     def createSettings(self, slayout):
         self.is_half_rotation = Settings(

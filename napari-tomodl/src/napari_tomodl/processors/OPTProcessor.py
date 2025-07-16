@@ -19,6 +19,7 @@ from .unet import UNet
 
 try:
     from torch_radon24 import Radon as radon_thrad
+    from torch_radon24 import ramp_filter_torch
 
     use_torch_radon = True
     use_tomopy = False
@@ -47,31 +48,28 @@ def min_max_normalize_save_factor(image):
     min_image, max_image = image.min(), image.max()
     return new_image, min_image, max_image
 
-def ramp_filter_torch(sinogram, device="cpu"):
-    """
-    Apply ramp filter to a batched sinogram tensor: [B, 1, D, A]
-    Returns: filtered sinogram of same shape
-    """
-    B, C, D, A = sinogram.shape
-    n = int(2 ** torch.ceil(torch.log2(torch.tensor(D, dtype=torch.float32))))  # padded size
-    freqs = torch.fft.fftfreq(n, device=device).abs()  # [n]
-    ramp = 2 * freqs  # [n]
+def ramp_filter(sinogram):
+    num_detectors, num_angles = sinogram.shape
+    n = int(2 ** np.ceil(np.log2(num_detectors)))  # zero-padding for FFT
+    freqs = np.fft.fftfreq(n).reshape(-1, 1)
+    ramp = 2 * np.abs(freqs)
 
-    # Pad detector axis (dim=2)
-    pad_size = n - D
-    sino_padded = torch.nn.functional.pad(sinogram, (0, 0, 0, pad_size))  # [B, 1, n, A]
+    filtered_sino = np.zeros_like(sinogram)
 
-    # FFT along detector axis
-    sino_fft = torch.fft.fft(sino_padded, dim=2)
+    for i in range(num_angles):
+        projection = sinogram[:, i]
+        padded = np.zeros(n)
+        padded[:num_detectors] = projection
 
-    # Apply ramp filter
-    ramp = ramp.view(1, 1, -1, 1)  # reshape for broadcasting
-    filtered_fft = sino_fft * ramp.to(sinogram.device)
+        proj_fft = np.fft.fft(padded)
+        filtered_fft = proj_fft * ramp[:, 0]
+        filtered_proj = np.real(np.fft.ifft(filtered_fft))[:num_detectors]
 
-    # Inverse FFT and crop back to original detector size
-    filtered_sino = torch.real(torch.fft.ifft(filtered_fft, dim=2))[:, :, :D, :]
+        filtered_sino[:, i] = filtered_proj
 
     return filtered_sino
+
+#     return filtered_sino
 class dwLayer(nn.Module):
     """
     Creates denoiser singular layer
@@ -830,12 +828,8 @@ class OPTProcessor:
             # print(sinogram.shape)
             #######################################################################################
 
-            # self.iradon_functor.lam = torch.nn.Parameter(torch.tensor([0.5], requires_grad=False, device=device))
-            print("lamdba is: ", self.iradon_functor.lam)
-
             radon24 = radon_thrad(self.angles_torch, circle=self.clip_to_circle, filter_name=None, device=device)
-            # radon24_filter = radon_thrad(self.angles_torch, circle=self.clip_to_circle, filter_name="ramp", device=device)
-            # print("lamdba is: ", self.iradon_functor.lam)
+
 
             # the self.iradon_functor receive a reconstructed image (B, 1, Q, Q)
             # the input is a sinogram (B, 1, Q, theta)
@@ -884,7 +878,8 @@ class OPTProcessor:
                 "number_projections_total": sinogram.shape[0],
                 "acceleration_factor": 10,
                 "image_size": sinogram.shape[1],
-                "lambda": 0.7170,
+                "lambda": 0.5,
+                "is_half_rotation": self.is_half_rotation,
                 "use_shared_weights": True,
                 "denoiser_method": "resnet",
                 "resnet_options": resnet_options_dict,
@@ -896,7 +891,7 @@ class OPTProcessor:
 
             self.iradon_functor = ToMoDL(self.tomodl_dictionary)
             __location__ = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)))
-            artifact_path = os.path.join(__location__, "model256_1.ckpt")
+            artifact_path = os.path.join(__location__, "modl100_vs2_lam0.67.ckpt")
             tomodl_checkpoint = torch.load(artifact_path, map_location=torch.device("cpu"))
 
             tomodl_checkpoint["state_dict"] = {
@@ -910,10 +905,10 @@ class OPTProcessor:
 
             def _iradon(sino):
                 with torch.inference_mode():
-
-                    sino = iradon_scikit(sino[..., 0], self.angles, circle=self.clip_to_circle, filter_name=None)
-                    sino = torch.Tensor(sino[None, None])
-                    reconstruction = self.iradon_functor(sino)["dc" + str(self.tomodl_dictionary["K_iterations"])]
+                    sino = ramp_filter(sino[..., 0])
+                    reconstruction = iradon_scikit(sino, self.angles, circle=self.clip_to_circle, filter_name=None)
+                    reconstruction = torch.Tensor(reconstruction[None, None])
+                    reconstruction = self.iradon_functor(reconstruction)["dc" + str(self.tomodl_dictionary["K_iterations"])]
                     reconstruction = np.asarray(reconstruction.numpy())[..., None]
                     return reconstruction
 

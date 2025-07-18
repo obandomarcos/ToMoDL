@@ -435,13 +435,14 @@ class ReconstructionWidget(QTabWidget):
             self.bar_thread.value = 0
             self.bar_thread.run()
             optVolume = np.rollaxis(optVolume, -1)
-            # # convert resize volume to original size
+            #  change the scale instead of resizing ################################### TODO: change this to resizing
             if self.reshapebox.val:
                 if self.is_reconstruct_one.val == True and self.fullvolume.val == False and self.input_type == "3D":
                     self.scale_image = [self.scale_image[0] * original_size / self.resizebox.val, self.scale_image[1]* original_size / self.resizebox.val]
                 elif self.fullvolume.val == True and self.input_type == "3D":
                     self.scale_image = [self.scale_image[0], self.scale_image[1] * original_size / self.resizebox.val, self.scale_image[2]* original_size / self.resizebox.val]
-            # # change the scale instead of resizing ################################### TODO: change this to resizing
+            
+            # # convert resize volume to original size
             #     optVolume_resized = np.zeros([self.h.Z, original_size, original_size], np.float32)
             #     print("Resizing volume to original size")
             #     if self.fullvolume.val == False and self.is_reconstruct_one.val == True:

@@ -13,7 +13,6 @@ from skimage.transform import iradon as iradon_scikit
 from skimage.transform import resize as resize_scikit
 import torch
 import tifffile as tif
-# from .modl import ToMoDL
 
 from .unet import UNet
 
@@ -807,7 +806,7 @@ class OPTProcessor:
 
             __location__ = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)))
             # artifact_path = os.path.join(__location__, "modl_dark_unnormal.ckpt")
-            artifact_path = os.path.join(__location__, "modl100_vs2_lam0.67.ckpt")
+            artifact_path = os.path.join(__location__, "tomodl256_3.ckpt")
             tomodl_checkpoint = torch.load(artifact_path, map_location=torch.device("cuda:0"))
 
             ########################### old weight loading ############################
@@ -826,6 +825,7 @@ class OPTProcessor:
             self.iradon_functor.load_state_dict(tomodl_checkpoint["state_dict"], strict=False)
             self.iradon_functor.eval()
             # print(sinogram.shape)
+            # print("lambda is: ", self.iradon_functor.lam)
             #######################################################################################
 
             radon24 = radon_thrad(self.angles_torch, circle=self.clip_to_circle, filter_name=None, device=device)
@@ -839,11 +839,6 @@ class OPTProcessor:
                     sino = torch.from_numpy(sino[:, None, :, :]).to(device)
                     sino = ramp_filter_torch(sino, device=device)
                     reconstruction = radon24.filter_backprojection(sino)
-                    # reconstruction_filter = radon24_filter.filter_backprojection(sino)
-
-                    # min_original, max_original = reconstruction.min(), reconstruction.max()
-                    # save reconstruction to tif file
-                    
                     reconstruction = normalize_images(reconstruction)
                     output = self.iradon_functor(reconstruction)[
                         "dc" + str(self.tomodl_dictionary["K_iterations"])
@@ -908,7 +903,9 @@ class OPTProcessor:
                     sino = ramp_filter(sino[..., 0])
                     reconstruction = iradon_scikit(sino, self.angles, circle=self.clip_to_circle, filter_name=None)
                     reconstruction = torch.Tensor(reconstruction[None, None])
+                    reconstruction = normalize_images(reconstruction)
                     reconstruction = self.iradon_functor(reconstruction)["dc" + str(self.tomodl_dictionary["K_iterations"])]
+                    reconstruction = normalize_images(reconstruction)
                     reconstruction = np.asarray(reconstruction.numpy())[..., None]
                     return reconstruction
 

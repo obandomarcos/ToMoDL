@@ -889,7 +889,7 @@ class OPTProcessor:
 
             self.iradon_functor = ToMoDL(self.tomodl_dictionary)
             __location__ = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)))
-            artifact_path = os.path.join(__location__, "modl100_vs2_lam0.67.ckpt")
+            artifact_path = os.path.join(__location__, "tomodl256_3.ckpt")
             tomodl_checkpoint = torch.load(artifact_path, map_location=torch.device("cpu"))
 
             tomodl_checkpoint["state_dict"] = {

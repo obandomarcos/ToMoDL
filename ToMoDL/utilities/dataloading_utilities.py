@@ -19,7 +19,7 @@ import os
 from tqdm import tqdm
 
 try:
-    from torch_radon24 import Radon
+    from QBI_radon import Radon
 except ModuleNotFoundError:
     from skimage.transform import radon
 from skimage.transform import iradon

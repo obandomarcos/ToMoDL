@@ -8,7 +8,7 @@ try:
     import torch
     import torch.nn as nn
     import torch.nn.functional as F
-    from torch_radon24 import Radon as thrad
+    from QBI_radon import Radon as thrad
 
     use_torch_radon = True
     use_tomopy = False

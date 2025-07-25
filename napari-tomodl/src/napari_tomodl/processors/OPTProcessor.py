@@ -17,14 +17,14 @@ import tifffile as tif
 from .unet import UNet
 
 try:
-    from torch_radon24 import Radon as radon_thrad
-    from torch_radon24 import ramp_filter_torch
+    from QBI_radon import Radon as radon_thrad
+    from QBI_radon import ramp_filter_torch
 
     use_torch_radon = True
     use_tomopy = False
     use_scikit = False
 
-    print("Torch-Radon24 available!")
+    print("QBI-Radon available!")
 
 except:
 
@@ -753,7 +753,9 @@ class OPTProcessor:
             def _iradon(sino):
                 sino = sino.transpose(2, 0, 1)
                 sino = torch.from_numpy(sino[:, None, :, :]).to(device)
-                reconstruction = self.iradon_functor.filter_backprojection(sino).permute(1, 2, 3, 0)[0].cpu()
+                reconstruction = self.iradon_functor.filter_backprojection(sino)
+                reconstruction = normalize_images(reconstruction)
+                reconstruction = reconstruction.permute(1, 2, 3, 0)[0].cpu()
                 reconstruction = np.asarray(reconstruction.numpy())
 
                 # save reconstruction to tif file
@@ -806,7 +808,8 @@ class OPTProcessor:
 
             __location__ = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)))
             # artifact_path = os.path.join(__location__, "modl_dark_unnormal.ckpt")
-            artifact_path = os.path.join(__location__, "tomodl256_3.ckpt")
+            # artifact_path = os.path.join(__location__, "tomodl256_3.ckpt")
+            artifact_path = os.path.join(__location__, "modl100_vs2_lam0.67.ckpt")
             tomodl_checkpoint = torch.load(artifact_path, map_location=torch.device("cuda:0"))
 
             ########################### old weight loading ############################

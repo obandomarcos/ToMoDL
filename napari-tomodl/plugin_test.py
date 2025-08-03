@@ -1,5 +1,5 @@
 import napari
-from src.napari_tomodl._reconstruction_widget import ReconstructionWidget
+from src.napari_tomodl._reconstruction_widget_2 import ReconstructionWidget
 
 if __name__ == '__main__':
    

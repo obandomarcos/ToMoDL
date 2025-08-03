@@ -10,7 +10,7 @@ import torch.nn.functional as F
 
 from skimage.transform import radon as radon_scikit
 from skimage.transform import iradon as iradon_scikit
-from skimage.transform import resize as resize_scikit
+# from skimage.transform import resize as resize_scikit
 import torch
 import tifffile as tif
 
@@ -28,7 +28,7 @@ try:
 
 except:
 
-    print("Torch-Radon not available!")
+    print("QBI-Radon not available!")
     use_torch_radon = False
     use_tomopy = False
     use_scikit = True
@@ -533,8 +533,7 @@ class OPTProcessor:
         self.use_filter = False
         self.batch_size = 1
         self.is_half_rotation = False
-
-        self.resize_bool = True
+        self.filter_FBP = "ramp" # can be  "shepp-logan" or "cosine" or "hamming" or "hann" 
         self.register_bool = True
         self.max_shift = 200
         self.shift_step = 10
@@ -563,97 +562,6 @@ class OPTProcessor:
             assert torch.cuda.is_available() == True
             self.angles_gen = lambda num_angles: np.linspace(0, rotation_factor * np.pi, num_angles, endpoint=False)
 
-    # def correct_and_reconstruct(self, sinogram: np.ndarray):
-    #     """
-    #     Corrects rotation axis by finding optimal registration via maximising reconstructed image's intensity variance.
-
-    #     Based on 'Walls, J. R., Sled, J. G., Sharpe, J., & Henkelman, R. M. (2005). Correction of artefacts in optical projection tomography. Physics in Medicine & Biology, 50(19), 4645.'
-
-    #     Params:
-    #     - sinogram
-    #     """
-
-    #     if self.shift_step < 1:
-
-    #         if self.order_mode == Order_Modes.Vertical.value:
-    #             shift_tuple = (0, self.center_shift)
-    #         elif self.order_mode == Order_Modes.Horizontal.value:
-    #             shift_tuple = (self.center_shift, 0)
-
-    #         # Restart shifts
-    #         self.max_shift = 200
-    #         self.shift_step = 10
-    #         self.center_shift = 0
-
-    #         return self.reconstruct(ndi.shift(sinogram, shift_tuple, mode="nearest"))
-
-    #     shifts = np.arange(-self.max_shift, self.max_shift, self.shift_step) + self.center_shift
-    #     image_std = []
-
-    #     for i, shift in enumerate(shifts):
-
-    #         if self.order_mode == Order_Modes.Vertical.value:
-    #             shift_tuple = (0, shift)
-
-    #         if self.order_mode == Order_Modes.Horizontal.value:
-    #             shift_tuple = (shift, 0)
-
-    #         sino_shift = ndi.shift(sinogram, shift_tuple, mode="nearest")
-
-    #         # Get image reconstruction
-    #         shift_iradon = self.reconstruct(sino_shift)
-
-    #         # Calculate variance
-    #         image_std.append(np.std(shift_iradon))
-
-    #     # To-Do: Change shifts
-    #     self.center_shift = shifts[np.argmax(image_std)]
-    #     self.max_shift /= 5
-    #     self.shift_step /= 2.5
-
-    #     return self.correct_and_reconstruct(sinogram)
-
-    def correct_and_reconstruct(self, sinogram: np.ndarray, type_sino="3D"):
-        """
-        Corrects rotation axis by finding optimal registration via maximising reconstructed image's intensity variance.
-
-        Based on 'Walls, J. R., Sled, J. G., Sharpe, J., & Henkelman, R. M. (2005). Correction of artefacts in optical projection tomography. Physics in Medicine & Biology, 50(19), 4645.'
-
-        Params:
-        - sinogram
-        """
-
-        while self.shift_step >= 1:
-            shifts = np.arange(-self.max_shift, self.max_shift, self.shift_step) + self.center_shift
-            image_std = []
-            for i, shift in enumerate(shifts):
-                if self.order_mode == Order_Modes.Vertical.value and type_sino == "3D":
-                    shift_tuple = (0, shift, 0)
-                elif self.order_mode == Order_Modes.Horizontal.value or type_sino == "2D":
-                    shift_tuple = (shift, 0, 0)
-
-                sino_shift = ndi.shift(sinogram, shift_tuple, mode="nearest")
-
-                # Get image reconstruction
-                shift_iradon = self.reconstruct(sino_shift)
-
-                # Calculate variance
-                image_std.append(np.std(shift_iradon))
-
-            # Update shifts
-            self.center_shift = shifts[np.argmax(image_std)]
-            self.max_shift /= 5
-            self.shift_step /= 2.5
-            if self.order_mode == Order_Modes.Vertical.value and type_sino == "3D":
-                sinogram = ndi.shift(sinogram, (0, self.center_shift, 0), mode="nearest")
-            elif self.order_mode == Order_Modes.Horizontal.value or type_sino == "2D":
-                sinogram = ndi.shift(sinogram, (self.center_shift, 0, 0), mode="nearest")
-
-        # Restart shifts
-        self.max_shift = 200
-        self.shift_step = 10
-        self.center_shift = 0
-        return self.reconstruct(sinogram)
 
     def resize(self, sinogram_volume: np.ndarray, type_sino="3D"):
         """
@@ -672,38 +580,30 @@ class OPTProcessor:
         else:
             sinogram_size = int(np.ceil(self.resize_val * np.sqrt(2)))
 
-        if self.resize_bool == True:
+        if self.order_mode == Order_Modes.Vertical.value:
+
+            sinogram_resize = np.zeros((self.theta, sinogram_size, self.Z), dtype=np.float32)
+
+        elif self.order_mode == Order_Modes.Horizontal.value:
+
+            sinogram_resize = np.zeros((sinogram_size, self.theta, self.Z), dtype=np.float32)
+
+        for idx in tqdm.tqdm(range(self.Z)):
 
             if self.order_mode == Order_Modes.Vertical.value:
-
-                sinogram_resize = np.zeros((self.theta, sinogram_size, self.Z), dtype=np.float32)
+                sinogram_resize[:, :, idx] = cv2.resize(
+                    sinogram_volume[:, :, idx],
+                    (sinogram_size, self.theta),
+                    interpolation=cv2.INTER_NEAREST,
+                )
 
             elif self.order_mode == Order_Modes.Horizontal.value:
+                sinogram_resize[:, :, idx] = cv2.resize(
+                    sinogram_volume[:, :, idx],
+                    (self.theta, sinogram_size),
+                    interpolation=cv2.INTER_NEAREST,
+                )
 
-                sinogram_resize = np.zeros((sinogram_size, self.theta, self.Z), dtype=np.float32)
-
-            for idx in tqdm.tqdm(range(self.Z)):
-
-                if self.order_mode == Order_Modes.Vertical.value:
-                    sinogram_resize[:, :, idx] = cv2.resize(
-                        sinogram_volume[:, :, idx],
-                        (sinogram_size, self.theta),
-                        interpolation=cv2.INTER_NEAREST,
-                    )
-
-                    # sinogram_resize[:, :, idx] = resize_scikit(
-                    #     sinogram_volume[:, :, idx], (self.theta, sinogram_size), anti_aliasing=True
-                    # )
-
-                elif self.order_mode == Order_Modes.Horizontal.value:
-                    sinogram_resize[:, :, idx] = cv2.resize(
-                        sinogram_volume[:, :, idx],
-                        (self.theta, sinogram_size),
-                        interpolation=cv2.INTER_NEAREST,
-                    )
-                    # sinogram_resize[:, :, idx] = resize_scikit(
-                    #     sinogram_volume[:, :, idx], (self.theta, sinogram_size), anti_aliasing=True
-                    # )
 
         return sinogram_resize
 
@@ -721,10 +621,10 @@ class OPTProcessor:
             rotation_factor = 1
         else:
             rotation_factor = 2
+        # give the angles in radians
         self.angles_torch = np.linspace(0, rotation_factor * np.pi, self.theta, endpoint=False)
         self.angles = np.linspace(0, rotation_factor * 180, self.theta, endpoint=False)
 
-        ## Es un enriedo, pero inicializa los generadores de ángulos. Poco claro
 
         if self.iradon_functor == None:
             try:
@@ -732,7 +632,7 @@ class OPTProcessor:
                 self.iradon_functor = radon_thrad(
                     thetas=self.angles_torch,
                     circle=self.clip_to_circle,
-                    filter_name=None if self.use_filter == False else "ramp",
+                    filter_name=None if self.use_filter == False else self.filter_FBP,
                     device=device,
                 )
             except:
@@ -743,7 +643,7 @@ class OPTProcessor:
             self.iradon_functor = radon_thrad(
                 thetas=self.angles_torch,
                 circle=self.clip_to_circle,
-                filter_name=None if self.use_filter == False else "ramp",
+                filter_name=None if self.use_filter == False else self.filter_FBP,
                 device=device,
             )
 
@@ -769,7 +669,7 @@ class OPTProcessor:
                 sino[..., 0],
                 self.angles,
                 circle=self.clip_to_circle,
-                filter_name=None if self.use_filter == False else "ramp",
+                filter_name=None if self.use_filter == False else self.filter_FBP,
             )[..., None]
 
         elif self.rec_process == Rec_Modes.MODL_GPU.value:
@@ -961,3 +861,46 @@ class OPTProcessor:
             reconstruction = reconstruction.max() - reconstruction
 
         return reconstruction
+
+    # def correct_and_reconstruct(self, sinogram: np.ndarray, type_sino="3D"):
+    #     """
+    #     Corrects rotation axis by finding optimal registration via maximising reconstructed image's intensity variance.
+
+    #     Based on 'Walls, J. R., Sled, J. G., Sharpe, J., & Henkelman, R. M. (2005). Correction of artefacts in optical projection tomography. Physics in Medicine & Biology, 50(19), 4645.'
+
+    #     Params:
+    #     - sinogram
+    #     """
+
+    #     while self.shift_step >= 1:
+    #         shifts = np.arange(-self.max_shift, self.max_shift, self.shift_step) + self.center_shift
+    #         image_std = []
+    #         for i, shift in enumerate(shifts):
+    #             if self.order_mode == Order_Modes.Vertical.value and type_sino == "3D":
+    #                 shift_tuple = (0, shift, 0)
+    #             elif self.order_mode == Order_Modes.Horizontal.value or type_sino == "2D":
+    #                 shift_tuple = (shift, 0, 0)
+
+    #             sino_shift = ndi.shift(sinogram, shift_tuple, mode="nearest")
+
+    #             # Get image reconstruction
+    #             shift_iradon = self.reconstruct(sino_shift)
+
+    #             # Calculate variance
+    #             image_std.append(np.std(shift_iradon))
+
+    #         # Update shifts
+    #         self.center_shift = shifts[np.argmax(image_std)]
+    #         self.max_shift /= 5
+    #         self.shift_step /= 2.5
+    #         if self.order_mode == Order_Modes.Vertical.value and type_sino == "3D":
+    #             sinogram = ndi.shift(sinogram, (0, self.center_shift, 0), mode="nearest")
+    #         elif self.order_mode == Order_Modes.Horizontal.value or type_sino == "2D":
+    #             sinogram = ndi.shift(sinogram, (self.center_shift, 0, 0), mode="nearest")
+
+    #     # Restart shifts
+    #     self.max_shift = 200
+    #     self.shift_step = 10
+    #     self.center_shift = 0
+    #     return self.reconstruct(sinogram)
+

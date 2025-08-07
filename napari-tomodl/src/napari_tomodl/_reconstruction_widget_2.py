@@ -270,9 +270,7 @@ class ReconstructionWidget(QTabWidget):
         self.iterations_advanced = Settings(
             "Smoothing Level", dtype=int, initial=2, layout=slayout, write_function=self.set_opt_processor_advanced
         )
-        self.invert_color_advanced = Settings(
-            "Invert colors", dtype=bool, initial=False, layout=slayout, write_function=self.set_opt_processor_advanced
-        )
+
         self.fullvolume_advanced = Settings(
             "Reconstruct full volume", dtype=bool, initial=True, layout=slayout, write_function=self.set_opt_processor_advanced
         )
@@ -292,6 +290,9 @@ class ReconstructionWidget(QTabWidget):
             choices=Order_Modes,
             layout=slayout,
             write_function=self.set_opt_processor_advanced,
+        )
+        self.invert_color_advanced = Settings(
+            "Invert colors", dtype=bool, initial=False, layout=slayout, write_function=self.set_opt_processor_advanced
         )
         self.output_conversion_advanced = Settings(
             "16-bit conversion", dtype=bool, initial=True, layout=slayout, write_function=self.set_opt_processor_advanced
@@ -642,6 +643,8 @@ class ReconstructionWidget(QTabWidget):
                 optVolume = (optVolume - min_val) / (max_val - min_val) * (2**16 - 1)
                 optVolume = optVolume.astype(np.uint16, copy=False)
                 print("done converting to uint16")
+                
+            print("reconstruction shape: ", optVolume.shape)
 
             if self.is_reconstruct_one_advanced.val == True and self.fullvolume_advanced.val == False and self.input_type == "3D":
                 return optVolume[self.slices_advanced.val]

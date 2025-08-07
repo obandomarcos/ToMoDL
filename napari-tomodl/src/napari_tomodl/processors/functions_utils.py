@@ -122,7 +122,7 @@ def fast_reconstruct_FBP(sinogram: np.ndarray, resize_val=None, batch_process=32
     return opt_volume
 
 
-def find_center_shift(sinogram: np.ndarray, bar_thread=None, batch_process=None, type_sino="3D", resize_val=None, order_mode=0, clip_to_circle=False, device="cpu"):
+def find_center_shift(sinogram: np.ndarray, bar_thread=None, type_sino="3D", order_mode=0, clip_to_circle=False, device="cpu"):
     """
     Corrects rotation axis by finding optimal registration via maximising reconstructed image's intensity variance.
 
@@ -132,35 +132,42 @@ def find_center_shift(sinogram: np.ndarray, bar_thread=None, batch_process=None,
     - sinogram
     """
 
-    if resize_val is not None:
-        sinogram = resize_sino(sinogram, order_mode=order_mode, resize_val=resize_val, clip_to_circle=clip_to_circle)
+
+    new_sinogram = resize_sino(sinogram, order_mode=order_mode, resize_val=100, clip_to_circle=clip_to_circle)
         
     if order_mode == 0:
-        theta, Q, Z = sinogram.shape
+        theta, Q, Z = new_sinogram.shape
+        factor_shift = sinogram.shape[1] / Q
     elif order_mode == 1:
-        Q, theta, Z = sinogram.shape
+        Q, theta, Z = new_sinogram.shape
+        factor_shift = sinogram.shape[0] / Q
     
     # max_shift is the number of pixels to shift, take 10 pecent of the sinogram size
-    max_shift = min(int(Q * 0.1), 200)
-    shift_step = min(int(max_shift * 0.05), 9) + 1
+    max_shift = 10
+    shift_step = 2
     center_shift = 0
     # take only xx percent slices from sinogram from the center
-    number_slices = int(Z * 0.2)
+    number_slices = int(Z * 0.5)
     print("max_shift: ", max_shift, "shift_step: ", shift_step, "number_slices: ", number_slices)
-    sino_center = sinogram[:, :, Z//2-number_slices//2:Z//2+number_slices//2]
+    # reduce the number of theta to 100 to reduce the memory usage
+    if theta > 100:
+        factor_theta = theta // 100
+        if order_mode == 0:
+            new_sinogram = new_sinogram[::factor_theta, :, :]
+        elif order_mode == 1:
+            new_sinogram = new_sinogram[:, ::factor_theta, :]
+
+    sino_center = new_sinogram[:, :, Z//2-number_slices//2:Z//2+number_slices//2]
     # calculate batch_process base on theta x Q size for optimizing GPU resource 
     # should be the power of 2 nearest to the result of 1073741 / (theta * Q) with int 
-    if batch_process is None:
-        batch_process = 2**int((np.log2(1073741 / (theta * Q))))
-        
-    print("batch_process: ", batch_process)
+
     if bar_thread is not None:
         bar_thread.start()
         bar_thread.max = 2 *max_shift
         bar_thread.value = 0
         bar_thread.run()
     while shift_step >= 1:
-        shifts = np.arange(-max_shift, max_shift, shift_step) + center_shift
+        shifts = np.arange(-max_shift, max_shift, shift_step)
         image_std = []
         for shift in tqdm.tqdm(shifts):
             if order_mode == 0 and type_sino == "3D":
@@ -171,7 +178,8 @@ def find_center_shift(sinogram: np.ndarray, bar_thread=None, batch_process=None,
             sino_shift = ndi.shift(sino_center, shift_tuple, mode="nearest")
 
             # Get image reconstruction
-            shift_iradon = fast_reconstruct_FBP(sino_shift, device=device, rotation_factor=2, order_mode=order_mode, clip_to_circle=False, batch_process=batch_process)
+            shift_iradon = fast_reconstruct_FBP(sino_shift, device=device, rotation_factor=2, order_mode=order_mode, clip_to_circle=False, 
+                                                batch_process=32)
 
             # Calculate variance
             image_std.append(np.std(shift_iradon))
@@ -188,10 +196,11 @@ def find_center_shift(sinogram: np.ndarray, bar_thread=None, batch_process=None,
             bar_thread.max = 2 * max_shift
             bar_thread.run()
         print("center_shift: ", center_shift, "max_shift: ", max_shift, "shift_step: ", shift_step)
-        if order_mode == 0 and type_sino == "3D":
-            sinogram = ndi.shift(sinogram, (0, center_shift, 0), mode="nearest")
-        elif order_mode == 1 or type_sino == "2D":
-            sinogram = ndi.shift(sinogram, (center_shift, 0, 0), mode="nearest")
+    print("final shift: ", center_shift * factor_shift)
+    if order_mode == 0 and type_sino == "3D":
+        sinogram = ndi.shift(sinogram, (0, center_shift * factor_shift, 0), mode="nearest")
+    elif order_mode == 1 or type_sino == "2D":
+        sinogram = ndi.shift(sinogram, (center_shift * factor_shift, 0, 0), mode="nearest")
     if bar_thread is not None:
         bar_thread.value = 0
         bar_thread.run()

@@ -123,11 +123,11 @@ class ReconstructionWidget(QTabWidget):
         self.basic_reconstruction_layout.addWidget(QLabel("Basic reconstruction"))
         self.basic_reconstruction_layout.addWidget(self.basic_reconstruction_widget)
         
-        self.choose_layer_widget = choose_layer()
-        self.choose_layer_widget.call_button.visible = False
-        self.add_magic_function(self.choose_layer_widget, self.basic_reconstruction_layout)
+        self.choose_layer_widget_basic = choose_layer()
+        self.choose_layer_widget_basic.call_button.visible = False
+        self.add_magic_function(self.choose_layer_widget_basic, self.basic_reconstruction_layout)
         select_button = QPushButton("Select image layer")
-        select_button.clicked.connect(self.select_layer)
+        select_button.clicked.connect(self.select_layer_basic)
         self.basic_reconstruction_layout.addWidget(select_button)
 
         settings_layout = QVBoxLayout()
@@ -156,11 +156,11 @@ class ReconstructionWidget(QTabWidget):
         self.advanced_reconstruction_layout.addWidget(QLabel("Advanced reconstruction"))
         self.advanced_reconstruction_layout.addWidget(self.advanced_reconstruction_widget)
         
-        self.choose_layer_widget = choose_layer()
-        self.choose_layer_widget.call_button.visible = False
-        self.add_magic_function(self.choose_layer_widget, self.advanced_reconstruction_layout)
+        self.choose_layer_widget_advanced = choose_layer()
+        self.choose_layer_widget_advanced.call_button.visible = False
+        self.add_magic_function(self.choose_layer_widget_advanced, self.advanced_reconstruction_layout)
         select_button = QPushButton("Select image layer")
-        select_button.clicked.connect(self.select_layer)
+        select_button.clicked.connect(self.select_layer_advanced)
         self.advanced_reconstruction_layout.addWidget(select_button)
         
         settings_layout = QVBoxLayout()
@@ -323,9 +323,9 @@ class ReconstructionWidget(QTabWidget):
             )
             return layer
 
-    def select_layer(self, sinos: Image):
+    def select_layer_basic(self, sinos: Image):
 
-        sinos = self.choose_layer_widget.image.value
+        sinos = self.choose_layer_widget_basic.image.value
 
         if sinos.data.ndim == 3 and sinos.data.shape[2] > 1:
             self.flat_field_advanced = flat_field_estimate(sinos.data[0])
@@ -336,8 +336,6 @@ class ReconstructionWidget(QTabWidget):
             print(sz, sy, sx)
             if not hasattr(self, "h_basic"):
                 self.start_opt_processor_basic()
-            if not hasattr(self, "h_advanced"):
-                self.start_opt_processor_advanced()
             print(f"Selected image layer: {sinos.name}")
         else:
             self.input_type = "2D"
@@ -348,10 +346,31 @@ class ReconstructionWidget(QTabWidget):
             print(sy, sx)
             if not hasattr(self, "h_basic"):
                 self.start_opt_processor_basic()
+            print(f"Selected image layer: {sinos.name}")
+
+    def select_layer_advanced(self, sinos: Image):
+        sinos = self.choose_layer_widget_advanced.image.value
+
+        if sinos.data.ndim == 3 and sinos.data.shape[2] > 1:
+            self.flat_field_advanced = flat_field_estimate(sinos.data[0])
+            print(f"Flat-field estimate: {self.flat_field_advanced}")
+            self.input_type = "3D"
+            self.imageRaw_name = sinos.name
+            sz, sy, sx = sinos.data.shape
+            print(sz, sy, sx)
             if not hasattr(self, "h_advanced"):
                 self.start_opt_processor_advanced()
             print(f"Selected image layer: {sinos.name}")
-
+        else:
+            self.input_type = "2D"
+            self.imageRaw_name = sinos.name
+            # add dim to the image
+            # sinos.data = np.expand_dims(sinos.data, axis=0)
+            sy, sx = sinos.data.shape
+            print(sy, sx)
+            if not hasattr(self, "h_advanced"):
+                self.start_opt_processor_advanced()
+            print(f"Selected image layer: {sinos.name}")
 
     def stack_reconstruction_basic(self):
         self.scale_image_basic = self.viewer.layers[self.imageRaw_name].scale
@@ -395,7 +414,8 @@ class ReconstructionWidget(QTabWidget):
             optVolume = np.zeros([size_compression, size_compression, self.h_basic.Z], np.float32)
 
             if self.registerbox_basic.val == True:
-                sinos = find_center_shift(sinos, bar_thread=self.bar_thread_basic, type_sino=self.input_type, order_mode=self.orderbox_basic.val, clip_to_circle=False, device=device)
+                sinos = find_center_shift(sinos, bar_thread=self.bar_thread_basic, type_sino=self.input_type, 
+                                          order_mode=self.orderbox_basic.val, clip_to_circle=False, device=device)
 
             # Reconstruction process
             #reconstructing full volume 
@@ -539,9 +559,16 @@ class ReconstructionWidget(QTabWidget):
                 sinos = sinos / self.flat_field_advanced
 
             if self.registerbox_advanced.val == True:
-                sinos = find_center_shift(sinos, batch_process=self.batch_size_advanced.val,bar_thread=self.bar_thread_advanced, 
+                sinos = find_center_shift(sinos, bar_thread=self.bar_thread_advanced, 
                                           type_sino=self.input_type, order_mode=self.orderbox_advanced.val, 
                                           clip_to_circle=self.clipcirclebox_advanced.val, device=device)
+                
+            elif self.manualalignbox_advanced.val == True:
+                if self.orderbox_advanced.val == 0:
+                    sinos = ndi.shift(sinos, (0, self.alignbox_advanced.val, 0), mode="nearest")
+                elif self.orderbox_advanced.val == 1:
+                    sinos = ndi.shift(sinos, (self.alignbox_advanced.val, 0, 0), mode="nearest")
+
 
             # Reconstruction process
             # if reconstructing only one slice
@@ -570,45 +597,18 @@ class ReconstructionWidget(QTabWidget):
                 zidx = slice(batch_start, batch_end)
                 ####################### stacks reconstruction ############################
                 if self.input_type == "3D":
-
-                    if self.manualalignbox_advanced.val == True:
-                        if self.orderbox_advanced.val == 0:
-                            optVolume[:, :, zidx] = self.h_advanced.reconstruct(
-                                ndi.shift(sinos[:, :, zidx], (0, self.alignbox_advanced.val, 0), mode="nearest").transpose(
-                                    1, 0, 2
-                                )
-                            )
-                        elif self.orderbox_advanced.val == 1:
-                            optVolume[:, :, zidx] = self.h_advanced.reconstruct(
-                                ndi.shift(sinos[:, :, zidx], (self.alignbox_advanced.val, 0, 0), mode="nearest")
-                            )
-                    else:
-
-                        if self.orderbox_advanced.val == 0:
-                            optVolume[:, :, zidx] = self.h_advanced.reconstruct(sinos[:, :, zidx].transpose(1, 0, 2))
-                        elif self.orderbox_advanced.val == 1:
-                            optVolume[:, :, zidx] = self.h_advanced.reconstruct(sinos[:, :, zidx])
+                    if self.orderbox_advanced.val == 0:
+                        optVolume[:, :, zidx] = self.h_advanced.reconstruct(sinos[:, :, zidx].transpose(1, 0, 2))
+                    elif self.orderbox_advanced.val == 1:
+                        optVolume[:, :, zidx] = self.h_advanced.reconstruct(sinos[:, :, zidx])
 
                 ####################### 2D reconstruction ############################
                 elif self.input_type == "2D":
+                    if self.orderbox_advanced.val == 0:
+                        optVolume[:, :, zidx] = self.h_advanced.reconstruct(sinos[:, :, zidx].transpose(1, 0, 2))
 
-                    if self.manualalignbox_advanced.val == True:
-                        if self.orderbox_advanced.val == 0:
-                            optVolume[:, :, zidx] = self.h_advanced.reconstruct(
-                                ndi.shift(sinos[:, :, zidx], (0, self.alignbox_advanced.val, 0), mode="nearest").transpose(
-                                    1, 0, 2
-                                )
-                            )
-                        elif self.orderbox_advanced.val == 1:
-                            optVolume[:, :, zidx] = self.h_advanced.reconstruct(
-                                ndi.shift(sinos[:, :, zidx], (self.alignbox_advanced.val, 0, 0), mode="nearest")
-                            )
-                    else:
-                        if self.orderbox_advanced.val == 0:
-                            optVolume[:, :, zidx] = self.h_advanced.reconstruct(sinos[:, :, zidx].transpose(1, 0, 2))
-
-                        elif self.orderbox_advanced.val == 1:
-                            optVolume[:, :, zidx] = self.h_advanced.reconstruct(sinos[:, :, zidx])
+                    elif self.orderbox_advanced.val == 1:
+                        optVolume[:, :, zidx] = self.h_advanced.reconstruct(sinos[:, :, zidx])
 
                 self.bar_thread_advanced.value = batch_end
                 self.bar_thread_advanced.run()

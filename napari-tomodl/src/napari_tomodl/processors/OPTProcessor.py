@@ -654,7 +654,7 @@ class OPTProcessor:
                 sino = sino.transpose(2, 0, 1)
                 sino = torch.from_numpy(sino[:, None, :, :]).to(device)
                 reconstruction = self.iradon_functor.filter_backprojection(sino)
-                reconstruction = normalize_images(reconstruction)
+                # reconstruction = normalize_images(reconstruction)
                 reconstruction = reconstruction.permute(1, 2, 3, 0)[0].cpu()
                 reconstruction = np.asarray(reconstruction.numpy())
 
@@ -742,11 +742,17 @@ class OPTProcessor:
                     sino = torch.from_numpy(sino[:, None, :, :]).to(device)
                     sino = ramp_filter_torch(sino, device=device)
                     reconstruction = radon24.filter_backprojection(sino)
+                    # save mean and std of reconstruction for each image in the batch
+                    mean_reconstruction = reconstruction.mean(dim=(1, 2)).cpu()
+                    std_reconstruction = reconstruction.std(dim=(1, 2)).cpu()
+
                     reconstruction = normalize_images(reconstruction)
                     output = self.iradon_functor(reconstruction)[
                         "dc" + str(self.tomodl_dictionary["K_iterations"])
                     ].cpu()
                     output = normalize_images(output)
+                    # undo the normalization with mean and std of reconstruction
+                    # output = output * std_reconstruction.unsqueeze(1).unsqueeze(1) + mean_reconstruction.unsqueeze(1).unsqueeze(1)
                     # output shape (B, 1, Q, Q)
                     output = np.asarray(output.numpy())
                     output = output.transpose(1, 2, 3, 0)[0]

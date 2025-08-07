@@ -115,12 +115,12 @@ class ReconstructionWidget(QTabWidget):
         
         # i) add a tab widget
         self.acquisition_params_widget_basic = QWidget()
-        self.addTab(self.acquisition_params_widget_basic, "Basic options")
+        self.addTab(self.acquisition_params_widget_basic, "Basic Mode")
         
         # ii) layout
         self.basic_reconstruction_layout = QVBoxLayout()
         self.basic_reconstruction_widget = QWidget()
-        self.basic_reconstruction_layout.addWidget(QLabel("Basic reconstruction"))
+        # self.basic_reconstruction_layout.addWidget(QLabel("Basic reconstruction"))
         self.basic_reconstruction_layout.addWidget(self.basic_reconstruction_widget)
         
         self.choose_layer_widget_basic = choose_layer()
@@ -148,12 +148,12 @@ class ReconstructionWidget(QTabWidget):
         
         # i) add a tab widget
         self.acquisition_params_widget_advanced = QWidget()
-        self.addTab(self.acquisition_params_widget_advanced, "Advanced options")
+        self.addTab(self.acquisition_params_widget_advanced, "Advanced Mode")
         
         # ii) layout
         self.advanced_reconstruction_layout = QVBoxLayout()
         self.advanced_reconstruction_widget = QWidget()
-        self.advanced_reconstruction_layout.addWidget(QLabel("Advanced reconstruction"))
+        # self.advanced_reconstruction_layout.addWidget(QLabel("Advanced reconstruction"))
         self.advanced_reconstruction_layout.addWidget(self.advanced_reconstruction_widget)
         
         self.choose_layer_widget_advanced = choose_layer()
@@ -643,7 +643,7 @@ class ReconstructionWidget(QTabWidget):
                 optVolume = (optVolume - min_val) / (max_val - min_val) * (2**16 - 1)
                 optVolume = optVolume.astype(np.uint16, copy=False)
                 print("done converting to uint16")
-                
+
             print("reconstruction shape: ", optVolume.shape)
 
             if self.is_reconstruct_one_advanced.val == True and self.fullvolume_advanced.val == False and self.input_type == "3D":

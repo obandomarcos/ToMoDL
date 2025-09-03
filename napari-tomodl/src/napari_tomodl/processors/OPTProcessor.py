@@ -13,7 +13,8 @@ from skimage.transform import iradon as iradon_scikit
 # from skimage.transform import resize as resize_scikit
 import torch
 import tifffile as tif
-
+from skimage.filters import median
+from skimage.morphology import disk
 from .unet import UNet
 
 try:
@@ -42,10 +43,15 @@ from . import unet
 # Modify for multi-gpu
 device = torch.device("cuda:0" if use_torch_radon == True else "cpu")
 
-def min_max_normalize_save_factor(image):
-    new_image = (image - image.min()) / (image.max() - image.min())
-    min_image, max_image = image.min(), image.max()
-    return new_image, min_image, max_image
+def mean_std_median_filter(images):
+
+    mean_images = np.zeros((images.shape[0], 1))
+    std_images = np.zeros((images.shape[0], 1))
+    for i, image in enumerate(images):
+        image_median = median(image[0], disk(5))
+        mean_images[i, 0] = image_median.mean()
+        std_images[i, 0] = image_median.std()
+    return mean_images, std_images
 
 def ramp_filter(sinogram):
     num_detectors, num_angles = sinogram.shape
@@ -534,12 +540,7 @@ class OPTProcessor:
         self.batch_size = 1
         self.is_half_rotation = False
         self.filter_FBP = "ramp" # can be  "shepp-logan" or "cosine" or "hamming" or "hann" 
-        self.register_bool = True
-        self.max_shift = 200
-        self.shift_step = 10
-        self.center_shift = 0
         self.is_resize = False
-        self.init_volume_rec = False
         self.iradon_functor = None
         self.invert_color = False
         self.iterations = 6
@@ -660,6 +661,7 @@ class OPTProcessor:
 
                 # save reconstruction to tif file
                 # tif.imwrite("reconstruction_FBP_GPU.tif", reconstruction)
+                # print("mean and std of reconstruction: ", reconstruction[0, :, :].mean(), reconstruction[0, :, :].std())
                 return reconstruction
 
             self.iradon_function = _iradon
@@ -743,18 +745,24 @@ class OPTProcessor:
                     sino = ramp_filter_torch(sino, device=device)
                     reconstruction = radon24.filter_backprojection(sino)
                     # save mean and std of reconstruction for each image in the batch
-                    mean_reconstruction = reconstruction.mean(dim=(1, 2)).cpu()
-                    std_reconstruction = reconstruction.std(dim=(1, 2)).cpu()
+                    # make reconstruction to cpu to apply median filter
+                    reconstruction_new = reconstruction.clone().cpu().numpy()
+                    mean_reconstruction, std_reconstruction = mean_std_median_filter(reconstruction_new)
 
-                    reconstruction = normalize_images(reconstruction)
+                    mean_reconstruction = torch.from_numpy(mean_reconstruction)
+                    std_reconstruction = torch.from_numpy(std_reconstruction)
+                    # median filter the reconstruction 
+                    reconstruction = normalize_images(reconstruction)  
+                    # median filter the reconstruction
                     output = self.iradon_functor(reconstruction)[
                         "dc" + str(self.tomodl_dictionary["K_iterations"])
                     ].cpu()
                     output = normalize_images(output)
                     # undo the normalization with mean and std of reconstruction
-                    # output = output * std_reconstruction.unsqueeze(1).unsqueeze(1) + mean_reconstruction.unsqueeze(1).unsqueeze(1)
+                    output = output * std_reconstruction.unsqueeze(1).unsqueeze(1) + mean_reconstruction.unsqueeze(1).unsqueeze(1)
                     # output shape (B, 1, Q, Q)
                     output = np.asarray(output.numpy())
+                    # print("mean and std of reconstruction: ", output[0, 0, :, :].mean(), output[0, 0, :, :].std())
                     output = output.transpose(1, 2, 3, 0)[0]
 
 
@@ -806,17 +814,37 @@ class OPTProcessor:
                 dict(filter(my_filtering_function, tomodl_checkpoint["state_dict"].items()))
             )
             self.iradon_functor.eval()
+            radon24 = radon_thrad(self.angles_torch, circle=self.clip_to_circle, filter_name=None, device="cpu")
 
             def _iradon(sino):
                 with torch.inference_mode():
-                    sino = ramp_filter(sino[..., 0])
-                    reconstruction = iradon_scikit(sino, self.angles, circle=self.clip_to_circle, filter_name=None)
-                    reconstruction = torch.Tensor(reconstruction[None, None])
-                    reconstruction = normalize_images(reconstruction)
-                    reconstruction = self.iradon_functor(reconstruction)["dc" + str(self.tomodl_dictionary["K_iterations"])]
-                    reconstruction = normalize_images(reconstruction)
-                    reconstruction = np.asarray(reconstruction.numpy())[..., None]
-                    return reconstruction
+                    sino = sino.transpose(2, 0, 1)
+                    sino = torch.from_numpy(sino[:, None, :, :])
+                    sino = ramp_filter_torch(sino, device="cpu")
+                    reconstruction = radon24.filter_backprojection(sino)
+                    # save mean and std of reconstruction for each image in the batch
+                    # make reconstruction to cpu to apply median filter
+                    reconstruction_new = reconstruction.clone().numpy()
+                    mean_reconstruction, std_reconstruction = mean_std_median_filter(reconstruction_new)
+
+                    mean_reconstruction = torch.from_numpy(mean_reconstruction)
+                    std_reconstruction = torch.from_numpy(std_reconstruction)
+                    # median filter the reconstruction 
+                    reconstruction = normalize_images(reconstruction)  
+                    # median filter the reconstruction
+                    output = self.iradon_functor(reconstruction)[
+                        "dc" + str(self.tomodl_dictionary["K_iterations"])
+                    ]
+                    output = normalize_images(output)
+                    # undo the normalization with mean and std of reconstruction
+                    output = output * std_reconstruction.unsqueeze(1).unsqueeze(1) + mean_reconstruction.unsqueeze(1).unsqueeze(1)
+                    # output shape (B, 1, Q, Q)
+                    output = np.asarray(output.numpy())
+                    # print("mean and std of reconstruction: ", output[0, 0, :, :].mean(), output[0, 0, :, :].std())
+                    output = output.transpose(1, 2, 3, 0)[0]
+
+
+                    return output
 
             self.iradon_function = _iradon
 

@@ -671,7 +671,6 @@ class ReconstructionWidget(QTabWidget):
         if hasattr(self, "h_basic"):
             
             self.h_basic.resize_val = Compression_modes[self.compression_basic.text].value
-            self.h_basic.register_bool = self.registerbox_basic.val
             self.h_basic.rec_process = self.reconbox_basic.val
             self.h_basic.order_mode = self.orderbox_basic.val
             self.h_basic.clip_to_circle = False
@@ -704,7 +703,6 @@ class ReconstructionWidget(QTabWidget):
         if hasattr(self, "h_advanced"):
 
             self.h_advanced.resize_val = self.resizebox_advanced.val
-            self.h_advanced.register_bool = self.registerbox_advanced.val
             self.h_advanced.rec_process = self.reconbox_advanced.val
             self.h_advanced.order_mode = self.orderbox_advanced.val
             self.h_advanced.clip_to_circle = self.clipcirclebox_advanced.val

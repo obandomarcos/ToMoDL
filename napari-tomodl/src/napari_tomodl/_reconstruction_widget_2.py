@@ -10,6 +10,7 @@ from .processors.functions_utils import *
 from .widget_settings import Settings, Combo_box
 import gc
 import torch
+import datetime
 import tifffile as tif
 # import processors
 import napari
@@ -415,8 +416,9 @@ class ReconstructionWidget(QTabWidget):
             optVolume = np.zeros([size_compression, size_compression, self.h_basic.Z], np.float32)
 
             if self.registerbox_basic.val == True:
+                rotation_factor = 2 if self.is_half_rotation_basic.val == True else 1
                 sinos = find_center_shift(sinos, bar_thread=self.bar_thread_basic, type_sino=self.input_type, 
-                                          order_mode=self.orderbox_basic.val, clip_to_circle=False, device=device)
+                                          order_mode=self.orderbox_basic.val, clip_to_circle=False, device=device, rotation_factor=rotation_factor)
 
             # Reconstruction process
             #reconstructing full volume 
@@ -443,7 +445,9 @@ class ReconstructionWidget(QTabWidget):
             # add progressBar to track the reconstruction process
             self.bar_thread_basic.start()
             self.bar_thread_basic.max = slices_reconstruction[-1] + 1
-            time_in = time()
+            # calculate the total time of reconstruction
+            total_time = 0
+            time_in = datetime.datetime.now()
             while batch_start <= slices_reconstruction[-1]:
                 print("Reconstructing slices {} to {}".format(batch_start, batch_end), end="\r")
                 zidx = slice(batch_start, batch_end)
@@ -465,8 +469,8 @@ class ReconstructionWidget(QTabWidget):
                 self.bar_thread_basic.run()
                 batch_start = batch_end
                 batch_end += batch_process
-
-            print("Computation time total: {} s".format(round(time() - time_in, 3)))
+            total_time = datetime.datetime.now() - time_in
+            print("Computation time total: {} s".format(total_time.total_seconds()))
 
             self.bar_thread_basic.value = 0
             self.bar_thread_basic.run()
@@ -560,9 +564,10 @@ class ReconstructionWidget(QTabWidget):
                 sinos = sinos / self.flat_field_advanced
 
             if self.registerbox_advanced.val == True:
+                rotation_factor = 2 if self.is_half_rotation_advanced.val == True else 1
                 sinos = find_center_shift(sinos, bar_thread=self.bar_thread_advanced, 
                                           type_sino=self.input_type, order_mode=self.orderbox_advanced.val, 
-                                          clip_to_circle=self.clipcirclebox_advanced.val, device=device)
+                                          clip_to_circle=self.clipcirclebox_advanced.val, device=device, rotation_factor=rotation_factor)
                 
             elif self.manualalignbox_advanced.val == True:
                 if self.orderbox_advanced.val == 0:

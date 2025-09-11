@@ -122,7 +122,7 @@ def fast_reconstruct_FBP(sinogram: np.ndarray, resize_val=None, batch_process=32
     return opt_volume
 
 
-def find_center_shift(sinogram: np.ndarray, bar_thread=None, type_sino="3D", order_mode=0, clip_to_circle=False, device="cpu"):
+def find_center_shift(sinogram: np.ndarray, bar_thread=None, rotation_factor=2, type_sino="3D", order_mode=0, clip_to_circle=False, device="cpu"):
     """
     Corrects rotation axis by finding optimal registration via maximising reconstructed image's intensity variance.
 
@@ -178,7 +178,7 @@ def find_center_shift(sinogram: np.ndarray, bar_thread=None, type_sino="3D", ord
             sino_shift = ndi.shift(sino_center, shift_tuple, mode="nearest")
 
             # Get image reconstruction
-            shift_iradon = fast_reconstruct_FBP(sino_shift, device=device, rotation_factor=2, order_mode=order_mode, clip_to_circle=False, 
+            shift_iradon = fast_reconstruct_FBP(sino_shift, device=device, rotation_factor=rotation_factor, order_mode=order_mode, clip_to_circle=False, 
                                                 batch_process=32)
 
             # Calculate variance

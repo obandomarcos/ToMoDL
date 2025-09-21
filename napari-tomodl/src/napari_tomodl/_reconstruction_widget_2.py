@@ -393,6 +393,7 @@ class ReconstructionWidget(QTabWidget):
             """
 
             if self.orderbox_basic.val == 0 and self.input_type == "3D":
+                print("shape of sinos: ", self.get_sinos().shape)
                 sinos = np.moveaxis(np.float32(self.get_sinos()), 1, 2)
                 self.h_basic.theta, self.h_basic.Q, self.h_basic.Z = sinos.shape
             elif self.orderbox_basic.val == 1 and self.input_type == "3D":

@@ -40,32 +40,7 @@ Recent advances in different tomographic methodologies have contributed to a bro
 
 Here, we introduce napari-ToMoDL, a plugin for napari [@chiu2022napari] (open-source, interactive, N-dimensional image viewer) that contains four main tomographic reconstruction methods, which often require the use of separate software for each: filtered backprojection (FBP) [@kak2001principles], Two-step Iterative Shrinkage/Thresholding (TwIST) [@bioucas2007new] [@correia2015accelerated], U-Net [@ronneberger2015u] [@davis2019convolutional] and ToMoDL [@obando2023model], where the latter corresponds to our recently introduced model-based deep learning reconstruction method for accelerated Optical Projection Tomography (OPT). The neural network-based techniques have been trained using the PyTorch framework [@NEURIPS2019_9015] and demonstrate excellent performance when reconstruction is performed from a very sparse set of projections (i.e., accelerated scans or undersampled data) [@obando2023model]. Additionally, the plugin  offers the capability of axis alignment via manual selection or variance maximisation [@walls2005correction], along with a range of other image pre-processing and processing options \autoref{fig:Figura1}. 
 
-The **input** to napari-tomodl is an **ordered stack of projection images** acquired over a set of angular positions (typically 0–180° \[half rotation\] or 0–360° \[full-rotation\]). The plugin automatically interprets the stack as a sinogram volume and prepares it for tomographic reconstruction.
-
-Before reconstruction, the user must **define the rotation axis** of the imaging system — either **vertical** or **horizontal** — to ensure that projections are interpreted in the correct geometric configuration. After that, users can select the **reconstruction method** from a range of options, including both analytical and deep-learning-based algorithms.
-
-In addition to the core settings, napari-tomodl provides several **optional preprocessing and reconstruction controls** that enhance flexibility and reconstruction quality:
-
-- **Projection image resizing/compression**  
-  Reduces the Z-axis dimension to accelerate computation or reduce memory usage, with adjustable compression levels (**high**, **medium**, **low**, or **none**).
-
-- **Manual or automatic center-of-rotation alignment**  
-  Corrects for misalignment in the rotation axis. The automatic mode implements the *Wall method* [@walls2005correction], which estimates the correct center by optimizing symmetry in the sinogram.
-
-- **Clip to circle**  
-  Restricts reconstruction to a circular field of view, removing background noise and improving visualization for cylindrical samples.
-
-- **Filter selection (for FBP methods)**  
-  Users can choose the desired filtering kernel (e.g., *Ram-Lak*, *Shepp-Logan*, etc.) for the filtered backprojection algorithm, balancing noise suppression and edge preservation.
-
-- **Full or partial volume reconstruction**  
-  Enables fast testing or memory-efficient reconstruction by limiting computation to a subset of slices along the detector axis.
-
-- **Intensity inversion**  
-  Inverts grayscale values in the reconstructed image volume, which can be useful when projection data were acquired with inverted intensity mapping.
-
-- **CPU/GPU selection**  
-  Users can choose whether to perform reconstruction on the CPU or accelerate computations using the GPU depending on available hardware and the selected algorithm. When running on the GPU, napari-tomodl supports **batch reconstruction**, allowing multiple slices to be reconstructed **in parallel** to significantly improve processing speed. Batch size can be adjusted depending on available GPU memory.
+The input to the napari-tomodl plugin is an ordered stack of projection images acquired during a tomography scan, typically provided in standard image formats such as TIFF, JPEG, or PNG. The user simply specifies the rotation axis of the system (vertical or horizontal) and selects the desired reconstruction method. Several additional options are available to enhance reconstruction quality and performance, including **projection image resizing or compression**, **manual or automatic center-of-rotation alignment**, **clipping to circular regions**, **filter selection for FBP methods**, **partial or full volume reconstruction**, **intensity inversion**, and **CPU/GPU computation selection**. Together, these features make napari-tomodl a flexible and efficient framework for performing tomographic reconstructions directly within the napari environment.
 
 
 napari-ToMoDL is integrally based on well-established open source software libraries such as NumPy [@harris2020array], Scipy [@virtanen2020scipy] and scikit-image [@scikit-image]. The neural network methods in U-Net and ToMoDL are implemented in PyTorch [@NEURIPS2019_9015]. The computational burden imposed by the iterative application of the Radon transform is mitigated through the use of an adapted version of QBI-radon — a fast, differentiable routine for computed tomography reconstruction.  This implementation, developed as a PyTorch 2.0 extension enables efficient execution on both CPU and GPU across all major operating systems.  
@@ -123,6 +98,28 @@ In \autoref{fig:Workflow}, a complete pipeline describing the usage of napari-to
 
 Once these steps are completed, the 'Reconstruction' button allows for executing the desired specifications for image recovery from projections. In napari, outputs are written as image layers which can be analysed by other plugins and saved in different formats. One special feature that napari offers on top of 3D images is volume renderization, useful once a full volume is computed with the presented plugin. Normalization of intensity and contrast can be also applied to specific layers using napari's built-in tools in the top-left bar.
 
+In addition to the core settings, napari-tomodl provides several **optional preprocessing and reconstruction controls** that enhance flexibility and reconstruction quality:
+
+- **Projection image resizing/compression**  
+  Reduces the Z-axis dimension to accelerate computation or reduce memory usage, with adjustable compression levels (**high**, **medium**, **low**, or **none**).
+
+- **Manual or automatic center-of-rotation alignment**  
+  Corrects for misalignment in the rotation axis. The automatic mode implements the *Wall method* [@walls2005correction], which estimates the correct center by optimizing symmetry in the sinogram.
+
+- **Clip to circle**  
+  Restricts reconstruction to a circular field of view, removing background noise and improving visualization for cylindrical samples.
+
+- **Filter selection (for FBP methods)**  
+  Users can choose the desired filtering kernel (e.g., *Ram-Lak*, *Shepp-Logan*, etc.) for the filtered backprojection algorithm, balancing noise suppression and edge preservation.
+
+- **Full or partial volume reconstruction**  
+  Enables fast testing or memory-efficient reconstruction by limiting computation to a subset of slices along the detector axis.
+
+- **Intensity inversion**  
+  Inverts grayscale values in the reconstructed image volume, which can be useful when projection data were acquired with inverted intensity mapping.
+
+- **CPU/GPU selection**  
+  Users can choose whether to perform reconstruction on the CPU or accelerate computations using the GPU depending on available hardware and the selected algorithm. When running on the GPU, napari-tomodl supports **batch reconstruction**, allowing multiple slices to be reconstructed **in parallel** to significantly improve processing speed. Batch size can be adjusted depending on available GPU memory.
 
 
 # Use cases

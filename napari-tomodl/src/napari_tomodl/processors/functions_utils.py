@@ -132,8 +132,15 @@ def find_center_shift(sinogram: np.ndarray, bar_thread=None, rotation_factor=2, 
     - sinogram
     """
 
+    if order_mode == 0:
+        theta, Q, Z = sinogram.shape
+    elif order_mode == 1:
+        Q, theta, Z = sinogram.shape
 
-    new_sinogram = resize_sino(sinogram, order_mode=order_mode, resize_val=100, clip_to_circle=clip_to_circle)
+    if Q > 300:
+        new_sinogram = resize_sino(sinogram, order_mode=order_mode, resize_val=100, clip_to_circle=clip_to_circle)
+    else:
+        new_sinogram = sinogram
         
     if order_mode == 0:
         theta, Q, Z = new_sinogram.shape
@@ -147,8 +154,8 @@ def find_center_shift(sinogram: np.ndarray, bar_thread=None, rotation_factor=2, 
     shift_step = 2
     center_shift = 0
     # take only xx percent slices from sinogram from the center
-    number_slices = int(Z * 0.5)
-    print("max_shift: ", max_shift, "shift_step: ", shift_step, "number_slices: ", number_slices)
+
+    print("max_shift: ", max_shift, "shift_step: ", shift_step, )
     # reduce the number of theta to 100 to reduce the memory usage
     if theta > 100:
         factor_theta = theta // 100
@@ -157,7 +164,7 @@ def find_center_shift(sinogram: np.ndarray, bar_thread=None, rotation_factor=2, 
         elif order_mode == 1:
             new_sinogram = new_sinogram[:, ::factor_theta, :]
 
-    sino_center = new_sinogram[:, :, Z//2-number_slices//2:Z//2+number_slices//2]
+
     # calculate batch_process base on theta x Q size for optimizing GPU resource 
     # should be the power of 2 nearest to the result of 1073741 / (theta * Q) with int 
 
@@ -175,7 +182,7 @@ def find_center_shift(sinogram: np.ndarray, bar_thread=None, rotation_factor=2, 
             elif order_mode == 1 or type_sino == "2D":
                 shift_tuple = (shift, 0, 0)
 
-            sino_shift = ndi.shift(sino_center, shift_tuple, mode="nearest")
+            sino_shift = ndi.shift(new_sinogram, shift_tuple, mode="nearest")
 
             # Get image reconstruction
             shift_iradon = fast_reconstruct_FBP(sino_shift, device=device, rotation_factor=rotation_factor, order_mode=order_mode, clip_to_circle=False, 
@@ -200,7 +207,7 @@ def find_center_shift(sinogram: np.ndarray, bar_thread=None, rotation_factor=2, 
     if order_mode == 0 and type_sino == "3D":
         sinogram = ndi.shift(sinogram, (0, center_shift * factor_shift, 0), mode="nearest")
     elif order_mode == 1 or type_sino == "2D":
-        sinogram = ndi.shift(sinogram, (center_shift * factor_shift, 0, 0), mode="nearest")
+        sinogram = ndi.shift(sinogram, (-center_shift * factor_shift, 0, 0), mode="nearest")
     if bar_thread is not None:
         bar_thread.value = 0
         bar_thread.run()

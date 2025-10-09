@@ -173,7 +173,7 @@ class ReconstructionWidget(QTabWidget):
 
     def createSettingsBasic(self, slayout):
         self.is_half_rotation_basic = Settings(
-            "Half-rotation (angles 0-179)", dtype=bool, initial=False, layout=slayout, write_function=self.set_opt_processor_basic
+            "Half-rotation (angles 0-180)", dtype=bool, initial=False, layout=slayout, write_function=self.set_opt_processor_basic
         )
 
         self.registerbox_basic = Settings(
@@ -226,7 +226,7 @@ class ReconstructionWidget(QTabWidget):
 
     def createSettingsAdvanced(self, slayout):
         self.is_half_rotation_advanced = Settings(
-            "Half-rotation", dtype=bool, initial=False, layout=slayout, write_function=self.set_opt_processor_advanced
+            "Half-rotation (angles 0-180)", dtype=bool, initial=False, layout=slayout, write_function=self.set_opt_processor_advanced
         )
 
         self.registerbox_advanced = Settings(
@@ -237,7 +237,7 @@ class ReconstructionWidget(QTabWidget):
             "Manual axis alignment", dtype=bool, initial=False, layout=slayout, write_function=self.set_opt_processor_advanced
         )
 
-        self.alignbox_advanced = Settings("Axis shift", dtype=int, vmin=-500, vmax=500, initial=0, layout=slayout, write_function=self.set_opt_processor_advanced)
+        self.alignbox_advanced = Settings("Axis shift", dtype=float, vmin=-500, vmax=500, initial=0, layout=slayout, write_function=self.set_opt_processor_advanced)
 
         self.reshapebox_advanced = Settings(
             "Reshape volume", dtype=bool, initial=True, layout=slayout, write_function=self.set_opt_processor_advanced
@@ -627,13 +627,16 @@ class ReconstructionWidget(QTabWidget):
             self.bar_thread_advanced.value = 0
             self.bar_thread_advanced.run()
             optVolume = np.rollaxis(optVolume, -1)
+            
             #  change the scale instead of resizing ################################### TODO: change this to resizing
             if self.reshapebox_advanced.val:
                 if self.is_reconstruct_one_advanced.val == True and self.fullvolume_advanced.val == False and self.input_type == "3D":
                     self.scale_image_advanced = [self.scale_image_advanced[0] * original_size / self.resizebox_advanced.val, self.scale_image_advanced[1]* original_size / self.resizebox_advanced.val]
                 elif self.fullvolume_advanced.val == True and self.input_type == "3D":
                     self.scale_image_advanced = [self.scale_image_advanced[0], self.scale_image_advanced[1] * original_size / self.resizebox_advanced.val, self.scale_image_advanced[2]* original_size / self.resizebox_advanced.val]
-            
+            else:
+                if self.is_reconstruct_one_advanced.val == True and self.fullvolume_advanced.val == False and self.input_type == "3D":
+                    self.scale_image_advanced = [1., 1.]
 
             self.bar_thread_advanced.value = 0
             self.bar_thread_advanced.run()
@@ -653,6 +656,7 @@ class ReconstructionWidget(QTabWidget):
             print("reconstruction shape: ", optVolume.shape)
 
             if self.is_reconstruct_one_advanced.val == True and self.fullvolume_advanced.val == False and self.input_type == "3D":
+                print("scale image advanced: ", self.scale_image_advanced)
                 return optVolume[self.slices_advanced.val]
             elif self.input_type == "3D":
                 return optVolume

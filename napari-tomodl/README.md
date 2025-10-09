@@ -161,7 +161,7 @@ If you encounter any problems, please [file an issue] along with a detailed desc
 [cookiecutter-napari-plugin]: https://github.com/napari/cookiecutter-napari-plugin
 
 [QBI_radon]: https://github.com/QBioImaging/QBI_radon
-[Wall-method]: https://doi.org/10.1088/0031-9155/50/19/4645
+[Wall-method]: https://doi.org/10.1088/0031-9155/50/19/015
 [ToMoDL-paper]: https://doi.org/10.1038/s41598-023-47650-3
 [napari]: https://github.com/napari/napari
 [tox]: https://tox.readthedocs.io/en/latest/

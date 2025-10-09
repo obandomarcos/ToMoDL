@@ -66,7 +66,9 @@ The filter used in FBP is typically a ramp filter, which amplifies high-frequenc
 - **ToMoDL** is a  model-based deep learning framework  that combines iteration over a data consistency step and an image domain artefact removal step achieved by a convolutional neural network. The data consistency step is implemented using the gradient conjugate algorithm and the artefact removal via a deep neural network with shared weights across iterations. As the forward model is explicitly accounted for, the number of network parameters to be learned is significantly reduced compared to direct inversion approaches, providing better performance in settings where training data is constrained [@obando2023model].
 
 In \autoref{fig:Figura1}, a complete pipeline describing the usage of napari-tomodl is presented. Based on 1-channel raw data acquired by a parallel tomography use-case, this ordered stack of files undergoes the following steps in order to obtain ready-to-analyse reconstructions. The complete napari-tomodl pipeline is described here.
-![\textbf{Napari-tomodl usage pipeline.} step-by-step from a stack of raw projection acquisition to reconstruction of single specific slice or full volume.\label{fig:Figura1}](./napari-tomodl/figures/Figure1.pdf)
+
+![\textbf{napari-tomodl usage pipeline.}. step-by-step from a stack of raw projection acquisition to reconstruction of single specific slice or full volume.\label{fig:Figura1}](./napari-tomodl/figures/Figure1.pdf)
+
 
 1. **Load stack** – The workflow begins by importing the ordered stack of raw projection images (sinograms) into *napari* using its file manager. This generates a new 3D image layer representing the raw data to be reconstructed.
 
@@ -101,7 +103,7 @@ Once these steps are completed, the 'Reconstruction' button allows for executing
 In addition to the core settings, napari-tomodl provides several **optional preprocessing and reconstruction controls** that enhance flexibility and reconstruction quality:
 
 - **Projection image resizing/compression**  
-  Reduces the Z-axis dimension to accelerate computation or reduce memory usage, with adjustable compression levels (**high**, **medium**, **low**, or **none**).
+  Reduces the Z-axis dimension to accelerate computation or reduce memory usage, with adjustable compression levels (**HIGH**, **MEDIUM**, **LOW**, or **NO**).
 
 - **Manual or automatic center-of-rotation alignment**  
   Corrects for misalignment in the rotation axis. The automatic mode implements the *Wall method* [@walls2005correction], which estimates the correct center by optimizing symmetry in the sinogram.

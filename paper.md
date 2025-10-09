@@ -22,7 +22,7 @@ affiliations:
    index: 3
  - name: Instituto Balseiro, Bariloche, Argentina
    index: 4
- - name: Centre of Marine Sciences, University of Algarve, Faro, Portugal
+ - name: Quantitative Bio-Imaging Lab, Centro de Ciências do Mar do Algarve (CCMAR/CIMAR LA), University of Algarve, Faro, Portugal
    index: 5
  - name: School of Biomedical Engineering and Imaging Sciences, King’s College London, London, United Kingdom
    index: 6
@@ -36,17 +36,17 @@ bibliography: paper.bib
 
 # Summary
 
-Recent advances in different tomographic methodologies have contributed to a broad range of applications and research areas, from x-ray imaging dealing with medical [@ginat2014advances] and industrial [@de2014industrial] applications to optical sectioning, which provides a mesoscopic framework to visualise translucent samples [@sharpe2004optical], just to name a few. Tomographic imaging involves acquiring raw data (2D projections) from various angles around the object of interest. Once data is acquired, we face several challenges: first, artifacts should be corrected in a preprocessing stage if needed, then,  raw projections should be reconstructed via a mathematical algorithm, and, finally, the results should be visualised in a suitable way.
+Recent advances in different tomographic methodologies have contributed to a broad range of applications and research areas, from X-ray imaging dealing with medical [@ginat2014advances] and industrial [@de2014industrial] applications to optical sectioning, which provides a mesoscopic framework to visualise translucent samples [@sharpe2004optical], just to name a few. Tomographic imaging involves acquiring raw data (2D projections) from various angles around the object of interest. Once data are acquired, there are several challenges: first, if necessary, artefacts should be corrected in a preprocessing stage; then, raw projections should be reconstructed via a mathematical algorithm; and, finally, the results should be visualised as 2D cross-sectional images (slices) and 3D renderings (combined slices), providing a complete and interactive view of the internal structure of the sample.  
 
-Here, we introduce napari-ToMoDL, a plugin of the napari viewer [@chiu2022napari]  that contains four main methods for tomographic reconstruction, often requiring the use of different software or toolboxes for each of these steps: filtered backprojection (FBP) [@kak2001principles], Two-step Iterative Shrinkage/Thresholding (TwIST) [@bioucas2007new], U-Net [@ronneberger2015u] [@davis2019convolutional] and ToMoDL [@obando2023model], where the latter corresponds to our recently introduced model-based deep learning reconstruction method for accelerated Optical Projection  Tomography (OPT). The neural network based techniques have been trained in the PyTorch framework [@NEURIPS2019_9015] and they display excellent results when the reconstruction is performed using a very sparse set of projections [@obando2023model]. The plugin also offers the capability of axis alignment via manual selection and variance maximization [@walls2005correction]. 
+Here, we introduce napari-ToMoDL, a plugin for napari [@chiu2022napari] (open-source, interactive, N-dimensional image viewer) that contains four main tomographic reconstruction methods, which often require the use of separate software for each: filtered backprojection (FBP) [@kak2001principles], Two-step Iterative Shrinkage/Thresholding (TwIST) [@bioucas2007new] [@correia2015accelerated], U-Net [@ronneberger2015u] [@davis2019convolutional] and ToMoDL [@obando2023model], where the latter corresponds to our recently introduced model-based deep learning reconstruction method for accelerated Optical Projection Tomography (OPT). The neural network-based techniques have been trained using the PyTorch framework [@NEURIPS2019_9015] and demonstrate excellent performance when reconstruction is performed from a very sparse set of projections (i.e., accelerated scans or undersampled data) [@obando2023model]. Additionally, the plugin  offers the capability of axis alignment via manual selection or variance maximisation [@walls2005correction], along with a range of other image pre-processing and processing options \autoref{fig:Figura1}. 
 
-The **input** to napari-tomodl is an **ordered stack of projection images** acquired over a set of angular positions (typically 0–180° or 0–360°). The plugin automatically interprets the stack as a sinogram volume and prepares it for tomographic reconstruction.
+The **input** to napari-tomodl is an **ordered stack of projection images** acquired over a set of angular positions (typically 0–180° \[half rotation\] or 0–360° \[full-rotation\]). The plugin automatically interprets the stack as a sinogram volume and prepares it for tomographic reconstruction.
 
 Before reconstruction, the user must **define the rotation axis** of the imaging system — either **vertical** or **horizontal** — to ensure that projections are interpreted in the correct geometric configuration. After that, users can select the **reconstruction method** from a range of options, including both analytical and deep-learning-based algorithms.
 
 In addition to the core settings, napari-tomodl provides several **optional preprocessing and reconstruction controls** that enhance flexibility and reconstruction quality:
 
-- **Projection image resizing / compression**  
+- **Projection image resizing/compression**  
   Reduces the Z-axis dimension to accelerate computation or reduce memory usage, with adjustable compression levels (**high**, **medium**, **low**, or **none**).
 
 - **Manual or automatic center-of-rotation alignment**  
@@ -135,7 +135,7 @@ of the training phase.
 2. High resolution X-ray parallel tomography (X-ray CT).
 Projection data from a foramnifera were obtained using 20 KeV X rays and a high resolution detector with 1024x1280 pixels (5 μm per pixel). A rotatory support was used to acquire 360 projections with 1 degree interval. The projections were resampled to 256x320 to reduce computational complexity. The raw data was processed using phase contrast techniques to improve contrast [@Paganin2002]. 
 3. High-Throughput Tomography (HiTT).
-Projection data from a mosquito gut, osmium stained and resin embedded using a phase-contrast imaging platform for life-science samples on the EMBL beamline [@albers2024high]. The HiTT dataset contains 1800 projections with 0.1 degrees interval with a size of 2048x1800 pixels each (0.65 μm per pixel). The projections were resampled to have a resolution of 512x510 pixels.
+Projection data from a mosquito gut, osmium-stained and resin-embedded using a phase-contrast imaging platform for life-science samples on the EMBL beamline [@albers2024high]. The HiTT dataset contains 1800 projections with a 0.1-degree interval, with a size of 4040x2048 pixels each (0.65 μm per pixel). The projections were downsampled by a factor of 2.
 
 In \autoref{fig:Figura2} we show examples of the projections used for the reconstruction process and a view of the 3D volume obtained using the plugin with the ToMoDL option (projection images not shown). The volumes were fully rendered using in-built napari capabilities, allowing for a full integration on the data analysis workflow of the platform. 
 

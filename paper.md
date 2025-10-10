@@ -6,13 +6,15 @@ authors:
     equal-contrib: true
     affiliation: "1,2" # (Multiple affiliations must be quoted)
   - name: Minh Nhat Trinh
-    affiliation: 5 # (Multiple affiliations must be quoted)
-  - name: Germán Mato 
+    affiliation: 3 # (Multiple affiliations must be quoted)
     equal-contrib: true # (This is how you can denote equal contributions between multiple authors)
-    affiliation: "3,4"
-  - name: Teresa Correia
+  - name: David Pale\v{c}ek
+    affiliation: 3 # (Multiple affiliations must be quoted)
+  - name: Germán Mato 
+    affiliation: "4,5"
+  - name: Teresa Correia 
     corresponding: true # (This is how to denote the corresponding author)
-    affiliation: "5,6"
+    affiliation: "3,6"
 affiliations:
  - name: Centrum Wiskunde & Informatica, Amsterdam, the Netherlands
    index: 1
@@ -22,7 +24,7 @@ affiliations:
    index: 3
  - name: Instituto Balseiro, Bariloche, Argentina
    index: 4
- - name: Quantitative Bio-Imaging Lab, Centro de Ciências do Mar do Algarve (CCMAR/CIMAR LA), University of Algarve, Faro, Portugal
+ - name: Centro de Ciências do Mar do Algarve (CCMAR/CIMAR LA), University of Algarve, Faro, Portugal
    index: 5
  - name: School of Biomedical Engineering and Imaging Sciences, King’s College London, London, United Kingdom
    index: 6

@@ -883,6 +883,7 @@ class OPTProcessor:
             def _iradon(sino):
                 sino = sino.transpose(2, 0, 1)
                 sino = torch.from_numpy(sino[:, None, :, :]).to(device)
+                # sino = ramp_filter_torch(sino, device=device)
                 reconstruction = radon24.filter_backprojection(sino)
                 output = self.iradon_functor(reconstruction).detach().cpu()
                 output = np.asarray(output.numpy())

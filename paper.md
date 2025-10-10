@@ -82,7 +82,9 @@ The complete napari-tomodl pipeline includes:
    * *Automatic alignment* applies an efficient implementation of the variance maximisation method [@walls2005correction] to estimate the correct center of rotation.
    * *Manual alignment* allows the user to specify the pixel offset corresponding to the rotation axis shift. For fine-tuning, a single-slice reconstruction is recommended for iterative manual adjustment.
 
-5. **Data pre-processing** – Optional pre-processing steps such as flat-field correction and image resizing can be applied to normalise projection intensities and adapt image dimensions before reconstruction.
+5. **Data pre-processing** – Optional pre-processing steps such as flat-field correction and image resizing can be applied to normalise projection intensities and adapt image dimensions before reconstruction. As an altenative, in the basic mode, users can select: 
+
+**Compression/projection image resizing** - Reduces the Z-axis dimension to accelerate computation or reduce memory usage, with adjustable compression levels (**HIGH**, **MEDIUM**, **LOW**, or **NO**).
 
 6. **Reconstruction methods** – Users can select between different reconstruction algorithms according to their application:
 
@@ -93,7 +95,9 @@ The complete napari-tomodl pipeline includes:
 
 **CPU/GPU selection** Users can choose whether to perform reconstruction on the CPU or accelerate computations using the GPU, depending on available hardware and the selected algorithm. When running on the GPU, napari-tomodl supports **batch reconstruction**, allowing multiple slices to be reconstructed **in parallel** to significantly improve processing speed. Batch size can be adjusted depending on available GPU memory.
 
-7. **Reconstruction settings** – Parameters controlling reconstruction quality can be adjusted, including the choice of filter (for FBP), smoothing level, and whether to clip the reconstruction to a circular field of view. **Clip to circle** Restricts reconstruction to a circular field of view, removing background noise and improving visualization for cylindrical samples. **Filter selection (for FBP methods)** Users can choose the desired filtering kernel (e.g., *Ram-Lak*, *Shepp-Logan*, etc.) for the filtered backprojection algorithm, balancing noise suppression and edge preservation.  **Smoothing level** corresponds to the number of iterations, which controls the sharpness/smoothness of the reconstructed images. 
+7. **Reconstruction settings** – Parameters controlling reconstruction quality can be adjusted, including the choice of filter (for FBP), smoothing level, and whether to clip the reconstruction to a circular field of view. **Clip to circle** Restricts reconstruction to a circular field of view, removing background noise and improving visualization for cylindrical samples. **Filter selection (for FBP methods)** Users can choose the desired filtering kernel (e.g., *Ram-Lak*, *Shepp-Logan*, etc.) for the filtered backprojection algorithm, balancing noise suppression and edge preservation.  **Smoothing level** corresponds to the number of iterations, which controls the sharpness/smoothness of the reconstructed images. As an altenative, in the basic mode, users can select: 
+
+**Smoothing level** Select the smoothing strength of ToMoDL  (**HIGH**, **MEDIUM**, **LOW**).
 
 8. **Reconstruct full volume or specific slice(s)** – Users can decide whether to reconstruct the entire volume or only a specific slice. For large datasets, reconstructions can be performed in multiple batches, optimizing memory usage and computational efficiency.
 
@@ -102,14 +106,6 @@ The complete napari-tomodl pipeline includes:
 10. **Volume post-processing** – Finally, reconstructed volumes can undergo optional post-processing steps, such as color inversion or conversion to 16-bit depth, generating final images ready for quantitative analysis or visualization within *napari*. **Full or partial volume reconstruction** Enables fast testing or memory-efficient reconstruction by limiting computation to a subset of slices along the detector axis. **Intensity inversion** Inverts grayscale values in the reconstructed image volume, which can be useful when projection data were acquired with inverted intensity mapping.
 
 Once these steps are completed, the 'Reconstruction' button allows for executing the desired specifications for image recovery from projections. In napari, outputs are written as image layers, which can be analysed by other plugins and saved in different formats. One special feature that napari offers on top of 3D images is volume rendering, useful once a full volume is computed with the presented plugin. Normalisation of intensity and contrast can also be applied to specific layers using napari's built-in tools in the top-left bar.
-
-The napari-tomodl basic model is designed to provide a more accessible solution for non-expert users. Basic mode options include [3] **Half-rotation scans** , [4] **Automatic centre-of-rotation alignment** , [9] **Rotation axis slection** , [6] **Reconstruction methods** , in addition to:  
-
-- [5] **Compression/projection image resizing**  
-  Reduces the Z-axis dimension to accelerate computation or reduce memory usage, with adjustable compression levels (**HIGH**, **MEDIUM**, **LOW**, or **NO**).
-
-- [7] **Smoothing level**  
-  Select the smoothing strength of ToMoDL  (**HIGH**, **MEDIUM**, **LOW**).
 
 # Use cases
 

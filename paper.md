@@ -122,7 +122,7 @@ of the training phase. Note that deep learning-based reconstruction methods were
 2. \textbf{High-resolution X-ray parallel tomography} (X-ray CT).
 Projection data from a foramnifera were obtained using 20 KeV X rays and a high-resolution detector with 1024 $\times$ 1280 pixels (5 μm per pixel). A rotatory support was used to acquire 360 projections with 1 1-degree interval. The projections were resampled to 256 $\times$ 320 to reduce computational complexity. The raw data was processed using phase contrast techniques to improve contrast [@Paganin2002]. 
 3. \textbf{High-Throughput Tomography} (HiTT).
-Synchroton X-ray projection data from an ant, osmium-stained and resin-embedded, were obtained using a phase-contrast imaging platform for life-science samples on the EMBL beamline P14 [@albers2024high]. The HiTT dataset contains 1800 projections with a 0.1-degree interval, with a size of 4040 $\times$  2048 pixels each (0.65 μm per pixel). The projections were downsampled by a factor of 2.
+Synchrotron X-ray projection data from an ant, osmium-stained and resin-embedded, were obtained using a phase-contrast imaging platform for life-science samples on the EMBL beamline P14 [@albers2024high]. The HiTT dataset contains 1800 projections with a 0.1-degree interval, with a size of 4040 $\times$  2048 pixels each (0.65 μm per pixel). The projections were downsampled by a factor of 2.
 
 In \autoref{fig:Figura2} we show representative examples of the 2D reconstruction obtained with FBP and ToMoDL and 3D volume obtained using the plugin with the ToMoDL option. The volumes were fully rendered using the built-in napari capabilities, allowing for full integration into the data analysis workflow of the platform. 
 

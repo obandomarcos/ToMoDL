@@ -65,64 +65,51 @@ The filter used in FBP is typically a (modified) ramp filter, which enhances hig
 - **U\-Net** is a deep learning architecture for tomographic reconstruction that uses a U-shaped network with skip ­connections [@ronneberger2015u]. The proposed network in [@davis2019convolutional] processes undersampled FBP reconstructions and outputs streak-free 2D images. Skip connections help preserve fine details in the reconstruction, so that the network can handle complex geometries and noisy data. While reconstruction times for this approach are short, making it suitable for real-time imaging, training a U-Net requires large amounts of data.
 - **ToMoDL** is a  model-based deep learning framework  that combines iterations over a data consistency step and an image domain artefact removal step achieved by a convolutional neural network. The data consistency step is implemented using the conjugate gradient algorithm and the artefact removal via a deep neural network with shared weights across iterations. As the forward model is explicitly accounted for, the number of network parameters to be learned is significantly reduced compared to direct inversion approaches, providing better performance in settings where training data is constrained [@obando2023model].
 
-In \autoref{fig:Figura1}, a complete pipeline describing the usage of napari-tomodl is presented. Based on 1-channel raw data acquired by a parallel tomography use-case, this ordered stack of files undergoes the following steps in order to obtain ready-to-analyse reconstructions. The complete napari-tomodl pipeline is described here.
+In \autoref{fig:Figura1}, a complete pipeline describing the usage of napari-tomodl is presented. Based on 1-channel raw data acquired by a parallel tomography use-case, this ordered stack of files undergoes the following steps in order to obtain ready-to-analyse reconstructions. Two user modes are provided: a basic mode for users without deep learning expertise, and an advanced mode for fine control over smoothing, alignment, flat-field correction, and compression trade-offs. 
 
-![\textbf{napari-tomodl usage pipeline.}. step-by-step from a stack of raw projection acquisition to reconstruction of single specific slice or full volume.\label{fig:Figura1}](./napari-tomodl/figures/Figure1.pdf)
+![\textbf{napari-tomodl basic and advanced mode pipelines.}. Step-by-step from a stack of raw projection acquisition to reconstruction of a single specific slice or full volume. \label{fig:Figura1}](./napari-tomodl/figures/Figure1.pdf)
 
+The complete napari-tomodl pipeline includes:
 
 1. **Load stack** – The workflow begins by importing the ordered stack of raw projection images (sinograms) into *napari* using its file manager. This generates a new 3D image layer representing the raw data to be reconstructed.
 
 2. **Select image layer** – Within the *napari-tomodl* plugin interface, the user selects the desired input layer by clicking on *Select image layer*. This step defines which dataset will be used for reconstruction.
 
-3. **Half-rotation scans** – If the acquisition corresponds to a 180° half-rotation instead of a full 360° dataset, this option can be enabled to correctly interpret the projection geometry during reconstruction.
+3. **Half-rotation scans** – If the acquisition corresponds to a 180° half-rotation instead of a full 360° dataset, this option needs to be enabled to correctly interpret the projection geometry during reconstruction.
 
 4. **Manual or automatic axis alignment** – The rotation axis alignment can be adjusted automatically or manually.
 
-   * *Automatic alignment* applies an internal algorithm to estimate the correct center of rotation.
+   * *Automatic alignment* applies an efficient implementation of the variance maximisation method [@walls2005correction] to estimate the correct center of rotation.
    * *Manual alignment* allows the user to specify the pixel offset corresponding to the rotation axis shift. For fine-tuning, a single-slice reconstruction is recommended for iterative manual adjustment.
 
-5. **Data pre-processing** – Optional pre-processing steps such as flat-field correction and image resizing can be applied to normalize projection intensities and adapt image dimensions before reconstruction.
+5. **Data pre-processing** – Optional pre-processing steps such as flat-field correction and image resizing can be applied to normalise projection intensities and adapt image dimensions before reconstruction.
 
 6. **Reconstruction methods** – Users can select between different reconstruction algorithms according to their application:
 
    * *FBP* (Filtered Back Projection) — classical analytical approach;
-   * *TwIST* — iterative algorithm for sparse or noisy data;
-   * *U-Net* — deep learning-based reconstruction using convolutional networks;
+   * *TwIST* — iterative algorithm for sparse or undersampled data;
+   * *U-Net* — deep learning-based reconstruction using a convolutional network;
    * *ToMoDL* — hybrid deep learning approach combining model-based priors and learned representations.
 
-7. **Reconstruction settings** – Parameters controlling reconstruction quality can be adjusted, including the choice of filter (for FBP), smoothing level, and whether to clip the reconstruction to a circular field of view.
+**CPU/GPU selection** Users can choose whether to perform reconstruction on the CPU or accelerate computations using the GPU, depending on available hardware and the selected algorithm. When running on the GPU, napari-tomodl supports **batch reconstruction**, allowing multiple slices to be reconstructed **in parallel** to significantly improve processing speed. Batch size can be adjusted depending on available GPU memory.
 
-8. **Reconstruct full volume or specific slice(s)** – Users can decide whether to reconstruct the entire 3D dataset or only a specific slice. For large datasets, reconstructions can be performed in multiple batches, optimizing memory usage and computational efficiency.
+7. **Reconstruction settings** – Parameters controlling reconstruction quality can be adjusted, including the choice of filter (for FBP), smoothing level, and whether to clip the reconstruction to a circular field of view. **Clip to circle** Restricts reconstruction to a circular field of view, removing background noise and improving visualization for cylindrical samples. **Filter selection (for FBP methods)** Users can choose the desired filtering kernel (e.g., *Ram-Lak*, *Shepp-Logan*, etc.) for the filtered backprojection algorithm, balancing noise suppression and edge preservation.  **Smoothing level** corresponds to the number of iterations, which controls the sharpness/smoothness of the reconstructed images. 
+
+8. **Reconstruct full volume or specific slice(s)** – Users can decide whether to reconstruct the entire volume or only a specific slice. For large datasets, reconstructions can be performed in multiple batches, optimizing memory usage and computational efficiency.
 
 9. **Choose rotation axis** – Depending on the experimental setup, the user defines whether the rotation axis is vertical or horizontal to ensure that projections are correctly aligned during reconstruction.
 
-10. **Volume post-processing** – Finally, reconstructed volumes can undergo optional post-processing steps, such as color inversion or conversion to 16-bit depth, generating final images ready for quantitative analysis or visualization within *napari*.
+10. **Volume post-processing** – Finally, reconstructed volumes can undergo optional post-processing steps, such as color inversion or conversion to 16-bit depth, generating final images ready for quantitative analysis or visualization within *napari*. **Full or partial volume reconstruction** Enables fast testing or memory-efficient reconstruction by limiting computation to a subset of slices along the detector axis. **Intensity inversion** Inverts grayscale values in the reconstructed image volume, which can be useful when projection data were acquired with inverted intensity mapping.
 
-Once these steps are completed, the 'Reconstruction' button allows for executing the desired specifications for image recovery from projections. In napari, outputs are written as image layers which can be analysed by other plugins and saved in different formats. One special feature that napari offers on top of 3D images is volume renderization, useful once a full volume is computed with the presented plugin. Normalization of intensity and contrast can be also applied to specific layers using napari's built-in tools in the top-left bar.
+Once these steps are completed, the 'Reconstruction' button allows for executing the desired specifications for image recovery from projections. In napari, outputs are written as image layers, which can be analysed by other plugins and saved in different formats. One special feature that napari offers on top of 3D images is volume rendering, useful once a full volume is computed with the presented plugin. Normalisation of intensity and contrast can also be applied to specific layers using napari's built-in tools in the top-left bar.
 
-In addition to the core settings, napari-tomodl provides several **optional preprocessing and reconstruction controls** that enhance flexibility and reconstruction quality:
+The napari-tomodl basic model is designed to provide a more accessible solution for non-expert users. Basic mode options include [3] **Half-rotation scans** , [4] **Automatic centre-of-rotation alignment** , [9] **Rotation axis slection** , [6] **Reconstruction methods** , in addition to:  
 
-- **Projection image resizing/compression**  
+- [5] **Compression/projection image resizing**  
   Reduces the Z-axis dimension to accelerate computation or reduce memory usage, with adjustable compression levels (**HIGH**, **MEDIUM**, **LOW**, or **NO**).
 
-- **Manual or automatic center-of-rotation alignment**  
-  Corrects for misalignment in the rotation axis. The automatic mode implements the *Wall method* [@walls2005correction], which estimates the correct center by optimizing symmetry in the sinogram.
-
-- **Clip to circle**  
-  Restricts reconstruction to a circular field of view, removing background noise and improving visualization for cylindrical samples.
-
-- **Filter selection (for FBP methods)**  
-  Users can choose the desired filtering kernel (e.g., *Ram-Lak*, *Shepp-Logan*, etc.) for the filtered backprojection algorithm, balancing noise suppression and edge preservation.
-
-- **Full or partial volume reconstruction**  
-  Enables fast testing or memory-efficient reconstruction by limiting computation to a subset of slices along the detector axis.
-
-- **Intensity inversion**  
-  Inverts grayscale values in the reconstructed image volume, which can be useful when projection data were acquired with inverted intensity mapping.
-
-- **CPU/GPU selection**  
-  Users can choose whether to perform reconstruction on the CPU or accelerate computations using the GPU depending on available hardware and the selected algorithm. When running on the GPU, napari-tomodl supports **batch reconstruction**, allowing multiple slices to be reconstructed **in parallel** to significantly improve processing speed. Batch size can be adjusted depending on available GPU memory.
-
+- [7] **Smoothing level**  
+  Select the smoothing strength of ToMoDL  (**HIGH**, **MEDIUM**, **LOW**).
 
 # Use cases
 
@@ -131,7 +118,7 @@ We present three parallel beam tomography use cases for the napari-tomodl plugin
 1. \textbf{Optical projection tomography} (OPT)
 Projection data of wild-type zebrafish (Danio rerio) at 5 days post fertilisation were obtained using a 4x magnification objective. Using a rotatory cylinder, transmitted projections images were acquired with an angle step of 1 degree. The acquired projections have 2506x768 pixels with a resolution of 1.3 μm per pixel [@bassi2015optical]. These projections were resampled to have a resolution of 627 × 192 pixels in order to reduce the computational complexity.
 of the training phase.
-2. High resolution X-ray parallel tomography (X-ray CT).
+2. High-resolution X-ray parallel tomography (X-ray CT).
 Projection data from a foramnifera were obtained using 20 KeV X rays and a high resolution detector with 1024x1280 pixels (5 μm per pixel). A rotatory support was used to acquire 360 projections with 1 degree interval. The projections were resampled to 256x320 to reduce computational complexity. The raw data was processed using phase contrast techniques to improve contrast [@Paganin2002]. 
 3. High-Throughput Tomography (HiTT).
 Projection data from a mosquito gut, osmium-stained and resin-embedded using a phase-contrast imaging platform for life-science samples on the EMBL beamline [@albers2024high]. The HiTT dataset contains 1800 projections with a 0.1-degree interval, with a size of 4040x2048 pixels each (0.65 μm per pixel). The projections were downsampled by a factor of 2.

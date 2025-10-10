@@ -98,7 +98,7 @@ The complete napari-tomodl pipeline includes:
 7. **Reconstruction settings** – Parameters controlling reconstruction quality can be adjusted, including the choice of filter (for FBP), smoothing level, and whether to clip the reconstruction to a circular field of view. 
  
  * *Clip to circle* Restricts reconstruction to a circular field of view, removing background noise and improving visualization for cylindrical samples.
- * *Filter selection (for FBP methods)* Users can choose the desired filtering kernel (e.g., *Ram-Lak*, *Shepp-Logan*, etc.) for the filtered backprojection algorithm, balancing noise suppression and edge preservation.  
+ * *Filter selection (for FBP methods)* Users can choose the desired filtering kernel (e.g., *Ram-Lak*, *Shepp-Logan*, etc.) for the filtered backprojection algorithm, balancing noise suppression and edge preservation.
  * *Smoothing level* corresponds to the number of ToMoDL iterations, which controls the sharpness/smoothness of the reconstructed images. As an altenative, in the basic mode, users can select the smoothing strength as **HIGH**, **MEDIUM**, **LOW**.
 
 8. **Reconstruct full volume or specific slice(s)** – Users can decide whether to reconstruct the entire volume or only a specific slice. For large datasets, reconstructions can be performed in multiple batches, optimizing memory usage and computational efficiency.
@@ -110,19 +110,19 @@ The complete napari-tomodl pipeline includes:
 * *Full or partial volume reconstruction* Enables fast testing or memory-efficient reconstruction by limiting computation to a subset of slices along the detector axis. 
 **Intensity inversion* Inverts grayscale values in the reconstructed image volume, which can be useful when projection data were acquired with inverted intensity mapping.
 
-Once these steps are completed, the 'Reconstruction' button allows for executing the desired specifications for image recovery from projections. In napari, outputs are written as image layers, which can be analysed by other plugins and saved in different formats. One special feature that napari offers on top of 3D images is volume rendering, useful once a full volume is computed with the presented plugin. Normalisation of intensity and contrast can also be applied to specific layers using napari's built-in tools in the top-left bar.
+Once these steps are completed, the 'Reconstruction' button allows for executing the desired specifications for image recovery from projections. In napari, outputs are written as image layers, which can be analysed by other plugins and saved in different formats. One special feature that napari offers on top of 3D images is volume rendering, useful once a full volume is computed with the presented plugin. Normalisation of intensity and contrast can also be applied to specific layers using napari's built-in tools in the top-left bar. 
 
 # Use cases
 
 We present three parallel beam tomography use cases for the napari-tomodl plugin:
 
 1. \textbf{Optical projection tomography} (OPT)
-Projection data of wild-type zebrafish (Danio rerio) at 5 days post fertilisation were obtained using a 4x magnification objective. Using a rotatory cylinder, transmitted projections images were acquired with an angle step of 1 degree. The acquired projections have 2506x768 pixels with a resolution of 1.3 μm per pixel [@bassi2015optical]. These projections were resampled to have a resolution of 627 × 192 pixels in order to reduce the computational complexity.
-of the training phase.
-2. High-resolution X-ray parallel tomography (X-ray CT).
-Projection data from a foramnifera were obtained using 20 KeV X rays and a high resolution detector with 1024x1280 pixels (5 μm per pixel). A rotatory support was used to acquire 360 projections with 1 degree interval. The projections were resampled to 256x320 to reduce computational complexity. The raw data was processed using phase contrast techniques to improve contrast [@Paganin2002]. 
-3. High-Throughput Tomography (HiTT).
-Projection data from a mosquito gut, osmium-stained and resin-embedded using a phase-contrast imaging platform for life-science samples on the EMBL beamline [@albers2024high]. The HiTT dataset contains 1800 projections with a 0.1-degree interval, with a size of 4040x2048 pixels each (0.65 μm per pixel). The projections were downsampled by a factor of 2.
+Projection data of wild-type zebrafish (Danio rerio) at 5 days post fertilisation were obtained using a 4$\times$ magnification objective. Using a rotatory cylinder, transmitted projections images were acquired with an angle step of 1 degree. The acquired projections have 2506 $\times$ 768 pixels with a resolution of 1.3 μm per pixel [@bassi2015optical]. These projections were resampled to have a resolution of 627 $\times$ 192 pixels in order to reduce the computational complexity.
+of the training phase. Note that deep learning-based reconstruction methods were only training using OPT data. 
+2. \textbf{High-resolution X-ray parallel tomography} (X-ray CT).
+Projection data from a foramnifera were obtained using 20 KeV X rays and a high resolution detector with 1024 $\times$ 1280 pixels (5 μm per pixel). A rotatory support was used to acquire 360 projections with 1 degree interval. The projections were resampled to 256 $\times$ 320 to reduce computational complexity. The raw data was processed using phase contrast techniques to improve contrast [@Paganin2002]. 
+3. \textbf{High-Throughput Tomography} (HiTT).
+Synchroton X-ray projection data from an ant, osmium-stained and resin-embedded, were obtained using a phase-contrast imaging platform for life-science samples on the EMBL beamline P14 [@albers2024high]. The HiTT dataset contains 1800 projections with a 0.1-degree interval, with a size of 4040 $\times$  2048 pixels each (0.65 μm per pixel). The projections were downsampled by a factor of 2.
 
 In \autoref{fig:Figura2} we show examples of the projections used for the reconstruction process and a view of the 3D volume obtained using the plugin with the ToMoDL option (projection images not shown). The volumes were fully rendered using in-built napari capabilities, allowing for a full integration on the data analysis workflow of the platform. 
 

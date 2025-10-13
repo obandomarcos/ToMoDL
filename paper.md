@@ -10,9 +10,11 @@ authors:
     equal-contrib: true # (This is how you can denote equal contributions between multiple authors)
   - name: David Palecek
     affiliation: 3 # (Multiple affiliations must be quoted)
-  - name: Germán Mato 
+  - name: Germán Mato
+    equal-contrib: true 
     affiliation: "4,5"
-  - name: Teresa M Correia 
+  - name: Teresa M Correia
+    equal-contrib: true
     corresponding: true # (This is how to denote the corresponding author)
     affiliation: "3,6"
 affiliations:

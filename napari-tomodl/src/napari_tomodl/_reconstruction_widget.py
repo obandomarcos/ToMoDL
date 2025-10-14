@@ -1,6 +1,6 @@
 """
 Created on Tue Feb 2 16:34:41 2023
-@authors: Marcos Obando
+@authors: Marcos Obando, Minh Nhat Trinh, David Palecek, Germán Mato, Teresa Correia
 """
 
 # %%
@@ -64,9 +64,12 @@ class Rec_modes(Enum):
     FBP_CPU = 0
     FBP_GPU = 1
     TWIST_CPU = 2
-    UNET_GPU = 3
-    MODL_GPU = 4
-    MODL_CPU = 5
+    TOMODL_CPU = 3
+    TOMODL_GPU = 4
+    UNET_CPU = 5
+    UNET_GPU = 6
+
+
 
 class Compression_modes(Enum):
     HIGH = 100
@@ -430,7 +433,7 @@ class ReconstructionWidget(QTabWidget):
 
             batch_start = slices_reconstruction[0]
             # if use GPU process in batch to improve performance
-            if self.reconbox_basic.val in {Rec_modes.FBP_GPU.value, Rec_modes.MODL_GPU.value, Rec_modes.UNET_GPU.value}:
+            if self.reconbox_basic.val in {Rec_modes.FBP_GPU.value, Rec_modes.TOMODL_GPU.value, Rec_modes.UNET_GPU.value}:
                 if size_compression == 100:
                     batch_process = 32
                 elif size_compression == 256:
@@ -589,7 +592,7 @@ class ReconstructionWidget(QTabWidget):
 
             batch_start = slices_reconstruction[0]
             # if use GPU process in batch to improve performance
-            if self.reconbox_advanced.val in {Rec_modes.FBP_GPU.value, Rec_modes.MODL_GPU.value, Rec_modes.UNET_GPU.value}:
+            if self.reconbox_advanced.val in {Rec_modes.FBP_GPU.value, Rec_modes.TOMODL_GPU.value, Rec_modes.UNET_GPU.value}:
                 batch_process = self.batch_size_advanced.val
             else:
                 batch_process = 1
@@ -687,7 +690,7 @@ class ReconstructionWidget(QTabWidget):
             self.h_basic.use_filter = True
             self.h_basic.filter_FBP = Filter_modes.RAMP.value
             size_compression = Compression_modes[self.compression_basic.text].value
-            if self.reconbox_basic.val in {Rec_modes.FBP_GPU.value, Rec_modes.MODL_GPU.value, Rec_modes.UNET_GPU.value}:
+            if self.reconbox_basic.val in {Rec_modes.FBP_GPU.value, Rec_modes.TOMODL_GPU.value, Rec_modes.UNET_GPU.value}:
                     if size_compression == 100:
                         self.h_basic.batch_size = 32
                     elif size_compression == 256:

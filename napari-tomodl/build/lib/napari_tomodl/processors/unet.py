@@ -4,20 +4,29 @@ This code creates the model described in 'Convolutional neural networks for reco
 author: obanmarcos 
 '''
 
-import torch
-import torch.nn as nn
-import numpy as np
-from torch_radon import Radon, RadonFanbeam
-from torch_radon.solvers import cg
-import matplotlib.pyplot as plt 
+
+# try:
+#     from torch_radon import Radon, RadonFanbeam
+#     from torch_radon.solvers import cg
+    
+
+# except:
+#     print('Torch-Radon not available!')
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import monai
+import numpy as np
+import matplotlib.pyplot as plt 
 
 
-# Modify for multi-gpu
-device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+try:
+    # Modify for multi-gpu
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+
+except:
+    print('Torch not available!')
+    
 # U-Net
 
 class double_conv(nn.Module):
@@ -111,9 +120,13 @@ class up(nn.Module):
 class outconv(nn.Module):
     def __init__(self, in_ch, out_ch):
         super(outconv, self).__init__()
-        self.conv = nn.Conv2d(in_ch, out_ch, 1, padding = (2,2))
+        self.conv = nn.Conv2d(in_ch, out_ch, 1, padding = "same")
 
-    def forward(self, x):
+    def forward(self, x0, x):
+        # padding to x.shape == x0.shape    
+        diffX = x0.size()[2] - x.size()[2]
+        diffY = x0.size()[3] - x.size()[3]
+        x = F.pad(x, (diffX // 2, int(diffX / 2), diffY // 2, int(diffY / 2)))
         x = self.conv(x)
         return x
 
@@ -147,7 +160,8 @@ class UNet(nn.Module):
         x = self.up2(x, x3)
         x = self.up3(x, x2)
         x = self.up4(x, x1)
-        x = self.outc(x)
+        x = self.outc(x0, x)
+
         if self.residual is True:        
             x = x+self.lam*x0
 

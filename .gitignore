@@ -175,3 +175,4 @@ cython_debug/
 #.idea/
 
 wandb/
+napari-tomodl/.pypirc

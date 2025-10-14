@@ -7,5 +7,5 @@ __credits__ = "Teresa Correia and Germán Mato"
 __email__ = "marcos.obando@ib.edu.ar"
 
 
-from ._reconstruction_widget_2 import ReconstructionWidget
+from ._reconstruction_widget import ReconstructionWidget
 from .processors import OPTProcessor

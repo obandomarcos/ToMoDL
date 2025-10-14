@@ -1,5 +1,9 @@
 include LICENSE
 include README.md
 
+recursive-include /src/napari_tomodl/processors/*.ckpt
+
 recursive-exclude * __pycache__
 recursive-exclude * *.py[co]
+recursive-exclude * _tests
+

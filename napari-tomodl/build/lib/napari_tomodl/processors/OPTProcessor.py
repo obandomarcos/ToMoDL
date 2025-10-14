@@ -10,13 +10,17 @@ import torch.nn.functional as F
 
 from skimage.transform import radon as radon_scikit
 from skimage.transform import iradon as iradon_scikit
-# from skimage.transform import resize as resize_scikit
-import torch
-import tifffile as tif
 from skimage.filters import median
 from skimage.morphology import disk
 from .unet import UNet
 
+from .alternating import TwIST, TVdenoise, TVnorm
+import numpy as np
+import os
+import cv2
+from enum import Enum
+import tqdm
+import os
 try:
     from QBI_radon import Radon as radon_thrad
     from QBI_radon import ramp_filter_torch
@@ -467,35 +471,12 @@ def normalize_images(images):
 
     return image_norm
 
-def normalize_images_11(images):
-    """
-    Normalizes images between -1 and 1.
-    Params:
-     - images (torch.Tensor): Tensor of 1-channel images
-    """
-    image_norm = torch.zeros_like(images)
-    for i, image in enumerate(images):
-
-        image_norm[i, ...] = (image - image.min()) / (image.max() - image.min()) * 2 - 1
-
-    return image_norm
 
 """
 Process sinograms in 2D
 """
 
 
-from .alternating import TwIST, TVdenoise, TVnorm
-
-
-import numpy as np
-import scipy.ndimage as ndi
-import os
-import matplotlib.pyplot as plt
-import cv2
-from enum import Enum
-import tqdm
-import os, sys
 
 for k, v in os.environ.items():
     if k.startswith("QT_") and "cv2" in v:
@@ -506,9 +487,10 @@ class Rec_Modes(Enum):
     FBP_CPU = 0
     FBP_GPU = 1
     TWIST_CPU = 2
-    UNET_GPU = 3
-    MODL_GPU = 4
-    MODL_CPU = 5
+    TOMODL_CPU = 3
+    TOMODL_GPU = 4
+    UNET_CPU = 5
+    UNET_GPU = 6
 
 
 class Order_Modes(Enum):
@@ -558,7 +540,7 @@ class OPTProcessor:
 
             self.angles_gen = lambda num_angles: np.linspace(0, rotation_factor * 180, num_angles, endpoint=False)
 
-        elif self.rec_process == Rec_Modes.FBP_GPU.value or self.rec_process == Rec_Modes.MODL_GPU.value:
+        elif self.rec_process == Rec_Modes.FBP_GPU.value or self.rec_process == Rec_Modes.TOMODL_GPU.value:
 
             assert torch.cuda.is_available() == True
             self.angles_gen = lambda num_angles: np.linspace(0, rotation_factor * np.pi, num_angles, endpoint=False)
@@ -674,7 +656,7 @@ class OPTProcessor:
                 filter_name=None if self.use_filter == False else self.filter_FBP,
             )[..., None]
 
-        elif self.rec_process == Rec_Modes.MODL_GPU.value:
+        elif self.rec_process == Rec_Modes.TOMODL_GPU.value:
 
             resnet_options_dict = {
                 "number_layers": 8,
@@ -711,7 +693,7 @@ class OPTProcessor:
             __location__ = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)))
             # artifact_path = os.path.join(__location__, "modl_dark_unnormal.ckpt")
             # artifact_path = os.path.join(__location__, "tomodl256_3.ckpt")
-            artifact_path = os.path.join(__location__, "modl100_vs2_lam0.67.ckpt")
+            artifact_path = os.path.join(__location__, "tomodl100.ckpt")
             tomodl_checkpoint = torch.load(artifact_path, map_location=torch.device("cuda:0"))
 
             ########################### old weight loading ############################
@@ -770,7 +752,7 @@ class OPTProcessor:
 
             self.iradon_function = _iradon
 
-        elif self.rec_process == Rec_Modes.MODL_CPU.value:
+        elif self.rec_process == Rec_Modes.TOMODL_CPU.value:
             resnet_options_dict = {
                 "number_layers": 8,
                 "kernel_size": 3,
@@ -804,7 +786,7 @@ class OPTProcessor:
             self.iradon_functor = ToMoDL(self.tomodl_dictionary)
             __location__ = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)))
             # artifact_path = os.path.join(__location__, "tomodl256_3.ckpt")
-            artifact_path = os.path.join(__location__, "modl100_vs2_lam0.67.ckpt")
+            artifact_path = os.path.join(__location__, "tomodl100.ckpt")
             tomodl_checkpoint = torch.load(artifact_path, map_location=torch.device("cpu"))
 
             tomodl_checkpoint["state_dict"] = {
@@ -879,6 +861,7 @@ class OPTProcessor:
             self.iradon_functor = UNet(
                 n_channels=1, n_classes=1, residual=True, up_conv=True, batch_norm=True, batch_norm_inconv=True
             ).to(device)
+            # TODO: load the weights of the unet
 
             def _iradon(sino):
                 sino = sino.transpose(2, 0, 1)
@@ -891,8 +874,26 @@ class OPTProcessor:
 
             self.iradon_function = _iradon
 
-        reconstruction = self.iradon_function(sinogram)
+        elif self.rec_process == Rec_Modes.UNET_CPU.value:
+            radon24 = radon_thrad(self.angles_torch, circle=self.clip_to_circle, filter_name=None, device="cpu")
+            self.iradon_functor = UNet(
+                n_channels=1, n_classes=1, residual=True, up_conv=True, batch_norm=True, batch_norm_inconv=True
+            ).to("cpu")
+            # TODO: load the weights of the unet
 
+            def _iradon(sino):
+                sino = sino.transpose(2, 0, 1)
+                sino = torch.from_numpy(sino[:, None, :, :])
+                # sino = ramp_filter_torch(sino, device="cpu")
+                reconstruction = radon24.filter_backprojection(sino)
+                output = self.iradon_functor(reconstruction).detach().cpu()
+                output = np.asarray(output.numpy())
+                return output.transpose(1, 2, 3, 0)[0]
+            self.iradon_function = _iradon
+
+
+        reconstruction = self.iradon_function(sinogram)
+        
         if self.invert_color == True:
             reconstruction = reconstruction.max() - reconstruction
 

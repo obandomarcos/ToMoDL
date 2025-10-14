@@ -27,12 +27,12 @@ https://napari.org/stable/plugins/index.html
 ## 🚀 Usage
 
 1. **Load ordered stack**  
-![plot](./figures/stack_image.png)
+![plot](https://raw.githubusercontent.com/obandomarcos/ToMoDL/refs/heads/nhattm/napari-tomodl/figures/stack_image.png)
 
    Go to **File → Open Files as Stack...** and load the angular projections for parallel beam optical tomography reconstruction.
 
 2. **Select image layer**  
-![plot](./figures/select_layer.png) 
+![plot](https://raw.githubusercontent.com/obandomarcos/ToMoDL/refs/heads/nhattm/napari-tomodl/figures/select_layer.png) 
 
    In the dropdown menu, click **Select image layer** and choose the loaded volume.  
 
@@ -40,7 +40,7 @@ https://napari.org/stable/plugins/index.html
 <h3>From here you can choose between two reconstruction modes: Basic and Advanced.</h3>
 
 ### 🔹 Basic Mode
-![plot](./figures/basic_mode.png)  
+![plot](https://raw.githubusercontent.com/obandomarcos/ToMoDL/refs/heads/nhattm/napari-tomodl/figures/basic_mode.png)  
 
 3. **Half-rotation**  
    - Click **Half rotation** if your projection data was acquired from 0° to 180°.  
@@ -59,10 +59,10 @@ https://napari.org/stable/plugins/index.html
 
 6. **Reconstruction method**  
    - **FBP CPU / FBP GPU** → from the [QBI_radon] library  
-   - **MODL CPU / MODL GPU / UNET GPU** → proposed in our [ToMoDL-paper]  
+   - **TOMODL CPU / TOMODL GPU / UNET CPU / UNET GPU** → proposed in our [ToMoDL-paper]  
 
 7. **Smoothing level**  
-   Select smoothing strength (only applies to **MODL** methods). Can be adjusted in the **Advanced mode**.
+   Select smoothing strength (only applies to **TOMODL** methods). Can be adjusted in the **Advanced mode**.
     - **LOW** → 2  
     - **MEDIUM** → 4  
     - **HIGH** → 6 
@@ -73,7 +73,7 @@ https://napari.org/stable/plugins/index.html
 ---
 
 ### 🔹 Advanced Mode
-![plot](./figures/advanced_model.png)  
+![plot](https://raw.githubusercontent.com/obandomarcos/ToMoDL/refs/heads/nhattm/napari-tomodl/figures/advanced_model.png)  
 
 9. **Manual axis alignment**  
    Shift the object along the detector axis (Z-axis).  
@@ -115,7 +115,7 @@ https://napari.org/stable/plugins/index.html
 
 19. **Reconstruct!** 
 
-![plot](./figures/reconstruct_button.png)
+![plot](https://raw.githubusercontent.com/obandomarcos/ToMoDL/refs/heads/nhattm/napari-tomodl/figures/reconstruct_button.png)
 
    A new layer will appear on top of the projections stack with the reconstructed volume.
 

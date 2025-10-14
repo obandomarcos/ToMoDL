@@ -861,6 +861,7 @@ class OPTProcessor:
             self.iradon_functor = UNet(
                 n_channels=1, n_classes=1, residual=True, up_conv=True, batch_norm=True, batch_norm_inconv=True
             ).to(device)
+            # TODO: load the weights of the unet
 
             def _iradon(sino):
                 sino = sino.transpose(2, 0, 1)
@@ -878,6 +879,8 @@ class OPTProcessor:
             self.iradon_functor = UNet(
                 n_channels=1, n_classes=1, residual=True, up_conv=True, batch_norm=True, batch_norm_inconv=True
             ).to("cpu")
+            # TODO: load the weights of the unet
+
             def _iradon(sino):
                 sino = sino.transpose(2, 0, 1)
                 sino = torch.from_numpy(sino[:, None, :, :])

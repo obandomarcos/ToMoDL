@@ -694,7 +694,7 @@ class OPTProcessor:
             # artifact_path = os.path.join(__location__, "modl_dark_unnormal.ckpt")
             # artifact_path = os.path.join(__location__, "tomodl256_3.ckpt")
             artifact_path = os.path.join(__location__, "tomodl100.ckpt")
-            tomodl_checkpoint = torch.load(artifact_path, map_location=torch.device("cuda:0"))
+            tomodl_checkpoint = torch.load(artifact_path, map_location=torch.device("cuda:0"), weights_only=False)
 
             ########################### old weight loading ############################
             # tomodl_checkpoint["state_dict"] = {
@@ -787,7 +787,7 @@ class OPTProcessor:
             __location__ = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)))
             # artifact_path = os.path.join(__location__, "tomodl256_3.ckpt")
             artifact_path = os.path.join(__location__, "tomodl100.ckpt")
-            tomodl_checkpoint = torch.load(artifact_path, map_location=torch.device("cpu"))
+            tomodl_checkpoint = torch.load(artifact_path, map_location=torch.device("cpu"), weights_only=False)
 
             tomodl_checkpoint["state_dict"] = {
                 k.replace("model.", ""): v for (k, v) in tomodl_checkpoint["state_dict"].items()

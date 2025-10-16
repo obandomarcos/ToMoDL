@@ -11,8 +11,7 @@ from .widget_settings import Settings, Combo_box
 import gc
 import torch
 import datetime
-import tifffile as tif
-# import processors
+from magicgui import magic_factory
 import napari
 from qtpy.QtWidgets import (
     QVBoxLayout,
@@ -32,14 +31,11 @@ from qtpy.QtCore import Qt, QThread, Signal
 from napari.layers import Image
 import numpy as np
 from napari.qt.threading import thread_worker
-from magicgui.widgets import FunctionGui
-from magicgui import magic_factory, magicgui
-import warnings
 from time import time
 import scipy.ndimage as ndi
 from enum import Enum
-import cv2
-from tqdm import tqdm
+
+
 import numpy as np
 
 device = "cuda" if torch.cuda.is_available() else "cpu"

@@ -1,9 +1,6 @@
 import numpy as np
 import scipy as sp
-import matplotlib.pyplot as plt
-import phantominator as ph
 from skimage.transform import radon, iradon
-# import cupy as cp
 from time import time
 from skimage.metrics import structural_similarity as ssim
 import sys

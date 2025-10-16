@@ -1,0 +1,66 @@
+channels:
+  - conda-forge
+  - pytorch
+  - nvidia
+  - defaults
+
+package:
+  name: napari-tomodl
+  version: "0.2.11"
+
+source:
+  path: ../
+
+build:
+  noarch: python
+  script: |
+    python -m pip install . --no-deps --ignore-installed
+  # ensure setuptools/wheel/pip are available
+  requirements:
+    - python >=3.10
+    - pip
+    - setuptools
+    - wheel
+
+requirements:
+  host:
+    - python >=3.10
+    - pip
+    - setuptools
+    - wheel
+  run:
+    - python >=3.10
+    - qtpy
+    - pyqt
+    - opencv
+    - scikit-image
+    - scipy
+    - pytorch ==2.4.1
+    - pytorch-cuda =12.4
+
+# pip dependencies that are not available in conda
+# this tells conda-build to install them via pip after conda dependencies
+  run_constrained:
+    - pip
+
+test:
+  commands:
+    - python -c "import torch; print(torch.__version__)"
+    - python -c "import napari_tomodl; print('napari-tomodl imported successfully')"
+
+about:
+  home: https://github.com/obandomarcos/ToMoDL/tree/main/napari-tomodl
+  license: MIT
+  license_file: LICENSE
+  summary: "A plugin for optical projection tomography reconstruction with model-based neural networks."
+  description: |
+    Napari plugin for model-based optical projection tomography reconstruction
+    using deep learning models optimized for affordability and portability.
+
+extra:
+  recipe-maintainers:
+    - minhnhattrinh312
+
+# post-link script: install missing PyPI-only dependencies (e.g. QBI-radon)
+post:
+  - python -m pip install QBI-radon magicgui pyopengl==3.1.6

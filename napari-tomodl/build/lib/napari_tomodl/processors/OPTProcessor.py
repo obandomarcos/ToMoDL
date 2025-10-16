@@ -39,7 +39,6 @@ except:
     use_scikit = True
 
 from skimage.transform import radon, iradon
-import matplotlib.pyplot as plt
 import numpy as np
 from . import unet
 
@@ -693,8 +692,8 @@ class OPTProcessor:
             __location__ = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)))
             # artifact_path = os.path.join(__location__, "modl_dark_unnormal.ckpt")
             # artifact_path = os.path.join(__location__, "tomodl256_3.ckpt")
-            artifact_path = os.path.join(__location__, "tomodl100.ckpt")
-            tomodl_checkpoint = torch.load(artifact_path, map_location=torch.device("cuda:0"))
+            artifact_path = os.path.join(__location__, "weights_tomodl100.ckpt")
+            tomodl_checkpoint = torch.load(artifact_path, map_location=torch.device("cuda:0"), weights_only=True)
 
             ########################### old weight loading ############################
             # tomodl_checkpoint["state_dict"] = {
@@ -705,11 +704,11 @@ class OPTProcessor:
             #     dict(filter(my_filtering_function, tomodl_checkpoint["state_dict"].items()))
             # )
             ############################# fix lambda weight loading ############################
-            tomodl_checkpoint["state_dict"] = {
-                k.replace("model.", ""): v for k, v in tomodl_checkpoint["state_dict"].items()
+            tomodl_checkpoint = {
+                k.replace("model.", ""): v for k, v in tomodl_checkpoint.items()
             }
             # tomodl_checkpoint["state_dict"] = dict(filter(my_filtering_function, tomodl_checkpoint["state_dict"].items()))
-            self.iradon_functor.load_state_dict(tomodl_checkpoint["state_dict"], strict=False)
+            self.iradon_functor.load_state_dict(tomodl_checkpoint, strict=False)
             self.iradon_functor.eval()
             # print(sinogram.shape)
             # print("lambda is: ", self.iradon_functor.lam)
@@ -786,15 +785,15 @@ class OPTProcessor:
             self.iradon_functor = ToMoDL(self.tomodl_dictionary)
             __location__ = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)))
             # artifact_path = os.path.join(__location__, "tomodl256_3.ckpt")
-            artifact_path = os.path.join(__location__, "tomodl100.ckpt")
-            tomodl_checkpoint = torch.load(artifact_path, map_location=torch.device("cpu"))
+            artifact_path = os.path.join(__location__, "weights_tomodl100.ckpt")
+            tomodl_checkpoint = torch.load(artifact_path, map_location=torch.device("cpu"), weights_only=True)
 
-            tomodl_checkpoint["state_dict"] = {
-                k.replace("model.", ""): v for (k, v) in tomodl_checkpoint["state_dict"].items()
+            tomodl_checkpoint= {
+                k.replace("model.", ""): v for (k, v) in tomodl_checkpoint.items()
             }
 
             self.iradon_functor.load_state_dict(
-                dict(filter(my_filtering_function, tomodl_checkpoint["state_dict"].items()))
+                dict(filter(my_filtering_function, tomodl_checkpoint.items()))
             )
             self.iradon_functor.eval()
             radon24 = radon_thrad(self.angles_torch, circle=self.clip_to_circle, filter_name=None, device="cpu")

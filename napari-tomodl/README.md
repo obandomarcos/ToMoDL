@@ -121,19 +121,23 @@ https://napari.org/stable/plugins/index.html
 
 
 ## 💻 Installation
-
-This package requires [QBI_radon] for optimized GPU tomographic reconstruction:
-<!-- add code block -->
-```bash
-pip install QBI-radon
+Follow these steps in <span style="color:red;">**Napari’s Python console**</span>.
+### **1. Install PyTorch**
+#### GPU (CUDA-compatible GPU)
+```python
+!conda install -y pytorch>=2.1 pytorch-cuda=12.1 -c pytorch -c nvidia
+```
+#### CPU-only (no GPU)
+```python
+!conda install -y pytorch>=2.1 cpuonly -c pytorch
 ```
 
-You can install `napari-tomodl` via [pip]:
-<!-- add code block -->
-```bash
-pip install napari-tomodl
+### **2. Install the napari-tomodl plugin**
+```python
+!pip install napari-tomodl
 ```
 
+> Tip: After installing PyTorch, restart Napari to ensure it detects the new environment. 😊
 
 ## 🤝 Contributing
 

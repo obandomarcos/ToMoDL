@@ -125,11 +125,11 @@ Follow these steps in <span style="color:red;">**Napari’s Python console**</sp
 ### **1. Install PyTorch**
 #### GPU (CUDA-compatible GPU)
 ```python
-!conda install -y pytorch>=2.1 pytorch-cuda=12.1 -c pytorch -c nvidia
+!conda install -y pytorch>=2.5.0 pytorch-cuda=12.1 -c pytorch -c nvidia
 ```
 #### CPU-only (no GPU)
 ```python
-!conda install -y pytorch>=2.1 cpuonly -c pytorch
+!conda install -y pytorch>=2.5.0 cpuonly -c pytorch
 ```
 
 ### **2. Install the napari-tomodl plugin**

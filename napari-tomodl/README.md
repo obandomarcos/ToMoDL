@@ -120,24 +120,66 @@ https://napari.org/stable/plugins/index.html
    A new layer will appear on top of the projections stack with the reconstructed volume.
 
 
-## 💻 Installation
-Follow these steps in <span style="color:red;">**Napari’s Python console**</span>.
-### **1. Install PyTorch**
-#### GPU (CUDA-compatible GPU)
-```python
-!conda install -y pytorch>=2.5.0 pytorch-cuda=12.1 -c pytorch -c nvidia
+## 💻 Installation Guide
+
+### 1️⃣ Install **napari** as a bundled app
+
+Please visit the official napari documentation and follow the instructions here:  
+👉 [Napari Installation Guide (bundled app)](https://napari.org/stable/tutorials/fundamentals/installation_bundle_conda.html)
+
+You can also directly download the installer for your operating system:
+- **Windows (.exe):**  
+  [napari-0.6.4-Windows-x86_64.exe](https://github.com/napari/napari/releases/download/v0.6.4/napari-0.6.4-Windows-x86_64.exe)
+- **Ubuntu (.sh):**  
+  [napari-0.6.4-Linux-x86_64.sh](https://github.com/napari/napari/releases/download/v0.6.4/napari-0.6.4-Linux-x86_64.sh)
+
+---
+
+### 2️⃣ Install **PyTorch** inside Napari’s bundled environment
+
+> **💡 Tip:** Make sure napari is closed before installing PyTorch.  
+---
+#### 🪟 **For Windows users**
+Open **Command Prompt** (not PowerShell).
+
+🔹 For GPU (choose suitable CUDA or PyTorch version)
+```bash
+"%LOCALAPPDATA%\napari-0.6.4\envs\napari-0.6.4\Scripts\conda.exe" install -y pytorch==2.5.0 pytorch-cuda=12.1 -c conda-forge -c pytorch -c nvidia --override-channels
 ```
-#### CPU-only (no GPU)
-```python
-!conda install -y pytorch>=2.5.0 cpuonly -c pytorch
+🔹 For CPU only
+```bash
+"%LOCALAPPDATA%\napari-0.6.4\envs\napari-0.6.4\Scripts\conda.exe" install -y pytorch==2.5.0 cpuonly -c pytorch -c nvidia -c conda-forge --override-channels
+```
+---
+#### 🐧 For Linux users
+Open a **terminal**, then run the following:
+
+🔹 For GPU (choose suitable CUDA or PyTorch version)
+```bash
+~/.local/napari-0.6.4/bin/conda install -y pytorch==2.5.0 pytorch-cuda=12.1 -c conda-forge -c pytorch -c nvidia --override-channels
+```
+🔹 For CPU only
+```bash
+~/.local/napari-0.6.4/bin/conda install -y pytorch==2.5.0 cpuonly -c pytorch -c nvidia -c conda-forge --override-channels
+```
+---
+### 3️⃣ Install our plugin — **napari-tomodl**
+
+Our plugin is available on the [napari-hub](https://napari-hub.org/plugins/napari-tomodl.html).
+---
+🔹 Option 1: Install directly from napari
+1. Open **napari**.  
+2. Go to **Plugins → Install/Uninstall Plugins**.  
+3. Search for **napari-tomodl** and click **Install**.
+---
+🔹 Option 2: Install via pip (from Napari Console)
+Open napari’s **Python Console** and type:
+
+```bash
+pip install napari-tomodl
 ```
 
-### **2. Install the napari-tomodl plugin**
-```python
-!pip install napari-tomodl
-```
-
-> Tip: After installing PyTorch, restart Napari to ensure it detects the new environment. 😊
+> After installation, **restart napari** to apply the changes. 😊
 
 ## 🤝 Contributing
 

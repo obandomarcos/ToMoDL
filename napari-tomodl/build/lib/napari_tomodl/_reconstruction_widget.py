@@ -478,7 +478,8 @@ class ReconstructionWidget(QTabWidget):
             #  change the scale instead of resizing ################################### TODO: change this to resizing
             if self.compression_basic.text in {"HIGH", "MEDIUM", "LOW"}:
                 if self.input_type == "3D":
-                    self.scale_image_basic = [self.scale_image_basic[0], self.scale_image_basic[1] * original_size / size_compression, self.scale_image_basic[2]* original_size / size_compression]
+                    # self.scale_image_basic = [self.scale_image_basic[0], self.scale_image_basic[1] * original_size / size_compression, self.scale_image_basic[2]* original_size / size_compression]
+                    self.scale_image_basic = [self.scale_image_basic[0] / original_size * size_compression, self.scale_image_basic[1], self.scale_image_basic[2]]
                 else:
                     self.scale_image_basic = [self.scale_image_basic[0] * original_size / size_compression, self.scale_image_basic[1]]
             # # convert resize volume to original size
@@ -630,9 +631,11 @@ class ReconstructionWidget(QTabWidget):
             #  change the scale instead of resizing ################################### TODO: change this to resizing
             if self.reshapebox_advanced.val:
                 if self.is_reconstruct_one_advanced.val == True and self.fullvolume_advanced.val == False and self.input_type == "3D":
-                    self.scale_image_advanced = [self.scale_image_advanced[0] * original_size / self.resizebox_advanced.val, self.scale_image_advanced[1]* original_size / self.resizebox_advanced.val]
+                    # self.scale_image_advanced = [self.scale_image_advanced[0] * original_size / self.resizebox_advanced.val, self.scale_image_advanced[1]* original_size / self.resizebox_advanced.val]
+                    self.scale_image_advanced = [self.scale_image_advanced[0], self.scale_image_advanced[1]]
                 elif self.fullvolume_advanced.val == True and self.input_type == "3D":
-                    self.scale_image_advanced = [self.scale_image_advanced[0], self.scale_image_advanced[1] * original_size / self.resizebox_advanced.val, self.scale_image_advanced[2]* original_size / self.resizebox_advanced.val]
+                    # self.scale_image_advanced = [self.scale_image_advanced[0], self.scale_image_advanced[1] * original_size / self.resizebox_advanced.val, self.scale_image_advanced[2]* original_size / self.resizebox_advanced.val]
+                    self.scale_image_advanced = [self.scale_image_advanced[0] / original_size * self.resizebox_advanced.val, self.scale_image_advanced[1], self.scale_image_advanced[2]]
             else:
                 if self.is_reconstruct_one_advanced.val == True and self.fullvolume_advanced.val == False and self.input_type == "3D":
                     self.scale_image_advanced = [1., 1.]

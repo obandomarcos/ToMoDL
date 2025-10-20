@@ -73,7 +73,7 @@ https://napari.org/stable/plugins/index.html
 ---
 
 ### 🔹 Advanced Mode
-![plot](https://raw.githubusercontent.com/obandomarcos/ToMoDL/refs/heads/nhattm/napari-tomodl/figures/advanced_mode.png)  
+![plot](https://raw.githubusercontent.com/obandomarcos/ToMoDL/52d849b3a488d28d6fcaef3c199dad167ade45b3/napari-tomodl/figures/advanced_mode.png)
 
 9. **Manual axis alignment**  
    Shift the object along the detector axis (Z-axis).  

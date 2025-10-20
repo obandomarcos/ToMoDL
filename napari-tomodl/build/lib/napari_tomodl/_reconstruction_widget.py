@@ -26,6 +26,8 @@ from qtpy.QtWidgets import (
     QComboBox,
     QLabel,
     QProgressBar,
+    QRadioButton,
+    QButtonGroup,
 )
 from qtpy.QtCore import Qt, QThread, Signal
 from napari.layers import Image
@@ -270,18 +272,23 @@ class ReconstructionWidget(QTabWidget):
         self.iterations_advanced = Settings(
             "Smoothing Level", dtype=int, initial=2, layout=slayout, write_function=self.set_opt_processor_advanced
         )
+        radio_layout = QHBoxLayout()
 
         self.fullvolume_advanced = Settings(
-            "Reconstruct full volume", dtype=bool, initial=True, layout=slayout, write_function=self.set_opt_processor_advanced
+            "Full volume", dtype=bool, initial=True, layout=radio_layout, write_function=self.set_opt_processor_advanced
         )
+        self.is_reconstruct_one_advanced = Settings(
+            "One slice", dtype=bool, initial=False, layout=radio_layout, write_function=self.set_opt_processor_advanced
+        )
+
+        # Add the horizontal layout to the provided slayout
+        slayout.addLayout(radio_layout)
+
         self.batch_size_advanced = Settings(
             "Batch size", dtype=int, initial=32, layout=slayout, write_function=self.set_opt_processor_advanced
         )
-        self.is_reconstruct_one_advanced = Settings(
-            "Reconstruct only slices", dtype=bool, initial=True, layout=slayout, write_function=self.set_opt_processor_advanced
-        )
         self.slices_advanced = Settings(
-            "# of slices to reconstruct", dtype=int, initial=0, layout=slayout, write_function=self.set_opt_processor_advanced
+            "# of slices", dtype=int, initial=0, layout=slayout, write_function=self.set_opt_processor_advanced
         )
 
         self.orderbox_advanced = Combo_box(
@@ -630,14 +637,11 @@ class ReconstructionWidget(QTabWidget):
             
             #  change the scale instead of resizing ################################### TODO: change this to resizing
             if self.reshapebox_advanced.val:
-                if self.is_reconstruct_one_advanced.val == True and self.fullvolume_advanced.val == False and self.input_type == "3D":
-                    # self.scale_image_advanced = [self.scale_image_advanced[0] * original_size / self.resizebox_advanced.val, self.scale_image_advanced[1]* original_size / self.resizebox_advanced.val]
-                    self.scale_image_advanced = [self.scale_image_advanced[0], self.scale_image_advanced[1]]
-                elif self.fullvolume_advanced.val == True and self.input_type == "3D":
-                    # self.scale_image_advanced = [self.scale_image_advanced[0], self.scale_image_advanced[1] * original_size / self.resizebox_advanced.val, self.scale_image_advanced[2]* original_size / self.resizebox_advanced.val]
+                if self.fullvolume_advanced.val == True and self.input_type == "3D":
                     self.scale_image_advanced = [self.scale_image_advanced[0] / original_size * self.resizebox_advanced.val, self.scale_image_advanced[1], self.scale_image_advanced[2]]
-            else:
-                if self.is_reconstruct_one_advanced.val == True and self.fullvolume_advanced.val == False and self.input_type == "3D":
+                elif self.input_type == "3D" and self.fullvolume_advanced.val == False and self.is_reconstruct_one_advanced.val == False:
+                    self.scale_image_advanced = [self.scale_image_advanced[0] / original_size * self.resizebox_advanced.val, self.scale_image_advanced[1], self.scale_image_advanced[2]]
+                else:
                     self.scale_image_advanced = [1., 1.]
 
             self.bar_thread_advanced.value = 0

@@ -73,7 +73,7 @@ https://napari.org/stable/plugins/index.html
 ---
 
 ### 🔹 Advanced Mode
-![plot](https://raw.githubusercontent.com/obandomarcos/ToMoDL/refs/heads/nhattm/napari-tomodl/figures/advanced_model.png)  
+![plot](https://raw.githubusercontent.com/obandomarcos/ToMoDL/refs/heads/nhattm/napari-tomodl/figures/advanced_mode.png)  
 
 9. **Manual axis alignment**  
    Shift the object along the detector axis (Z-axis).  
@@ -92,7 +92,7 @@ https://napari.org/stable/plugins/index.html
 13. **Filter (FBP only)**  
     Choose the filter to apply when using FBP methods. 
 
-14. **Reconstruct full volume**  
+14. **Full volume**  
     - Enabled → reconstruct the whole volume.  
     - Disabled → reconstruct only a subset of slices along the detector axis (faster for testing).
 
@@ -101,7 +101,7 @@ https://napari.org/stable/plugins/index.html
     - Higher values → faster reconstruction but greater GPU memory usage.  
     - On CPU → limited to processing **1 slice at a time**.  
 
-16. **Reconstruct only slices**  
+16. **One Slice**  
     - Enabled → reconstruct only a single slice at the specified index.  
     - Disabled → reconstruct from index 0 up to the chosen slice index in the **# of slices to reconstruct** field.  
 

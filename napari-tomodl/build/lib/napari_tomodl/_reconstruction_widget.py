@@ -274,14 +274,33 @@ class ReconstructionWidget(QTabWidget):
         )
         radio_layout = QHBoxLayout()
 
-        self.fullvolume_advanced = Settings(
-            "Full volume", dtype=bool, initial=True, layout=radio_layout, write_function=self.set_opt_processor_advanced
-        )
-        self.is_reconstruct_one_advanced = Settings(
-            "One slice", dtype=bool, initial=False, layout=radio_layout, write_function=self.set_opt_processor_advanced
-        )
+        # self.fullvolume_advanced = Settings(
+        #     "Full volume", dtype=bool, initial=True, layout=radio_layout, write_function=self.set_opt_processor_advanced
+        # )
+        # self.is_reconstruct_one_advanced = Settings(
+        #     "One slice", dtype=bool, initial=False, layout=radio_layout, write_function=self.set_opt_processor_advanced
+        # )
+        self.fullvolume_advanced_mode = QRadioButton("Full volume")
+        self.one_slice_advanced_mode = QRadioButton("One slice")
+        self.multiple_slices_advanced = QRadioButton("Slices")
+        self.fullvolume_advanced_mode.setChecked(True)   # Full volume = True
+        self.one_slice_advanced_mode.setChecked(False)   # One slice = False
+        self.multiple_slices_advanced.setChecked(False)   # Multiple slices = False
+        # Add to button group for mutual exclusivity
+        self.radio_group_advanced = QButtonGroup()
+        self.radio_group_advanced.addButton(self.fullvolume_advanced_mode, 0)  # id 0 -> Full volume
+        self.radio_group_advanced.addButton(self.one_slice_advanced_mode, 1)     # id 1 -> One slice
+        self.radio_group_advanced.addButton(self.multiple_slices_advanced, 2)     # id 2 -> Multiple slices
+        self.radio_group_advanced.setExclusive(True)
 
-        # Add the horizontal layout to the provided slayout
+        # Connect signal to update function
+        self.radio_group_advanced.idClicked.connect(self.set_opt_processor_advanced)
+
+        # Add to layout
+        radio_layout.addWidget(self.fullvolume_advanced_mode)
+        radio_layout.addWidget(self.one_slice_advanced_mode)
+        radio_layout.addWidget(self.multiple_slices_advanced)
+        # Add layout to slayout
         slayout.addLayout(radio_layout)
 
         self.batch_size_advanced = Settings(
@@ -586,13 +605,13 @@ class ReconstructionWidget(QTabWidget):
 
             # Reconstruction process
             # if reconstructing only one slice
-            if self.is_reconstruct_one_advanced.val == True and self.fullvolume_advanced.val == False and self.input_type == "3D":
+            if self.one_slice_advanced_mode.isChecked() and self.input_type == "3D":
                 slices_reconstruction = [self.slices_advanced.val]
             # if reconstructing full volume or multiple slices
-            elif self.input_type == "3D":
-                slices_reconstruction = range(self.h_advanced.Z if self.fullvolume_advanced.val == True else self.slices_advanced.val)
+            elif self.multiple_slices_advanced.isChecked() and self.input_type == "3D":
+                slices_reconstruction = range(self.slices_advanced.val)
             else:
-                slices_reconstruction = [0]
+                slices_reconstruction = range(self.h_advanced.Z)
 
             batch_start = slices_reconstruction[0]
             # if use GPU process in batch to improve performance
@@ -637,9 +656,7 @@ class ReconstructionWidget(QTabWidget):
             
             #  change the scale instead of resizing ################################### TODO: change this to resizing
             if self.reshapebox_advanced.val:
-                if self.fullvolume_advanced.val == True and self.input_type == "3D":
-                    self.scale_image_advanced = [self.scale_image_advanced[0] / original_size * self.resizebox_advanced.val, self.scale_image_advanced[1], self.scale_image_advanced[2]]
-                elif self.input_type == "3D" and self.fullvolume_advanced.val == False and self.is_reconstruct_one_advanced.val == False:
+                if (self.fullvolume_advanced_mode.isChecked() or self.multiple_slices_advanced.isChecked()) and self.input_type == "3D":
                     self.scale_image_advanced = [self.scale_image_advanced[0] / original_size * self.resizebox_advanced.val, self.scale_image_advanced[1], self.scale_image_advanced[2]]
                 else:
                     self.scale_image_advanced = [1., 1.]
@@ -661,13 +678,16 @@ class ReconstructionWidget(QTabWidget):
 
             print("reconstruction shape: ", optVolume.shape)
 
-            if self.is_reconstruct_one_advanced.val == True and self.fullvolume_advanced.val == False and self.input_type == "3D":
+            if self.one_slice_advanced_mode.isChecked() and self.input_type == "3D":
                 print("scale image advanced: ", self.scale_image_advanced)
                 return optVolume[self.slices_advanced.val]
-            elif self.input_type == "3D":
+            elif self.fullvolume_advanced_mode.isChecked() and self.input_type == "3D":
                 return optVolume
+            elif self.multiple_slices_advanced.isChecked() and self.input_type == "3D":
+                return optVolume[range(self.slices_advanced.val)]
             else:
                 return optVolume[0]
+
 
         _reconstruct_advanced()
 

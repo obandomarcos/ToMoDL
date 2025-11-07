@@ -73,7 +73,7 @@ https://napari.org/stable/plugins/index.html
 ---
 
 ### 🔹 Advanced Mode
-![plot](https://raw.githubusercontent.com/obandomarcos/ToMoDL/52d849b3a488d28d6fcaef3c199dad167ade45b3/napari-tomodl/figures/advanced_mode.png)
+![plot](https://raw.githubusercontent.com/obandomarcos/ToMoDL/refs/heads/nhattm/napari-tomodl/figures/advanced_mode.png)
 
 9. **Manual axis alignment**  
    Shift the object along the detector axis (Z-axis).  
@@ -92,28 +92,29 @@ https://napari.org/stable/plugins/index.html
 13. **Filter (FBP only)**  
     Choose the filter to apply when using FBP methods. 
 
-14. **Full volume**  
+14. **Full volume mode**  
     - Enabled → reconstruct the whole volume.  
-    - Disabled → reconstruct only a subset of slices along the detector axis (faster for testing).
 
-15. **Batch size**  
+16. **One Slice mode**  
+    - Enabled → reconstruct only a single slice at the **# of slices to reconstruct** index. 
+
+17. **Slices mode**
+    - Enabled → reconstruct from index 0 up to the chosen slice index in the **# of slices to reconstruct** field.  
+
+18. **Batch size**  
     Number of slices processed simultaneously:  
     - Higher values → faster reconstruction but greater GPU memory usage.  
     - On CPU → limited to processing **1 slice at a time**.  
 
-16. **One Slice**  
-    - Enabled → reconstruct only a single slice at the specified index.  
-    - Disabled → reconstruct from index 0 up to the chosen slice index in the **# of slices to reconstruct** field.  
-
-17. **Invert colors**  
+19. **Invert colors**  
     Invert grayscale values in the reconstructed volume.
 
-18. **16-bit conversion**  
+20. **16-bit conversion**  
     Convert the reconstructed volume to **16-bit** for faster 3D rendering.  
     Leave unchecked to keep **32-bit float** output.
 ---
 
-19. **Reconstruct!** 
+21. **Reconstruct!** 
 
 ![plot](https://raw.githubusercontent.com/obandomarcos/ToMoDL/refs/heads/nhattm/napari-tomodl/figures/reconstruct_button.png)
 

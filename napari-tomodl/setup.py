@@ -5,7 +5,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setup(
     name="napari-tomodl",
-    version="0.2.23",
+    version="0.2.24",
     description="A plugin for optical projection tomography reconstruction with model-based neural networks.",
     long_description=long_description,
     long_description_content_type="text/markdown",
@@ -30,13 +30,13 @@ setup(
     install_requires=[
         "magicgui",
         "qtpy",
-        "napari",
-        "pyqt5",
+        # "napari",
+        # "pyqt5",
         "opencv-python",
         "scikit-image",
         "scipy",
         "qbi-radon",
-        "pyopengl==3.1.6"
+        # "pyopengl==3.1.6"
     ],    
     package_dir={"": "src"},
     packages=find_packages(where="src"),

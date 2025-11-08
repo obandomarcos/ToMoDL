@@ -1,5 +1,6 @@
 import numpy as np
-import cv2
+# import cv2
+from skimage.transform import resize as resize_skimage
 import tqdm
 import scipy.ndimage as ndi
 import torch
@@ -57,26 +58,27 @@ def resize_sino(sinogram_volume: np.ndarray, order_mode=0, resize_val=100, clip_
 
     if order_mode == 0:
 
-        sinogram_resize = np.zeros((theta, sinogram_size, Z), dtype=np.float32)
+        # sinogram_resize = np.zeros((theta, sinogram_size, Z), dtype=np.float32)
+        sinogram_resize = resize_skimage(sinogram_volume, (theta, sinogram_size, Z), preserve_range=True)
 
     elif order_mode == 1:
-        sinogram_resize = np.zeros((sinogram_size, theta, Z), dtype=np.float32)
+        # sinogram_resize = np.zeros((sinogram_size, theta, Z), dtype=np.float32)
+        sinogram_resize = resize_skimage(sinogram_volume, (sinogram_size, theta, Z), preserve_range=True)
+    # for idx in range(Z):
 
-    for idx in range(Z):
+    #     if order_mode == 0:
+    #         sinogram_resize[:, :, idx] = cv2.resize(
+    #             sinogram_volume[:, :, idx],
+    #             (sinogram_size, theta),
+    #             interpolation=cv2.INTER_NEAREST,
+    #         )
 
-        if order_mode == 0:
-            sinogram_resize[:, :, idx] = cv2.resize(
-                sinogram_volume[:, :, idx],
-                (sinogram_size, theta),
-                interpolation=cv2.INTER_NEAREST,
-            )
-
-        elif order_mode == 1:
-            sinogram_resize[:, :, idx] = cv2.resize(
-                sinogram_volume[:, :, idx],
-                (theta, sinogram_size),
-                interpolation=cv2.INTER_NEAREST,
-            )
+    #     elif order_mode == 1:
+    #         sinogram_resize[:, :, idx] = cv2.resize(
+    #             sinogram_volume[:, :, idx],
+    #             (theta, sinogram_size),
+    #             interpolation=cv2.INTER_NEAREST,
+    #         )
 
     return sinogram_resize
 

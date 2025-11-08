@@ -302,12 +302,11 @@ class ReconstructionWidget(QTabWidget):
         radio_layout.addWidget(self.multiple_slices_advanced)
         # Add layout to slayout
         slayout.addLayout(radio_layout)
-
+        self.slices_advanced = Settings(
+            "Slices #", dtype=int, initial=0, layout=slayout, write_function=self.set_opt_processor_advanced
+        )
         self.batch_size_advanced = Settings(
             "Batch size", dtype=int, initial=32, layout=slayout, write_function=self.set_opt_processor_advanced
-        )
-        self.slices_advanced = Settings(
-            "# of slices", dtype=int, initial=0, layout=slayout, write_function=self.set_opt_processor_advanced
         )
 
         self.orderbox_advanced = Combo_box(
@@ -659,6 +658,9 @@ class ReconstructionWidget(QTabWidget):
                 if (self.fullvolume_advanced_mode.isChecked() or self.multiple_slices_advanced.isChecked()) and self.input_type == "3D":
                     self.scale_image_advanced = [self.scale_image_advanced[0] / original_size * self.resizebox_advanced.val, self.scale_image_advanced[1], self.scale_image_advanced[2]]
                 else:
+                    self.scale_image_advanced = [1., 1.]
+            else:
+                if self.one_slice_advanced_mode.isChecked() and self.input_type == "3D":
                     self.scale_image_advanced = [1., 1.]
 
             self.bar_thread_advanced.value = 0

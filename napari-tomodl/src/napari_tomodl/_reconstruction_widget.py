@@ -507,24 +507,7 @@ class ReconstructionWidget(QTabWidget):
                     self.scale_image_basic = [self.scale_image_basic[0] / original_size * size_compression, self.scale_image_basic[1], self.scale_image_basic[2]]
                 else:
                     self.scale_image_basic = [self.scale_image_basic[0] * original_size / size_compression, self.scale_image_basic[1]]
-            # # convert resize volume to original size
-            #     optVolume_resized = np.zeros([self.h_basic.Z, original_size, original_size], np.float32)
-            #     print("Resizing volume to original size")
-            #     if self.fullvolume.val == False and self.is_reconstruct_one.val == True:
-            #         optVolume_resized[self.slices.val] = cv2.resize(
-            #             optVolume[self.slices.val], (original_size, original_size), interpolation=cv2.INTER_LINEAR
-            #         )
-            #     else:
-            #         slices_resize = self.h_basic.Z if self.fullvolume.val == True else self.slices.val
-            #         self.bar_thread.max = slices_resize
-            #         for i in tqdm(range(slices_resize)):
-            #             optVolume_resized[i] = cv2.resize(
-            #                 optVolume[i], (original_size, original_size), interpolation=cv2.INTER_LINEAR
-            #             )
-            #             self.bar_thread.value = i + 1
-            #             self.bar_thread.run()
-            #     optVolume = optVolume_resized
-            #     del optVolume_resized, sinos
+
 
             self.bar_thread_basic.value = 0
             self.bar_thread_basic.run()

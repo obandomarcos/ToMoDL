@@ -11,13 +11,14 @@ import torch.nn.functional as F
 from skimage.transform import radon as radon_scikit
 from skimage.transform import iradon as iradon_scikit
 from skimage.filters import median
+from skimage.transform import resize as resize_skimage
 from skimage.morphology import disk
 from .unet import UNet
 
 from .alternating import TwIST, TVdenoise, TVnorm
 import numpy as np
 import os
-import cv2
+# import cv2
 from enum import Enum
 import tqdm
 import os
@@ -561,30 +562,33 @@ class OPTProcessor:
             sinogram_size = self.resize_val
         else:
             sinogram_size = int(np.ceil(self.resize_val * np.sqrt(2)))
-
+        print("orginal sinogram range: ", sinogram_volume.min(), sinogram_volume.max())
         if self.order_mode == Order_Modes.Vertical.value:
 
-            sinogram_resize = np.zeros((self.theta, sinogram_size, self.Z), dtype=np.float32)
+            # sinogram_resize = np.zeros((self.theta, sinogram_size, self.Z), dtype=np.float32)
+            sinogram_resize = resize_skimage(sinogram_volume, (self.theta, sinogram_size, self.Z), preserve_range=True)
 
         elif self.order_mode == Order_Modes.Horizontal.value:
 
-            sinogram_resize = np.zeros((sinogram_size, self.theta, self.Z), dtype=np.float32)
+            # sinogram_resize = np.zeros((sinogram_size, self.theta, self.Z), dtype=np.float32)
+            sinogram_resize = resize_skimage(sinogram_volume, (sinogram_size, self.theta, self.Z), preserve_range=True)
+        print("resized sinogram range: ", sinogram_resize.min(), sinogram_resize.max())
+        # for idx in tqdm.tqdm(range(self.Z)):
 
-        for idx in tqdm.tqdm(range(self.Z)):
+        #     if self.order_mode == Order_Modes.Vertical.value:
+        #         sinogram_resize[:, :, idx] = cv2.resize(
+        #             sinogram_volume[:, :, idx],
+        #             (sinogram_size, self.theta),
+        #             interpolation=cv2.INTER_NEAREST,
+        #         )
 
-            if self.order_mode == Order_Modes.Vertical.value:
-                sinogram_resize[:, :, idx] = cv2.resize(
-                    sinogram_volume[:, :, idx],
-                    (sinogram_size, self.theta),
-                    interpolation=cv2.INTER_NEAREST,
-                )
+        #     elif self.order_mode == Order_Modes.Horizontal.value:
+        #         sinogram_resize[:, :, idx] = cv2.resize(
+        #             sinogram_volume[:, :, idx],
+        #             (self.theta, sinogram_size),
+        #             interpolation=cv2.INTER_NEAREST,
+        #         )
 
-            elif self.order_mode == Order_Modes.Horizontal.value:
-                sinogram_resize[:, :, idx] = cv2.resize(
-                    sinogram_volume[:, :, idx],
-                    (self.theta, sinogram_size),
-                    interpolation=cv2.INTER_NEAREST,
-                )
 
 
         return sinogram_resize

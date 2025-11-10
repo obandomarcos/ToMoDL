@@ -176,3 +176,6 @@ cython_debug/
 
 wandb/
 napari-tomodl/.pypirc
+napari-tomodl/build
+napari-tomodl/dist
+napari-tomodl/src/*.egg-info

@@ -123,33 +123,21 @@ https://napari.org/stable/plugins/index.html
 
 ## 💻 Installation Guide
 
-### 1️⃣ Install **napari** as a bundled app
+### 1️⃣ Install **napari** as a bundled app (no code, highly recommend)
+
+You can directly download the installer for your operating system:
+- **Windows (.exe):**  
+  [napari-0.6.5-Windows-x86_64.exe](https://github.com/napari/napari/releases/download/v0.6.5/napari-0.6.5-Windows-x86_64.exe)
+- **Ubuntu (.sh):**  
+  [napari-0.6.5-Linux-x86_64.sh](https://github.com/napari/napari/releases/download/v0.6.5/napari-0.6.5-Linux-x86_64.sh)
 
 Please visit the official napari documentation and follow the instructions here:  
-👉 [Napari Installation Guide (bundled app)](https://napari.org/stable/tutorials/fundamentals/installation_bundle_conda.html)
-
-You can also directly download the installer for your operating system:
-- **Windows (.exe):**  
-  [napari-0.6.4-Windows-x86_64.exe](https://github.com/napari/napari/releases/download/v0.6.4/napari-0.6.4-Windows-x86_64.exe)
-- **Ubuntu (.sh):**  
-  [napari-0.6.4-Linux-x86_64.sh](https://github.com/napari/napari/releases/download/v0.6.4/napari-0.6.4-Linux-x86_64.sh)
+👉 [Napari Installation Guide (bundled app)](https://napari.org/0.6.5/tutorials/fundamentals/installation_bundle_conda.html)
 
 ---
 ### 2️⃣ Install **PyTorch** inside Napari’s bundled environment
 
 This guide provides detailed instructions for installing **PyTorch** within the Napari bundled environment. Follow the steps carefully to ensure compatibility and a smooth installation process.
-
-> **💡 Tip:** Ensure Napari is closed before proceeding with the installation to avoid conflicts.
-Before installing PyTorch, verify your system's CUDA version if you plan to use GPU support. This ensures compatibility with the PyTorch version and CUDA toolkit.
-
-**Check CUDA Version**:
-   - Open a **Command Prompt** (Windows) or **terminal** (Linux).
-   - Run the following command:
-     ```bash
-     nvidia-smi
-     ```
-   - Choose a `pytorch-cuda` version that is **less than or equal to** your CUDA version. Supported versions include 11.8, 12.1, or 12.4.
-   - For more details on compatible PyTorch versions, visit the [PyTorch Previous Versions page](https://pytorch.org/get-started/previous-versions).
 
 #### 🪟 **For Windows Users**
 
@@ -178,7 +166,8 @@ Before installing PyTorch, verify your system's CUDA version if you plan to use 
    Ensure your CUDA version matches the `pytorch-cuda` version specified (e.g., 12.1). Replace `2.5.0` and `12.1` with versions compatible with your system if needed.
 
    ```bash
-   ~/.local/napari-0.6.4/bin/conda install -y pytorch==2.5.0 pytorch-cuda=12.1 -c conda-forge -c pytorch -c nvidia --override-channels
+   sudo ~/.local/napari-0.6.6/envs/napari-0.6.6/bin/conda install -y pytorch==2.5.0 pytorch-cuda=12.4 -c conda-forge -c pytorch -c nvidia --override-channels 
+
    ```
 
    #### 🔹 For CPU Only

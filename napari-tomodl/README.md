@@ -121,62 +121,51 @@ https://napari.org/stable/plugins/index.html
    A new layer will appear on top of the projections stack with the reconstructed volume.
 
 
-## 💻 Installation Guide
+## 💻 Installation Guide *(No Code — Highly Recommended)*
 
-### 1️⃣ Install **napari** as a bundled app (no code, highly recommend)
+### 🧩 **Step 1: Install Napari (Bundled App)**
 
-You can directly download the installer for your operating system:
-- **Windows (.exe):**  
-  [napari-0.6.5-Windows-x86_64.exe](https://github.com/napari/napari/releases/download/v0.6.5/napari-0.6.5-Windows-x86_64.exe)
-- **Ubuntu (.sh):**  
-  [napari-0.6.5-Linux-x86_64.sh](https://github.com/napari/napari/releases/download/v0.6.5/napari-0.6.5-Linux-x86_64.sh)
+> 💡 *Skip this step if you already installed Napari via `pip`.*
 
-Please visit the official napari documentation and follow the instructions here:  
-👉 [Napari Installation Guide (bundled app)](https://napari.org/0.6.5/tutorials/fundamentals/installation_bundle_conda.html)
+You can directly download the official Napari **bundled installer** for your operating system:
+
+* 🪟 **Windows (.exe):**
+  👉 [napari-0.6.5-Windows-x86_64.exe](https://github.com/napari/napari/releases/download/v0.6.5/napari-0.6.5-Windows-x86_64.exe)
+
+* 🐧 **Ubuntu (.sh):**
+  👉 [napari-0.6.5-Linux-x86_64.sh](https://github.com/napari/napari/releases/download/v0.6.5/napari-0.6.5-Linux-x86_64.sh)
+
+📘 **Official Guide:**
+Follow the Napari documentation for detailed installation steps:
+🔗 [Napari Installation Guide (Bundled App)](https://napari.org/0.6.5/tutorials/fundamentals/installation_bundle_conda.html)
 
 ---
-### 2️⃣ Install **PyTorch** inside Napari’s bundled environment
 
-This guide provides detailed instructions for installing **PyTorch** within the Napari bundled environment. Follow the steps carefully to ensure compatibility and a smooth installation process.
+### ⚙️ **Step 2: Install PyTorch Inside Napari’s Bundled Environment**
 
-#### 🪟 **For Windows Users**
+> 💡 *Skip this step if PyTorch is already installed in your Napari environment.*
 
-1. Open **Command Prompt** (do **not** use PowerShell, as it may cause path resolution issues).
-2. Run the appropriate command based on your hardware setup:
+This step ensures **PyTorch** is properly installed within Napari’s internal Conda environment for full compatibility.
 
-   #### 🔹 For GPU Support
-   Ensure your CUDA version matches the `pytorch-cuda` version specified (e.g., 12.1). Replace `2.5.0` and `12.1` with versions compatible with your system if needed.
+#### 🪟 **Windows Users**
 
-   ```bash
-   "%LOCALAPPDATA%\napari-0.6.4\envs\napari-0.6.4\Scripts\conda.exe" install -y pytorch==2.5.0 pytorch-cuda=12.1 -c conda-forge -c pytorch -c nvidia --override-channels
-   ```
+1. Download the installer:
+   🔗 [install_torch2napari_windows.bat](https://github.com/obandomarcos/ToMoDL/releases/download/v.0.2.25/install_torch2napari_windows.bat)
+2. Double-click the `.bat` file to run it.
+   *(It will automatically detect Napari’s environment and install PyTorch.)*
 
-   #### 🔹 For CPU Only
-   If you do not have a compatible NVIDIA GPU or prefer to use CPU, run:
+#### 🐧 **Linux Users**
 
-   ```bash
-   "%LOCALAPPDATA%\napari-0.6.4\envs\napari-0.6.4\Scripts\conda.exe" install -y pytorch==2.5.0 cpuonly -c pytorch -c nvidia -c conda-forge --override-channels
-   ```
-
-#### 🐧 **For Linux Users**
-1. Open a **terminal**.
-2. Run the appropriate command based on your hardware setup:
-
-   #### 🔹 For GPU Support
-   Ensure your CUDA version matches the `pytorch-cuda` version specified (e.g., 12.1). Replace `2.5.0` and `12.1` with versions compatible with your system if needed.
+1. Download the installer:
+   🔗 [install_torch2napari_linux.sh](https://github.com/obandomarcos/ToMoDL/releases/download/v.0.2.25/install_torch2napari_linux.sh)
+2. Run it in your terminal:
 
    ```bash
-   sudo ~/.local/napari-0.6.6/envs/napari-0.6.6/bin/conda install -y pytorch==2.5.0 pytorch-cuda=12.4 -c conda-forge -c pytorch -c nvidia --override-channels 
-
+   bash install_torch2napari_linux.sh
    ```
 
-   #### 🔹 For CPU Only
-   If you do not have a compatible NVIDIA GPU or prefer to use CPU, run:
-
-   ```bash
-   ~/.local/napari-0.6.4/bin/conda install -y pytorch==2.5.0 cpuonly -c pytorch -c nvidia -c conda-forge --override-channels
-   ```
 ---
+
 ### 3️⃣ Install our plugin — **napari-tomodl**
 
 Our plugin is available on the [napari-hub](https://napari-hub.org/plugins/napari-tomodl.html).

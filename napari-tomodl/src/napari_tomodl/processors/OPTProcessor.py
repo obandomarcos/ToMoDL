@@ -518,7 +518,7 @@ class OPTProcessor:
         self.rec_process = Rec_Modes.FBP_CPU.value
         self.order_mode = Order_Modes.Vertical.value
         self.clip_to_circle = False
-        self.use_filter = False
+        self.use_filter = True  
         self.batch_size = 1
         self.is_half_rotation = False
         self.filter_FBP = "ramp" # can be  "shepp-logan" or "cosine" or "hamming" or "hann" 

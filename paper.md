@@ -1,10 +1,10 @@
 ---
-title: 'napari-ToMoDL: A Python package with a napari plugin for accelerated reconstruction of tomographic images'
+title: 'A napari plugin for (parallel) tomography reconstruction'
 tags:
 authors:
   - name: Marcos Obando
     equal-contrib: true
-    affiliation: "1,2" # (Multiple affiliations must be quoted)
+    affiliation: "1,2,4" # (Multiple affiliations must be quoted)
   - name: Minh Nhat Trinh
     affiliation: 3 # (Multiple affiliations must be quoted)
     equal-contrib: true # (This is how you can denote equal contributions between multiple authors)
@@ -30,7 +30,6 @@ affiliations:
    index: 5
  - name: School of Biomedical Engineering and Imaging Sciences, King’s College London, London, United Kingdom
    index: 6
-
 date: 
 bibliography: paper.bib
 

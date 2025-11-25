@@ -1,5 +1,5 @@
 ---
-  title: 'A napari plugin for (parallel) tomography reconstruction'
+  title: 'tomopari:A napari plugin for (parallel) tomography reconstruction'
 tags:
 authors:
   - name: Marcos Obando

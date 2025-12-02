@@ -82,7 +82,7 @@ In \autoref{fig:Figura1}, a complete pipeline describing the usage of tomonapari
 
 5. **Data pre-processing** – Optional pre-processing steps such as flat-field correction and image resizing can be applied to normalise projection intensities and adapt image dimensions before reconstruction. As an alternative, in the basic mode, users can select: 
 
-* *Compression/projection image resizing* - Resize the Z-axis dimension to accelerate computation or reduce memory usage, with adjustable compression levels (**HIGH**, **MEDIUM**, **LOW**, or **NO**). The number of slixes in the Z-axis is 100, 256, 512, and 1024 respectivley.  
+* *Compression/projection image resizing* - Resize the Z-axis dimension to accelerate computation or reduce memory usage, with adjustable compression levels (**HIGH**, **MEDIUM**, **LOW**, or **NO**). The number of slices in the Z-axis is 100, 256, 512, and 1024 respectivley.  
 
 6. **Reconstruction methods** – Users can select between different reconstruction algorithms according to their application:
 
@@ -95,7 +95,7 @@ In \autoref{fig:Figura1}, a complete pipeline describing the usage of tomonapari
 
 7. **Reconstruction settings** – Parameters controlling reconstruction quality can be adjusted, including the choice of filter (for FBP), smoothing level, and whether to clip the reconstruction to a circular field of view. 
  
- * *Clip to circle* Restricts reconstruction to a circular field of view (FOV), i.e. the reconstructed image is masked so that everything outside the FOV is set to zero, removind background noise and improving visual quality.
+ * *Clip to circle* Restricts reconstruction to a circular field of view (FOV), i.e. the reconstructed image is masked so that everything outside the FOV is set to zero, removing background noise and improving visual quality.
  * *Filter selection (for FBP methods)* Users can choose the desired filtering kernel (e.g., *Ram-Lak*, *Shepp-Logan*, etc.) for the filtered backprojection algorithm, balancing noise suppression and edge preservation.
  * *Smoothing level* corresponds to the number of ToMoDL iterations, which controls the sharpness/smoothness of the reconstructed images. As an altenative, in the basic mode, users can select the smoothing strength as **HIGH**, **MEDIUM**, **LOW**, that correspond to 6, 4 and 2 iterations of tomodl respectively.
 

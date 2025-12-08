@@ -12,7 +12,7 @@ authors:
     affiliation: 4 # (Multiple affiliations must be quoted)
   - name: Germán Mato
     equal-contrib: true 
-    affiliation: "2,5"
+    affiliation: "1,5"
   - name: Teresa M Correia
     equal-contrib: true
     corresponding: true # (This is how to denote the corresponding author)

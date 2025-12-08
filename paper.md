@@ -103,7 +103,7 @@ In \autoref{fig:Figura1}, a complete pipeline describing the usage of tomopari i
 
 9. **Choose rotation axis** – Depending on the experimental setup, the user defines whether the rotation axis is vertical or horizontal to ensure that projections are correctly aligned during reconstruction.
 
-10. **Volume post-processing** – Finally, reconstructed volumes can undergo optional post-processing steps, such as color inversion or conversion to 16-bit depth, generating final images ready for quantitative analysis or visualization within *napari*. Note that FBP always outputs 32-bit images; converting them to 16-bit improves visualization performanve.
+10. **Volume post-processing** – Finally, reconstructed volumes can undergo optional post-processing steps, such as color inversion or conversion to 16-bit depth, generating final images ready for quantitative analysis or visualization within *napari*. Note that FBP always outputs 32-bit images; converting them to 16-bit improves visualization performance.
 
 Once these steps are completed, the 'Reconstruction' button executes the desired specifications for image recovery from projections. In napari, outputs are written as image layers, which can be analysed by other plugins and saved in different formats. One special feature that napari offers on top of 3D images is volume rendering, useful once a full volume is computed with the presented plugin. Normalisation of intensity and contrast can also be applied to specific layers using napari's built-in tools in the top-left bar. 
 

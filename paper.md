@@ -1,32 +1,32 @@
 ---
-title: 'tomopari: A napari plugin for (parallel) tomography reconstruction'
+title: 'tomopari: A napari plugin for accelerated tomographic reconstruction'
 tags:
 authors:
   - name: Marcos Obando
     equal-contrib: true
-    affiliation: "1,2,3,4" # (Multiple affiliations must be quoted)
+    affiliation: "1,2,3" # (Multiple affiliations must be quoted)
   - name: Minh Nhat Trinh
-    affiliation: 5 # (Multiple affiliations must be quoted)
+    affiliation: 4 # (Multiple affiliations must be quoted)
     equal-contrib: true # (This is how you can denote equal contributions between multiple authors)
   - name: David Paleček
-    affiliation: 5 # (Multiple affiliations must be quoted)
+    affiliation: 4 # (Multiple affiliations must be quoted)
   - name: Germán Mato
     equal-contrib: true 
-    affiliation: "3,4"
+    affiliation: "1,5"
   - name: Teresa M Correia
     equal-contrib: true
     corresponding: true # (This is how to denote the corresponding author)
-    affiliation: "5,6"
+    affiliation: "4,6"
 affiliations:
- - name: Centrum Wiskunde & Informatica, Amsterdam, the Netherlands
-   index: 1
- - name: University of Eastern Finland, Kuopio, Finland
-   index: 2
- - name: Medical Physics Department, Centro Atómico Bariloche, Bariloche, Argentina
-   index: 3
  - name: Instituto Balseiro, Bariloche, Argentina
-   index: 4
+   index: 1
+ - name: Centrum Wiskunde & Informatica, Amsterdam, the Netherlands
+   index: 2
+ - name: University of Eastern Finland, Kuopio, Finland
+   index: 3
  - name: Centro de Ciências do Mar do Algarve (CCMAR/CIMAR LA), University of Algarve, Faro, Portugal
+   index: 4   
+ - name: Medical Physics Department, Centro Atómico Bariloche, Bariloche, Argentina
    index: 5
  - name: School of Biomedical Engineering and Imaging Sciences, King’s College London, London, United Kingdom
    index: 6
@@ -60,15 +60,15 @@ The user-friendly software presented here aims to bridge the gap between a wide 
 
 The reconstruction methods implemented in the *tomopari* package are:
 
-- **FBP** Filtered backprojection is a widely used method for tomographic reconstruction. Typically, it involves filtering the data in the frequency domain using a ramp filter, which amplifies high-frequency components, and then backprojecting the filtered projections from multiple angles into the image domain.
+- **FBP** (Filtered backprojection) is a widely used method for tomographic reconstruction. Typically, it involves filtering the data in the frequency domain using a ramp filter, which amplifies high-frequency components, and then backprojecting the filtered projections from multiple angles into the image domain.
 The filter used in FBP is typically a (modified) ramp filter, which enhances high-frequency components to correct for the blurring caused by backprojection. FBP is computationally efficient and works well for simple geometries, such as parallel-beam tomography.
-- **TwIST** is an iterative method  for compressed sensing image reconstruction adapted for tomographic reconstruction [@correia2015accelerated], which involves solving a non-convex optimisation problem using the shrinkage and thresholding­ technique for each 2D slice. In this implementation, we chose to minimise the total variation norm as our regularising function. TwIST can handle a wide range of geometries and produce high-quality reconstructions. However, it is computationally expensive and requires careful tuning of­ algortihm parameters.
+- **TwIST** is an iterative method  for compressed sensing image reconstruction adapted for tomographic reconstruction [@correia2015accelerated], which involves solving a non-convex optimisation problem using the shrinkage/thresholding­ technique for each 2D slice. In this implementation, we chose to minimise the total variation norm as our regularising function. TwIST can handle a wide range of geometries and produce high-quality reconstructions. However, it is computationally expensive and requires careful tuning of­ algorithm parameters.
 - **U\-Net** is a deep learning architecture for tomographic reconstruction that uses a U-shaped network with skip ­connections [@ronneberger2015u]. The proposed network in [@davis2019convolutional] processes undersampled FBP reconstructions and outputs streak-free 2D images. Skip connections help preserve fine details in the reconstruction, so that the network can handle complex geometries and noisy data. While reconstruction is fast, making it suitable for real-time imaging, training a U-Net requires large amounts of data.
 - **ToMoDL** is a  model-based deep learning framework  that combines iterations over a data consistency step and an image domain artefact removal step achieved by a convolutional neural network. The data consistency step is implemented using the conjugate gradient algorithm and the artefact removal via a deep neural network with shared weights across iterations. As the forward model is explicitly accounted for, the number of network parameters to be learned is significantly reduced compared to direct inversion approaches, providing better performance in settings where the amount of training data is limited [@obando2023model].
 
 In \autoref{fig:Figura1}, a complete pipeline describing the usage of *tomopari* is presented. The input is a single channel raw data acquired in a parallel beam tomography, loaded as an ordered stack of files. Two user modes are provided: a basic mode for users without deep learning expertise, and an advanced mode for fine control over smoothing, alignment, flat-field correction, and compression trade-offs. Processing steps labeled 1-10 in \autoref{fig:Figura1} are:
 
-![\textbf{napari-tomodl basic and advanced mode pipelines.}. Step-by-step from a stack of raw projection acquisition to reconstruction of a single specific slice or full volume. \label{fig:Figura1}](./napari-tomodl/figures/Figure1.pdf)
+![\textbf{tomopari basic and advanced mode pipelines.} Step-by-step from a stack of raw projection acquisition to reconstruction of a single specific slice or full volume. \label{fig:Figura1}](./napari-tomodl/figures/Figure1.pdf)
 
 1. **Load stack** – The workflow begins by importing the ordered stack of raw projection images (sinograms) into napari using its file manager. This generates a new 3D image layer representing the raw data to be reconstructed.
 
@@ -83,7 +83,7 @@ In \autoref{fig:Figura1}, a complete pipeline describing the usage of *tomopari*
 
 5. **Data pre-processing** – Optional pre-processing steps such as flat-field correction and image resizing can be applied to normalise projection intensities and adapt image dimensions before reconstruction. As an alternative, in the basic mode, users can select: 
 
-* *Compression/projection image resizing* - Reduce the Z-axis dimension to accelerate computation or reduce memory usage, with adjustable compression levels (**HIGH**, **MEDIUM**, **LOW**, or **NO**). (Explain here what factors these options correspond to)
+* *Compression/projection image resizing* - Resize the Z-axis dimension to accelerate computation or reduce memory usage, with adjustable compression levels (**HIGH**, **MEDIUM**, **LOW**, or **NO**). The number of slices in the Z-axis is 100, 256, 512, and no compression, respectivley.  
 
 6. **Reconstruction methods** – Users can select between different reconstruction algorithms according to their application:
 
@@ -96,9 +96,9 @@ In \autoref{fig:Figura1}, a complete pipeline describing the usage of *tomopari*
 
 7. **Reconstruction settings** – Parameters controlling reconstruction quality can be adjusted, including the choice of filter (for FBP), smoothing level, and whether to clip the reconstruction to a circular field of view. 
  
- * *Clip to circle* Restricts reconstruction to a circular field of view, removing background noise and improving visualization for cylindrical samples (i think it has nothing to do with cylindrical samples, remove.).
+ * *Clip to circle* Restricts reconstruction to a circular field of view (FOV), i.e. the reconstructed image is masked so that everything outside the FOV is set to zero, removing background noise and improving visual quality.
  * *Filter selection (for FBP methods)* Users can choose the desired filtering kernel (e.g., *Ram-Lak*, *Shepp-Logan*, etc.) for the filtered backprojection algorithm, balancing noise suppression and edge preservation.
- * *Smoothing level* corresponds to the number of ToMoDL iterations, which controls the sharpness/smoothness of the reconstructed images. As an altenative, in the basic mode, users can select the smoothing strength as **HIGH**, **MEDIUM**, **LOW**.
+ * *Smoothing level* corresponds to the number of ToMoDL iterations, which controls the sharpness/smoothness of the reconstructed images. As an altenative, in the basic mode, users can select the smoothing strength as **HIGH**, **MEDIUM**, **LOW**, that correspond to 6, 4 and 2 iterations of tomodl respectively.
 
 8. **Reconstruct the full volume or selected slices** – Users can choose to reconstruct the entire volume, a single slice, or a specific range of slices. For large datasets, reconstructing only a few slices is useful for quick testing. Reconstruction can also be performed in multiple batches to optimize memory usage and improve computational efficiency.
 
@@ -109,7 +109,7 @@ In \autoref{fig:Figura1}, a complete pipeline describing the usage of *tomopari*
 * *Full or partial volume reconstruction* Enables fast testing or memory-efficient reconstruction by limiting computation to a subset of slices along the detector axis. 
 * *Intensity inversion* Inverts grayscale values in the reconstructed image volume, which can be useful when projection data were acquired with inverted intensity mapping.
 
-Once these steps are completed, the 'Reconstruction' button allows for executing the desired specifications for image recovery from projections. In napari, outputs are written as image layers, which can be analysed by other plugins and saved in different formats. One special feature that napari offers on top of 3D images is volume rendering, useful once a full volume is computed with the presented plugin. Normalisation of intensity and contrast can also be applied to specific layers using napari's built-in tools in the top-left bar. 
+Once these steps are completed, the 'Reconstruction' button executes the desired specifications for image recovery from projections. In napari, outputs are written as image layers, which can be analysed by other plugins and saved in different formats. One special feature that napari offers on top of 3D images is volume rendering, useful once a full volume is computed with the presented plugin. Normalisation of intensity and contrast can also be applied to specific layers using napari's built-in tools in the top-left bar. 
 
 # Use cases
 
@@ -122,13 +122,12 @@ Projection data from a foramnifera were obtained using 20 KeV X rays and a high-
 3. \textbf{High-Throughput Tomography} (HiTT).
 Synchrotron X-ray projection data from an ant, fixed in a mixture of PFA (paraformaldehyde) and GA (glutaraldehyde), dehydrated and mounted in ethanol, were obtained using a phase-contrast imaging platform for life-science samples on the EMBL beamline P14 [@albers2024high]. The HiTT dataset contains 1800 projections over 180 degrees, acquired at 0.1-degree intervals, each composed of 3 tiles with a size of 2048 $\times$ 2048 pixels each (0.65 μm per pixel). The projections were downsampled by a factor of 2.
 
-In \autoref{fig:Figura2} we show representative examples of the 2D reconstruction obtained with FBP and ToMoDL and 3D volume obtained using the plugin with the ToMoDL option. The volumes were fully rendered using the built-in napari capabilities, allowing for full integration of the data analysis workflow in napari. 
+In \autoref{fig:Figura2} we show representative examples of the 2D reconstructions obtained with FBP and ToMoDL and 3D volumes obtained using the plugin with the ToMoDL option. The volumes were fully rendered using the built-in napari capabilities, allowing for full integration of the data analysis workflow in napari. 
 
 ![\textbf{Reconstruction use cases}. Left panels: 2D slices reconstructed from undersampled data using FBP and ToMoDL methods (OPT, X-ray CT and synchrotron X-ray HiTT). For each case, the acceleration factor, degrees per step and rotation range are indicated. Right panels: 3D renderings of ToMoDL reconstructions.\label{fig:Figura2}](./napari-tomodl/figures/Figure2.pdf)
 
 # Acknowledgements
 
-This study received Portuguese national funds from FCT - Foundation for Science and Technology through contracts UID/04326/2025, UID/PRR/04326/2025 and LA/P/0101/2020 (DOI:10.54499/LA/P/0101/2020), ‘la Caixa’ Foundation and FCT, I P under the Project code LCF/PR/HR22/00533, European Union’s Horizon 2020 research and innovation program under the Marie Skłodowska-Curie OPTIMAR grant with agreement no 867450 (DOI:10.3030/867450), European Union’s Horizon Europe Programme IMAGINE under grant agreement no. 101094250 (DOI:10.3030/101094250) and NVIDIA GPU hardware grant. M.O was supported by the European Union (GA 101072354), (GA 101072354) and UKRI (grant number EP/X030733/1).  M.O. would like to thank Dr Ezgi Demircan-Tureyen and Dr Vladyslav Andriiashen for thoughtful discussions on the matter of authorship.
- Views and opinions expressed are however those of the author(s) only and do not necessarily reflect those of the European Union or the European Research Executive Agency. Neither the European Union nor the granting authority can be held responsible for them. The authors would like to express sincere gratitude to: Dr. Ksenia Denisova, Dr. Elizabeth Duke and Dr. Yannick Schwab from EMBL for providing HiTT data and invaluable support in data preparation; Dr. Andrea Bassi from Politecnico di Milano for providing access to the OPT data;  
+This study received Portuguese national funds from FCT - Foundation for Science and Technology through contracts UID/04326/2025, UID/PRR/04326/2025 and LA/P/0101/2020 (DOI:10.54499/LA/P/0101/2020), ‘la Caixa’ Foundation and FCT, I P under the Project code LCF/PR/HR22/00533, European Union’s Horizon 2020 research and innovation program under the Marie Skłodowska-Curie OPTIMAR grant with agreement no 867450 (DOI:10.3030/867450), European Union’s Horizon Europe Programme IMAGINE under grant agreement no. 101094250 (DOI:10.3030/101094250) and NVIDIA GPU hardware grant. M.O was supported by the European Union (GA 101072354) and UKRI (grant number EP/X030733/1). Views and opinions expressed are however those of the author(s) only and do not necessarily reflect those of the European Union or the European Research Executive Agency. Neither the European Union nor the granting authority can be held responsible for them. M.O. would like to thank Dr Ezgi Demircan-Tureyen and Dr Vladyslav Andriiashen (Centrum Wiskunde & Informatica) for useful discussions.The authors would like to express sincere gratitude to: Dr. Ksenia Denisova, Dr. Elizabeth Duke and Dr. Yannick Schwab from EMBL for providing HiTT data and support in data preparation; Dr. Andrea Bassi from Politecnico di Milano for providing access to the OPT data; and Dr. Jose Lipovetzky and Damian Leonel Corsi (Centro Atomico Bariloche) for providing access to the high-resolution X-ray data.   
 
 # References

@@ -10,7 +10,7 @@ authors:
     #equal-contrib: true # (This is how you can denote equal contributions between multiple authors)
   - name: David Paleček
     affiliation: 4 # (Multiple affiliations must be quoted)
-  - name: Germán Mato‡
+  - name: Germán Mato
     equal-contrib: true 
     affiliation: "1,5"
   - name: Teresa M Correia

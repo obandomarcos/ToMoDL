@@ -2,25 +2,21 @@
 title: 'tomopari: A napari plugin for accelerated tomography reconstruction'
 tags:
 authors:
-  - name: Marcos Obando†
+  - name: Marcos Obando
     #equal-contrib: true
     affiliation: "1,2,3" # (Multiple affiliations must be quoted)
-  - name: Minh Nhat Trinh†
-    affiliation: 5 # (Multiple affiliations must be quoted)
+  - name: Minh Nhat Trinh
+    affiliation: 4 # (Multiple affiliations must be quoted)
     #equal-contrib: true # (This is how you can denote equal contributions between multiple authors)
   - name: David Paleček
-    affiliation: 5 # (Multiple affiliations must be quoted)
+    affiliation: 4 # (Multiple affiliations must be quoted)
   - name: Germán Mato‡
     equal-contrib: true 
-    affiliation: "1,4"
-  - name: Teresa M Correia‡*
+    affiliation: "1,5"
+  - name: Teresa M Correia
     equal-contrib: true
     #corresponding: true # (This is how to denote the corresponding author)
-    affiliation: "5,6"
-    notes:
-  - "† These authors contributed equally as first authors."
-  - "‡ These authors contributed equally as senior authors."
-  - "* Corresponding author."
+    affiliation: "4,6"
 affiliations:
  - name: Instituto Balseiro, Bariloche, Argentina
    index: 1
@@ -28,9 +24,9 @@ affiliations:
    index: 2
  - name: University of Eastern Finland, Kuopio, Finland
    index: 3
- - name: Medical Physics Department, Centro Atómico Bariloche, Bariloche, Argentina
+- name: Centro de Ciências do Mar do Algarve (CCMAR/CIMAR LA), University of Algarve, Faro, Portugal
    index: 4
- - name: Centro de Ciências do Mar do Algarve (CCMAR/CIMAR LA), University of Algarve, Faro, Portugal
+ - name: Medical Physics Department, Centro Atómico Bariloche, Bariloche, Argentina
    index: 5
  - name: School of Biomedical Engineering and Imaging Sciences, King’s College London, London, United Kingdom
    index: 6

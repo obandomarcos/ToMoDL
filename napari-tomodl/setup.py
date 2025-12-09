@@ -5,7 +5,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setup(
     name="napari-tomodl",
-    version="0.2.25",
+    version="0.2.27",
     description="A plugin for optical projection tomography reconstruction with model-based neural networks.",
     long_description=long_description,
     long_description_content_type="text/markdown",
@@ -26,7 +26,7 @@ setup(
         "Programming Language :: Python :: 3.11",
         "Topic :: Scientific/Engineering :: Image Processing",
     ],
-    python_requires=">=3.10",
+    python_requires=">=3.9",
     install_requires=[
         "magicgui",
         "qtpy",

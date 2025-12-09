@@ -46,7 +46,7 @@ def flat_field_estimate(img, ratio_corners=0.03):
 
 
 from skimage import exposure
-acceleration_factor = 30
+acceleration_factor = 10
 ctf3 = natsorted(glob.glob("datasets/ctf3/*.tif"))
 os.makedirs(f"datasets/stitched_2X_acc{acceleration_factor}x", exist_ok=True)
 for image_path1 in tqdm.tqdm(ctf3[::acceleration_factor]):

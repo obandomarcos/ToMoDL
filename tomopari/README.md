@@ -30,7 +30,12 @@ https://napari.org/stable/plugins/index.html
 ![plot](https://raw.githubusercontent.com/obandomarcos/ToMoDL/refs/heads/nhattm/tomopari/figures/stack_image.png)
 
    Go to **File → Open Files as Stack...** and load the angular projections for parallel beam optical tomography reconstruction.
+   
+   After loading, the stack of θ-angular projection images should have shape of $N_{angles} × det_h × det_w$, where:
 
+   - $N_{angles}$ is the number of projection views (one image per rotation angle θ),
+   - $det_h$ is the detector height (vertical pixel dimension),
+   - $det_w$ is the detector width (horizontal pixel dimension).
 2. **Select image layer**  
 ![plot](https://raw.githubusercontent.com/obandomarcos/ToMoDL/refs/heads/nhattm/tomopari/figures/select_layer.png) 
 
@@ -50,35 +55,42 @@ https://napari.org/stable/plugins/index.html
    If the rotation axis is not correctly aligned during acquisition, enable **Automatic axis alignment**.  This aligns the sinogram to the detector center using the [Wall-method].
 
 5. **Compression**  
-   Projection images are assumed to have shape **(Theta, Detector size, Z)** in vertical axis mode.  
-   You can compress along the Z-axis:  
-   - **HIGH** → resize Z to 100  
-   - **MEDIUM** → resize Z to 256  
-   - **LOW** → resize Z to 512  
+   Compression affects the detector dimension differently depending on the acquisition mode:
+
+   - Vertical-axis mode → the $det_w$ will be resized
+   - Horizontal-axis mode → the $det_h$ will be resized
+
+   Available compression levels:
+   - **HIGH** → resize to 100  
+   - **MEDIUM** → resize to 256  
+   - **LOW** → resize to 512  
    - **NO** → no compression  
+  
+
 
 6. **Reconstruction method**  
    - **FBP CPU / FBP GPU** → from the [QBI_radon] library  
    - **TOMODL CPU / TOMODL GPU / UNET CPU / UNET GPU** → proposed in our [ToMoDL-paper]  
 
 7. **Smoothing level**  
-   Select smoothing strength (only applies to **TOMODL** methods). Can be adjusted in the **Advanced mode**.
+   Select smoothing strength (only applies to **TOMODL** methods). Can be more fine tuned in the **Advanced mode**.
     - **LOW** → 2  
     - **MEDIUM** → 4  
     - **HIGH** → 6 
 
 8. **Rotation axis**  
-   - **Vertical** → for data shape (Theta, Detector size, Z)  
-   - **Horizontal** → for data shape (Theta, Z, Detector size)
+   Select how your data is organized with respect to the rotation axis:
+   - **Vertical** → $det_w$ corresponds to the axis **perpendicular** to rotation.
+   - **Horizontal** → $det_h$ corresponds to the axis **perpendicular** to rotation.
 ---
 
 ### 🔹 Advanced Mode
 ![plot](https://raw.githubusercontent.com/obandomarcos/ToMoDL/refs/heads/nhattm/tomopari/figures/advanced_mode.png)
 
 9. **Manual axis alignment**  
-   Shift the object along the detector axis (Z-axis).  
-   - Negative values → shift left  
-   - Positive values → shift right  
+   Shift the object along $det_w$ in vertical mode, and along $det_h$ in horizontal mode. 
+   - Negative values → shift left (toward lower pixel indices)
+   - Positive values → shift right (toward higher pixel indices)
 
 10. **Reshape volume**  
     Select a reconstruction size (alternative to compression levels from Basic mode).
@@ -96,10 +108,10 @@ https://napari.org/stable/plugins/index.html
     - Enabled → reconstruct the whole volume.  
 
 16. **One Slice mode**  
-    - Enabled → reconstruct only a single slice at the **# of slices to reconstruct** index. 
+    - Enabled → reconstruct only a single slice at the **Slice #** index. 
 
 17. **Slices mode**
-    - Enabled → reconstruct from index 0 up to the chosen slice index in the **# of slices to reconstruct** field.  
+    - Enabled → reconstruct from index 0 up to the chosen slice index in the **Slice #** field.  
 
 18. **Batch size**  
     Number of slices processed simultaneously:  
@@ -110,8 +122,8 @@ https://napari.org/stable/plugins/index.html
     Invert grayscale values in the reconstructed volume.
 
 20. **16-bit conversion**  
-    Convert the reconstructed volume to **16-bit** for faster 3D rendering.  
-    Leave unchecked to keep **32-bit float** output.
+   The reconstructed volume is always generated in **32-bit float** precision. Enable this option to convert the final volume to **16-bit**, which significantly improves 3D rendering performance in napari.
+   Leave it unchecked if you prefer to keep the full 32-bit float output.
 ---
 
 21. **Reconstruct!** 

@@ -4,7 +4,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
     long_description = fh.read()
 
 setup(
-    name="napari-tomodl",
+    name="tomopari",
     version="0.2.27",
     description="A plugin for optical projection tomography reconstruction with model-based neural networks.",
     long_description=long_description,
@@ -42,7 +42,7 @@ setup(
     include_package_data=True,
     entry_points={
         "napari.manifest": [
-            "napari-tomodl = napari_tomodl:napari.yaml",
+            "tomopari = napari_tomodl:napari.yaml",
         ]
     },
     package_data={"": ["*.yaml"], "napari_tomodl.processors": ["*.ckpt"]},

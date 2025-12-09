@@ -68,7 +68,7 @@ The filter used in FBP is typically a (modified) ramp filter, which enhances hig
 
 In \autoref{fig:Figura1}, a complete pipeline describing the usage of *tomopari* is presented. The input is a single channel raw data acquired in a parallel beam tomography, loaded as an ordered stack of files. Two user modes are provided: a basic mode for users without deep learning expertise, and an advanced mode for fine control over smoothing, alignment, flat-field correction, and compression trade-offs. Processing steps labeled 1-10 in \autoref{fig:Figura1} are:
 
-![\textbf{tomopari basic and advanced mode pipelines.} Step-by-step from a stack of raw projection acquisition to reconstruction of a single specific slice or full volume. \label{fig:Figura1}](./napari-tomodl/figures/Figure1.pdf)
+![\textbf{tomopari basic and advanced mode pipelines.} Step-by-step from a stack of raw projection acquisition to reconstruction of a single specific slice or full volume. \label{fig:Figura1}](./tomopari/figures/Figure1.pdf)
 
 1. **Load stack** – The workflow begins by importing the ordered stack of raw projection images (sinograms) into napari using its file manager. This generates a new 3D image layer representing the raw data to be reconstructed.
 
@@ -124,7 +124,7 @@ Synchrotron X-ray projection data from an ant, fixed in a mixture of PFA (parafo
 
 In \autoref{fig:Figura2} we show representative examples of the 2D reconstructions obtained with FBP and ToMoDL and 3D volumes obtained using the plugin with the ToMoDL option. The volumes were fully rendered using the built-in napari capabilities, allowing for full integration of the data analysis workflow in napari. 
 
-![\textbf{Reconstruction use cases}. Left panels: 2D slices reconstructed from undersampled data using FBP and ToMoDL methods (OPT, X-ray CT and synchrotron X-ray HiTT). For each case, the acceleration factor, degrees per step and rotation range are indicated. Right panels: 3D renderings of ToMoDL reconstructions.\label{fig:Figura2}](./napari-tomodl/figures/Figure2.pdf)
+![\textbf{Reconstruction use cases}. Left panels: 2D slices reconstructed from undersampled data using FBP and ToMoDL methods (OPT, X-ray CT and synchrotron X-ray HiTT). For each case, the acceleration factor, degrees per step and rotation range are indicated. Right panels: 3D renderings of ToMoDL reconstructions.\label{fig:Figura2}](./tomopari/figures/Figure2.pdf)
 
 # Acknowledgements
 

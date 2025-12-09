@@ -150,9 +150,12 @@ def find_center_shift(sinogram: np.ndarray, bar_thread=None, rotation_factor=2, 
     elif order_mode == 1:
         Q, theta, Z = new_sinogram.shape
         factor_shift = sinogram.shape[0] / Q
-    
+
+    # get the 70% of the sinogram from the center
+    # new_sinogram = new_sinogram[:, :, int(Z * 0.2):int(Z * 0.7)]
+    # print("new_sinogram shape: ", new_sinogram.shape)
     # max_shift is the number of pixels to shift, take 10 pecent of the sinogram size
-    max_shift = 10
+    max_shift = min(int(Q * 0.1), 200)
     shift_step = 2
     center_shift = 0
     # take only xx percent slices from sinogram from the center
@@ -175,8 +178,9 @@ def find_center_shift(sinogram: np.ndarray, bar_thread=None, rotation_factor=2, 
         bar_thread.max = 2 *max_shift
         bar_thread.value = 0
         bar_thread.run()
+    center_shift = 0
     while shift_step >= 1:
-        shifts = np.arange(-max_shift, max_shift, shift_step)
+        shifts = np.arange(-max_shift, max_shift, shift_step) + center_shift
         image_std = []
         for shift in tqdm.tqdm(shifts):
             if order_mode == 0 and type_sino == "3D":
@@ -189,8 +193,9 @@ def find_center_shift(sinogram: np.ndarray, bar_thread=None, rotation_factor=2, 
             # Get image reconstruction
             shift_iradon = fast_reconstruct_FBP(sino_shift, device=device, rotation_factor=rotation_factor, order_mode=order_mode, clip_to_circle=False, 
                                                 batch_process=32)
-
-            # Calculate variance
+            if order_mode == 1:
+                print("shift: ", shift, "std: ", np.std(shift_iradon))
+            # Calculate varianceshift
             image_std.append(np.std(shift_iradon))
             # create a progress bar thread to update the progress bar from -max_shift to max_shift with shift_step
             if bar_thread is not None:
@@ -200,6 +205,7 @@ def find_center_shift(sinogram: np.ndarray, bar_thread=None, rotation_factor=2, 
         center_shift = shifts[np.argmax(image_std)]
         max_shift /= 4
         shift_step /= 2
+        
         if bar_thread is not None:
             bar_thread.value = 0
             bar_thread.max = 2 * max_shift
@@ -209,7 +215,7 @@ def find_center_shift(sinogram: np.ndarray, bar_thread=None, rotation_factor=2, 
     if order_mode == 0 and type_sino == "3D":
         sinogram = ndi.shift(sinogram, (0, center_shift * factor_shift, 0), mode="nearest")
     elif order_mode == 1 or type_sino == "2D":
-        sinogram = ndi.shift(sinogram, (-center_shift * factor_shift, 0, 0), mode="nearest")
+        sinogram = ndi.shift(sinogram, (center_shift * factor_shift, 0, 0), mode="nearest")
     if bar_thread is not None:
         bar_thread.value = 0
         bar_thread.run()

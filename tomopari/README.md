@@ -1,11 +1,11 @@
-# napari-tomodl
+# tomopari
 
-[![License MIT](https://img.shields.io/pypi/l/napari-tomodl.svg?color=green)](https://github.com/marcoso96/napari-tomodl/raw/main/LICENSE)
-[![PyPI](https://img.shields.io/pypi/v/napari-tomodl.svg?color=green)](https://pypi.org/project/napari-tomodl)
-[![Python Version](https://img.shields.io/pypi/pyversions/napari-tomodl.svg?color=green)](https://python.org)
-<!-- [![tests](https://github.com/marcoso96/napari-tomodl/workflows/tests/badge.svg)](https://github.com/marcoso96/napari-tomodl/actions) -->
-[![codecov](https://codecov.io/gh/marcoso96/napari-tomodl/branch/main/graph/badge.svg)](https://codecov.io/gh/marcoso96/napari-tomodl)
-[![napari hub](https://img.shields.io/endpoint?url=https://api.napari-hub.org/shields/napari-tomodl)](https://napari-hub.org/plugins/napari-tomodl)
+[![License MIT](https://img.shields.io/pypi/l/tomopari.svg?color=green)](https://github.com/marcoso96/tomopari/raw/main/LICENSE)
+[![PyPI](https://img.shields.io/pypi/v/tomopari.svg?color=green)](https://pypi.org/project/tomopari)
+[![Python Version](https://img.shields.io/pypi/pyversions/tomopari.svg?color=green)](https://python.org)
+<!-- [![tests](https://github.com/marcoso96/tomopari/workflows/tests/badge.svg)](https://github.com/marcoso96/tomopari/actions) -->
+[![codecov](https://codecov.io/gh/marcoso96/tomopari/branch/main/graph/badge.svg)](https://codecov.io/gh/marcoso96/tomopari)
+[![napari hub](https://img.shields.io/endpoint?url=https://api.napari-hub.org/shields/tomopari)](https://napari-hub.org/plugins/tomopari)
 
 A plugin for optical projection tomography reconstruction with model-based neural networks.
 
@@ -22,17 +22,17 @@ https://napari.org/stable/plugins/index.html
 -->
 ## 🔬 Introduction
 
-**napari-tomodl** is a [napari](https://napari.org/) plugin that enables users to easily reconstruct tomography images directly from raw projection data. Simply load an ordered stack of projection files into the napari viewer, and the plugin takes care of reconstructing the corresponding tomographic volume.  
+**tomopari** is a [napari](https://napari.org/) plugin that enables users to easily reconstruct tomography images directly from raw projection data. Simply load an ordered stack of projection files into the napari viewer, and the plugin takes care of reconstructing the corresponding tomographic volume.  
 
 ## 🚀 Usage
 
 1. **Load ordered stack**  
-![plot](https://raw.githubusercontent.com/obandomarcos/ToMoDL/refs/heads/nhattm/napari-tomodl/figures/stack_image.png)
+![plot](https://raw.githubusercontent.com/obandomarcos/ToMoDL/refs/heads/nhattm/tomopari/figures/stack_image.png)
 
    Go to **File → Open Files as Stack...** and load the angular projections for parallel beam optical tomography reconstruction.
 
 2. **Select image layer**  
-![plot](https://raw.githubusercontent.com/obandomarcos/ToMoDL/refs/heads/nhattm/napari-tomodl/figures/select_layer.png) 
+![plot](https://raw.githubusercontent.com/obandomarcos/ToMoDL/refs/heads/nhattm/tomopari/figures/select_layer.png) 
 
    In the dropdown menu, click **Select image layer** and choose the loaded volume.  
 
@@ -40,7 +40,7 @@ https://napari.org/stable/plugins/index.html
 <h3>From here you can choose between two reconstruction modes: Basic and Advanced.</h3>
 
 ### 🔹 Basic Mode
-![plot](https://raw.githubusercontent.com/obandomarcos/ToMoDL/refs/heads/nhattm/napari-tomodl/figures/basic_mode.png)  
+![plot](https://raw.githubusercontent.com/obandomarcos/ToMoDL/refs/heads/nhattm/tomopari/figures/basic_mode.png)  
 
 3. **Half-rotation**  
    - Click **Half rotation** if your projection data was acquired from 0° to 180°.  
@@ -73,7 +73,7 @@ https://napari.org/stable/plugins/index.html
 ---
 
 ### 🔹 Advanced Mode
-![plot](https://raw.githubusercontent.com/obandomarcos/ToMoDL/refs/heads/nhattm/napari-tomodl/figures/advanced_mode.png)
+![plot](https://raw.githubusercontent.com/obandomarcos/ToMoDL/refs/heads/nhattm/tomopari/figures/advanced_mode.png)
 
 9. **Manual axis alignment**  
    Shift the object along the detector axis (Z-axis).  
@@ -116,7 +116,7 @@ https://napari.org/stable/plugins/index.html
 
 21. **Reconstruct!** 
 
-![plot](https://raw.githubusercontent.com/obandomarcos/ToMoDL/refs/heads/nhattm/napari-tomodl/figures/reconstruct_button.png)
+![plot](https://raw.githubusercontent.com/obandomarcos/ToMoDL/refs/heads/nhattm/tomopari/figures/reconstruct_button.png)
 
    A new layer will appear on top of the projections stack with the reconstructed volume.
 
@@ -166,20 +166,20 @@ This step ensures **PyTorch** is properly installed within Napari’s internal C
 
 ---
 
-### 3️⃣ Install our plugin — **napari-tomodl**
+### 3️⃣ Install our plugin — **tomopari**
 
-Our plugin is available on the [napari-hub](https://napari-hub.org/plugins/napari-tomodl.html).
+Our plugin is available on the [napari-hub](https://napari-hub.org/plugins/tomopari.html).
 ---
 🔹 Option 1: Install directly from napari
 1. Open **napari**.  
 2. Go to **Plugins → Install/Uninstall Plugins**.  
-3. Search for **napari-tomodl** and click **Install**.
+3. Search for **tomopari** and click **Install**.
 ---
 🔹 Option 2: Install via pip (from Napari Console)
 Open napari’s **Python Console** and type:
 
 ```bash
-pip install napari-tomodl
+pip install tomopari
 ```
 
 > After installation, **restart napari** to apply the changes. 😊
@@ -192,7 +192,7 @@ the coverage at least stays the same before you submit a pull request.
 ## 📜 License
 
 Distributed under the terms of the [MIT] license,
-"napari-tomodl" is free and open source software
+"tomopari" is free and open source software
 
 ## 🐛Issues
 

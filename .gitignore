@@ -175,7 +175,7 @@ cython_debug/
 #.idea/
 
 wandb/
-napari-tomodl/.pypirc
-napari-tomodl/build
-napari-tomodl/dist
-napari-tomodl/src/*.egg-info
+tomopari/.pypirc
+tomopari/build
+tomopari/dist
+tomopari/src/*.egg-info

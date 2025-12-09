@@ -2,7 +2,7 @@ try:
     from ._version import version as __version__
 except ImportError:
     __version__ = "unknown"
-__author__ = "Marcos Obando"
+__author__ = "Marcos Obando and Minh Nhat Trinh"
 __credits__ = "Teresa Correia and Germán Mato"
 __email__ = "marcos.obando@ib.edu.ar"
 

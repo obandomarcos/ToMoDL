@@ -9,7 +9,7 @@ import torch
 # import wandb
 import sys, os
 
-sys.path.append("./napari-tomodl/src/napari_tomodl/")
+sys.path.append("./tomopari/src/napari_tomodl/")
 
 from processors import *
 
@@ -55,7 +55,7 @@ model_tomodl = ToMoDL(tomodl_dictionary)
 
 # __location__ = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)))
 # artifact_path = os.path.join(__location__, "model.ckpt")
-artifact_path = "napari-tomodl/src/napari_tomodl/processors/model256_lambda0.4.ckpt"
+artifact_path = "tomopari/src/napari_tomodl/processors/model256_lambda0.4.ckpt"
 tomodl_checkpoint = torch.load(artifact_path, map_location=torch.device("cuda:0"))
 
 tomodl_checkpoint["state_dict"] = {k.replace("model.", ""): v for k, v in tomodl_checkpoint["state_dict"].items()}

@@ -81,7 +81,7 @@ https://napari.org/stable/plugins/index.html
 8. **Rotation axis**  
    Select how your data is organized with respect to the rotation axis:
    - **Vertical** → rotation axis parallel to $det_h$
-   - **Horizontal** → $rotation axis parallel to $det_w$
+   - **Horizontal** → rotation axis parallel to $det_w$
 ---
 
 ### 🔹 Advanced Mode

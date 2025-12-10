@@ -1,5 +1,5 @@
 ---
-title: 'tomopari: A napari plugin for accelerated tomographic reconstruction'
+title: 'tomopari: A plugin for optical projection tomography reconstruction with model-based neural networks'
 tags:
 authors:
   - name: Marcos Obando
@@ -83,7 +83,7 @@ In \autoref{fig:Figura1}, a complete pipeline describing the usage of *tomopari*
 
 5. **Data pre-processing** – Optional pre-processing steps such as flat-field correction and image resizing can be applied to normalise projection intensities and adapt image dimensions before reconstruction. As an alternative, in the basic mode, users can select: 
 
-* *Compression/projection image resizing* - Resize the Z-axis dimension to accelerate computation or reduce memory usage, with adjustable compression levels (**HIGH**, **MEDIUM**, **LOW**, or **NO**). The number of slices in the Z-axis is 100, 256, 512, and no compression, respectivley.  
+* *Compression/projection image resizing* - Resize the volume dimension corresponding to the detector’s width/height to reduce memory usage or accelerate computation. The plugin provides four compression levels: **HIGH**, **MEDIUM**, **LOW**, or **NO**, producing resolutions of 100, 256, 512, or the full uncompressed size, respectively
 
 6. **Reconstruction methods** – Users can select between different reconstruction algorithms according to their application:
 

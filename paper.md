@@ -104,7 +104,7 @@ In \autoref{fig:Figura1}, a complete pipeline describing the usage of *tomopari*
 
 9. **Choose rotation axis** – Depending on the experimental setup, the user defines whether the rotation axis is vertical or horizontal to ensure that projections are correctly aligned during reconstruction.
 
-10. **Volume post-processing** – Finally, reconstructed volumes can undergo optional post-processing steps, such as color inversion or conversion to 16-bit depth (isn't this a default? Q for NHAT), generating final images ready for quantitative analysis or visualization within napari. 
+10. **Volume post-processing** – Finally, reconstructed volumes can optionally be post-processed, for example by applying color inversion or converting the data to 16-bit depth for faster rendering. The reconstructed volume is always produced in 32-bit float precision. However, the plugin provides an option to convert the final volume to 16-bit, which can significantly improve 3D rendering performance in napari without affecting the reconstruction step itself.
 
 * *Full or partial volume reconstruction* Enables fast testing or memory-efficient reconstruction by limiting computation to a subset of slices along the detector axis. 
 * *Intensity inversion* Inverts grayscale values in the reconstructed image volume, which can be useful when projection data were acquired with inverted intensity mapping.

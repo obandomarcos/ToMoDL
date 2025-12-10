@@ -1,10 +1,10 @@
 # tomopari
 
-[![License MIT](https://img.shields.io/pypi/l/tomopari.svg?color=green)](https://github.com/marcoso96/tomopari/raw/main/LICENSE)
+[![License MIT](https://img.shields.io/pypi/l/tomopari.svg?color=green)](https://github.com/obandomarcos/ToMoDL/blob/nhattm/tomopari/LICENSE)
 [![PyPI](https://img.shields.io/pypi/v/tomopari.svg?color=green)](https://pypi.org/project/tomopari)
 [![Python Version](https://img.shields.io/pypi/pyversions/tomopari.svg?color=green)](https://python.org)
 <!-- [![tests](https://github.com/marcoso96/tomopari/workflows/tests/badge.svg)](https://github.com/marcoso96/tomopari/actions) -->
-[![codecov](https://codecov.io/gh/marcoso96/tomopari/branch/main/graph/badge.svg)](https://codecov.io/gh/marcoso96/tomopari)
+<!-- [![codecov](https://codecov.io/gh/marcoso96/tomopari/branch/main/graph/badge.svg)](https://codecov.io/gh/marcoso96/tomopari) -->
 [![napari hub](https://img.shields.io/endpoint?url=https://api.napari-hub.org/shields/tomopari)](https://napari-hub.org/plugins/tomopari)
 
 A plugin for optical projection tomography reconstruction with model-based neural networks.
@@ -48,8 +48,8 @@ https://napari.org/stable/plugins/index.html
 ![plot](https://raw.githubusercontent.com/obandomarcos/ToMoDL/refs/heads/nhattm/tomopari/figures/basic_mode.png)  
 
 3. **Half-rotation**  
-   - Click **Half rotation** if your projection data was acquired from 0° to 180°.  
-   - Leave it unchecked if data was acquired from 0° to 360°.
+   - Click **Half rotation** if your projection data were acquired from 0° to 180°.  
+   - Leave it unchecked if data were acquired from 0° to 360°.
 
 4. **Automatic axis alignment**  
    If the rotation axis is not correctly aligned during acquisition, enable **Automatic axis alignment**.  This aligns the sinogram to the detector center using the [Wall-method].
@@ -80,8 +80,8 @@ https://napari.org/stable/plugins/index.html
 
 8. **Rotation axis**  
    Select how your data is organized with respect to the rotation axis:
-   - **Vertical** → $det_w$ corresponds to the axis **perpendicular** to rotation.
-   - **Horizontal** → $det_h$ corresponds to the axis **perpendicular** to rotation.
+   - **Vertical** → rotation axis parallel to $det_h$
+   - **Horizontal** → $rotation axis parallel to $det_w$
 ---
 
 ### 🔹 Advanced Mode
@@ -108,10 +108,10 @@ https://napari.org/stable/plugins/index.html
     - Enabled → reconstruct the whole volume.  
 
 16. **One Slice mode**  
-    - Enabled → reconstruct only a single slice at the **Slice #** index. 
+    - Enabled → reconstruct only a single slice at **Slice #** index. 
 
 17. **Slices mode**
-    - Enabled → reconstruct from index 0 up to the chosen slice index in the **Slice #** field.  
+    - Enabled → reconstruct from index 0  up to the chosen slice index defined in **Slice #**.
 
 18. **Batch size**  
     Number of slices processed simultaneously:  

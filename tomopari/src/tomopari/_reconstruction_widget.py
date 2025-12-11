@@ -1,6 +1,30 @@
 """
-Created on Tue Feb 2 16:34:41 2023
-@authors: Marcos Obando, Minh Nhat Trinh, David Palecek, Germán Mato, Teresa Correia
+Graphical reconstruction widget for OPT/CT tomography inside Napari.
+
+This module defines a full-featured Qt-based reconstruction interface for
+Optical Projection Tomography (OPT), including:
+
+• Basic and advanced reconstruction modes  
+• GPU/CPU Filtered Backprojection (FBP)  
+• TwIST, UNet, and ToMoDL deep-learning reconstruction  
+• Automatic and manual rotation-axis alignment  
+• Flat-field correction  
+• Slice-based, volume-based, and batch reconstruction  
+• Real-time progress updates via QThread  
+• Napari layer management for visualization  
+
+The widget integrates with `OPTProcessor` to perform reconstruction and with
+the Napari viewer for displaying 2D/3D volumes.
+
+Authors:
+    Marcos Obando  
+    Minh Nhat Trinh  
+    David Palecek  
+    Germán Mato  
+    Teresa Correia
+
+Created:
+    Feb 2, 2023
 """
 
 # %%
@@ -45,6 +69,19 @@ device = "cuda" if torch.cuda.is_available() else "cpu"
 
 # this thread is used to update the progress bar
 class BarThread(QThread):
+    """Thread used to update a progress bar during reconstruction.
+
+    Computes a percent completion based on:
+        value, min, max → emits progressChanged(int)
+
+    Signals:
+        progressChanged (int): Percentage (0–100).
+
+    Attributes:
+        min (int): Lower bound of the progress range.
+        max (int): Upper bound of the progress range.
+        value (int): Current progress position.
+    """
     progressChanged = Signal(int)
 
     def __init__(self, parent=None):
@@ -59,6 +96,17 @@ class BarThread(QThread):
 
 
 class Rec_modes(Enum):
+    """Available reconstruction algorithms.
+
+    Options:
+        FBP_CPU: CPU filtered backprojection
+        FBP_GPU: GPU filtered backprojection
+        TWIST_CPU: TwIST iterative reconstruction on CPU
+        TOMODL_CPU: Model-based deep learning reconstruction (CPU)
+        TOMODL_GPU: Model-based deep learning reconstruction (GPU)
+        UNET_CPU: UNet-based learned reconstruction (CPU)
+        UNET_GPU: UNet-based learned reconstruction (GPU)
+    """
     FBP_CPU = 0
     FBP_GPU = 1
     TWIST_CPU = 2
@@ -70,17 +118,39 @@ class Rec_modes(Enum):
 
 
 class Compression_modes(Enum):
+    """Detector-size compression settings for memory/performance trade-offs.
+
+    Values represent target detector width used during resizing.
+        HIGH → 100 pixels  
+        MEDIUM → 256 pixels  
+        LOW → 512 pixels  
+        NO → 1024 pixels (no compression / full resolution)
+    """
     HIGH = 100
     MEDIUM = 256
     LOW = 512
     NO = 1024
 
 class Smoothing_modes(Enum):
+    """Smoothing level for CNN or iterative reconstruction filters.
+
+    Values indicate number of smoothing iterations or diffusion strength.
+    """
     LOW = 2
     MEDIUM = 4
     HIGH = 6
 
 class Filter_modes(Enum):
+    """Available filters for filtered backprojection (FBP).
+
+    Options:
+        RAMP (Ram-Lak)
+        SHEPPLOGAN
+        COSINE
+        HAMMING
+        HANN
+        NO → use no filter
+    """
     RAMP = "ramp"
     SHEPPLOGAN = "shepp-logan"
     COSINE = "cosine"
@@ -88,11 +158,30 @@ class Filter_modes(Enum):
     HANN = "hann" # TODO: add hann
     NO = "NO"
 class Order_Modes(Enum):
+    """Sinogram axis ordering.
+
+    Vertical   → (theta, detector, z)
+    Horizontal → (detector, theta, z)
+    """
     Vertical = 0
     Horizontal = 1
 
 
 class ReconstructionWidget(QTabWidget):
+    """Napari widget providing a full tomographic reconstruction interface.
+
+    Supports:
+        • Basic and advanced reconstruction workflows
+        • Selection of image layers
+        • Resizing, axis alignment, flat-field correction
+        • Multiple reconstruction algorithms (FBP, TwIST, MoDL, UNet)
+        • Slice-wise or full-volume reconstruction
+        • Progress reporting via QThread
+        • Automatic updating of Napari layers
+
+    Args:
+        viewer (napari.Viewer): Active Napari viewer instance.
+    """
 
     name = "Reconstructor"
 
@@ -109,6 +198,16 @@ class ReconstructionWidget(QTabWidget):
         self.bar_thread_advanced.progressChanged.connect(self.progressBar_advanced.setValue)
 
     def setup_ui_basic(self):
+        """Initialize the Basic Mode reconstruction tab.
+
+        Creates widgets for:
+            • Layer selection
+            • Compression
+            • Reconstruction method (CPU/GPU, FBP/TWIST/etc.)
+            • Rotation-axis mode
+            • Smoothing level
+            • Basic reconstruction button + progress bar
+        """
         def add_section(_layout, _title):
             _layout.addWidget(QLabel(_title))
             _layout.addWidget(QSplitter(Qt.Vertical))
@@ -142,6 +241,17 @@ class ReconstructionWidget(QTabWidget):
     
 
     def setup_ui_advanced(self):
+        """Initialize the Advanced Mode reconstruction tab.
+
+        Adds advanced controls including:
+            • Manual & automatic axis alignment
+            • Flat-field correction
+            • Reconstruction size control
+            • Filter selection
+            • Slice selection (single, multiple, full volume)
+            • Batch size configuration
+            • 16-bit output conversion toggle
+        """
         def add_section(_layout, _title):
             _layout.addWidget(QLabel(_title))
             _layout.addWidget(QSplitter(Qt.Vertical))
@@ -173,6 +283,20 @@ class ReconstructionWidget(QTabWidget):
 
 
     def createSettingsBasic(self, slayout):
+        """Create all configurable basic-mode controls.
+
+        Includes widgets for:
+            • Half rotation
+            • Automatic axis alignment
+            • Compression level
+            • Reconstruction method
+            • Smoothing mode
+            • Axis order
+
+        Also adds:
+            • Basic reconstruction start button
+            • Progress bar
+        """
         self.is_half_rotation_basic = Settings(
             "Half-rotation (angles 0-180)", dtype=bool, initial=False, layout=slayout, write_function=self.set_opt_processor_basic
         )
@@ -226,6 +350,20 @@ class ReconstructionWidget(QTabWidget):
         
 
     def createSettingsAdvanced(self, slayout):
+        """Create all advanced-mode UI controls.
+
+        Adds widgets for:
+            • Flat-field correction
+            • Manual / automatic axis alignment
+            • Volume resizing
+            • Reconstruction filter selection
+            • Slice selection mode (full, one slice, multiple)
+            • Batch size
+            • Rotation axis ordering
+            • Color inversion
+            • 16-bit conversion
+            • Progress bar and reconstruction trigger
+        """
         self.is_half_rotation_advanced = Settings(
             "Half-rotation (angles 0-180)", dtype=bool, initial=False, layout=slayout, write_function=self.set_opt_processor_advanced
         )
@@ -350,7 +488,13 @@ class ReconstructionWidget(QTabWidget):
             return layer
 
     def select_layer_basic(self, sinos: Image):
+        """Select input sinogram for basic reconstruction.
 
+        Determines whether the input is 2D or 3D and initializes the OPTProcessor.
+
+        Args:
+            sinos (Image): Napari image layer selected by the user.
+        """
         sinos = self.choose_layer_widget_basic.image.value
 
         if sinos.data.ndim == 3 and sinos.data.shape[2] > 1:
@@ -375,6 +519,13 @@ class ReconstructionWidget(QTabWidget):
             print(f"Selected image layer: {sinos.name}")
 
     def select_layer_advanced(self, sinos: Image):
+        """Select input sinogram for advanced-mode reconstruction.
+
+        Also computes flat-field estimate for 3D data.
+
+        Args:
+            sinos (Image): Selected Napari image layer.
+        """
         sinos = self.choose_layer_widget_advanced.image.value
 
         if sinos.data.ndim == 3 and sinos.data.shape[2] > 1:
@@ -399,6 +550,18 @@ class ReconstructionWidget(QTabWidget):
             print(f"Selected image layer: {sinos.name}")
 
     def stack_reconstruction_basic(self):
+        """Run full-volume or single-slice reconstruction in Basic Mode.
+
+        Performs:
+            • Preprocessing of sinogram (axis swap, resizing)
+            • Optional axis alignment
+            • Reconstruction using selected algorithm
+            • GPU batching when available
+            • Scaling and conversion to uint16
+            • Automatic display in Napari
+
+        Runs in a background thread to keep UI responsive.
+        """
         self.scale_image_basic = self.viewer.layers[self.imageRaw_name].scale
         def update_opt_image_basic(stack):
 
@@ -531,6 +694,18 @@ class ReconstructionWidget(QTabWidget):
         _reconstruct_basic()
 
     def stack_reconstruction_advanced(self):
+        """Run reconstruction using Advanced Mode settings.
+
+        Supports:
+            • Flat-field correction
+            • Manual or automatic rotational alignment
+            • Custom reconstruction size
+            • Full, single, or multiple-slice reconstruction
+            • GPU batch processing
+            • Optional output conversion to 16-bit
+        
+        Output volume is automatically pushed to Napari.
+        """
         self.scale_image_advanced = self.viewer.layers[self.imageRaw_name].scale
         def update_opt_image_advanced(stack):
 
@@ -678,14 +853,28 @@ class ReconstructionWidget(QTabWidget):
 
 
     def get_sinos(self):
+        """Return the currently selected sinogram layer.
+
+        Returns:
+            ndarray: Sinogram data.
+        Raises:
+            KeyError: If no valid sinogram layer is selected.
+        """
         try:
             return self.viewer.layers[self.imageRaw_name].data
         except:
             raise (KeyError(r"Please select a valid 3D image ($\theta$, q, z)"))
 
     def set_opt_processor_basic(self, *args):
-        """
-        Sets OPT reconstruction arguments
+        """Update OPTProcessor parameters for Basic Mode.
+
+        Applies UI-selected settings to:
+            • Reconstruction method
+            • Compression level
+            • Rotation axis mode
+            • Smoothing iterations
+            • Batch size
+            • Half rotation
         """
 
 
@@ -717,8 +906,17 @@ class ReconstructionWidget(QTabWidget):
             self.h_basic.set_reconstruction_process()
 
     def set_opt_processor_advanced(self, *args):
-        """
-        Sets OPT reconstruction arguments
+        """Update OPTProcessor parameters for Advanced Mode.
+
+        Applies:
+            • Resize settings
+            • Reconstruction algorithm
+            • Filter type
+            • Axis mode
+            • Batch size
+            • Denoising iterations
+            • Half rotation mode
+            • Color inversion & clipping
         """
 
         if hasattr(self, "h_advanced"):
@@ -737,6 +935,7 @@ class ReconstructionWidget(QTabWidget):
 
 
     def start_opt_processor_basic(self):
+        """Initialize or reset the Basic Mode OPTProcessor instance."""
         self.isCalibrated = False
 
         if hasattr(self, "h_basic"):
@@ -751,6 +950,7 @@ class ReconstructionWidget(QTabWidget):
             delattr(self, "h_basic")
 
     def start_opt_processor_advanced(self):
+        """Initialize or reset the Advanced Mode OPTProcessor instance."""
         self.isCalibrated = False
 
         if hasattr(self, "h_advanced"):
@@ -771,7 +971,12 @@ class ReconstructionWidget(QTabWidget):
     #     self.start_opt_processor()
 
     def add_magic_function(self, widget, _layout):
+        """Attach a magicgui widget to the layout and auto-refresh layer list.
 
+        Args:
+            widget: MagicGUI widget instance.
+            _layout: Parent Qt layout.
+        """
         self.viewer.layers.events.inserted.connect(widget.reset_choices)
         self.viewer.layers.events.removed.connect(widget.reset_choices)
         _layout.addWidget(widget.native)
@@ -779,4 +984,5 @@ class ReconstructionWidget(QTabWidget):
 
 @magic_factory
 def choose_layer(image: Image):
+    """Layer-selection helper used by magicgui."""
     pass  # TODO: substitute with a qtwidget without magic functions

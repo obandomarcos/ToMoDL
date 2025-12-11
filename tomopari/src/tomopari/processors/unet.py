@@ -1,17 +1,18 @@
-'''
-This code creates the model described in 'Convolutional neural networks for reconstruction of undersampled optical projection tomography data applied to in vivo imaging of zebrafish' and derived from https://github.com/imperial-photonics/CNOPT
+"""
+U-Net architecture and helper layers for tomographic image reconstruction.
 
-author: obanmarcos 
-'''
+This module implements:
+    • A configurable U-Net for denoising or learned reconstruction
+    • Optional batch normalization, dropout, bilinear upsampling, and residual output
+    • Supporting building blocks: double convolution, downsampling, upsampling, and output layer
 
+The implementation is compatible with GPU inference and can be integrated into
+model-based reconstruction frameworks such as MoDL or ToMoDL.
 
-# try:
-#     from torch_radon import Radon, RadonFanbeam
-#     from torch_radon.solvers import cg
-    
-
-# except:
-#     print('Torch-Radon not available!')
+References:
+    - Ronneberger et al., “U-Net: Convolutional Networks for Biomedical Image Segmentation”, MICCAI 2015.
+    - Adapted for use in OPT / CT tomographic deep reconstruction pipelines.
+"""
 
 import torch
 import torch.nn as nn
@@ -29,7 +30,23 @@ except:
 # U-Net
 
 class double_conv(nn.Module):
-    '''(conv => BN => ReLU) * 2'''
+    """Two consecutive convolution layers with optional batch normalization.
+
+    Each block performs:
+        Conv → (BatchNorm) → ReLU → Dropout →
+        Conv → (BatchNorm) → ReLU → Dropout
+
+    Args:
+        in_ch (int): Number of input channels.
+        out_ch (int): Number of output channels.
+        batch_norm (bool): Whether to include BatchNorm2d layers.
+
+    Forward Args:
+        x (Tensor): Input tensor of shape (B, C, H, W).
+
+    Returns:
+        Tensor: Output feature map after double convolution.
+    """
     def __init__(self, in_ch, out_ch, batch_norm = False):
         super(double_conv, self).__init__()
         
@@ -61,6 +78,21 @@ class double_conv(nn.Module):
 
 
 class inconv(nn.Module):
+    """Initial convolution block of the U-Net encoder.
+
+    Wraps `double_conv` with optional batch normalization on the input.
+
+    Args:
+        in_ch (int): Number of input channels.
+        out_ch (int): Number of output channels.
+        batch_norm (bool): Apply BatchNorm before convolutions.
+
+    Forward Args:
+        x (Tensor): Input batch.
+
+    Returns:
+        Tensor: First feature map of the U-Net encoder.
+    """
     def __init__(self, in_ch, out_ch, batch_norm):
         super(inconv, self).__init__()
         self.conv = double_conv(in_ch, out_ch, batch_norm = batch_norm)
@@ -80,6 +112,19 @@ class inconv(nn.Module):
 
 
 class down(nn.Module):
+    """Downsampling block: MaxPool2d followed by double_conv.
+
+    Args:
+        in_ch (int): Input channels.
+        out_ch (int): Output channels.
+        batch_norm (bool): Enable batch normalization in sub-convolutions.
+
+    Forward Args:
+        x (Tensor): Input tensor.
+
+    Returns:
+        Tensor: Downsampled feature map.
+    """
     def __init__(self, in_ch, out_ch, batch_norm):
         super(down, self).__init__()
         self.mpconv = nn.Sequential(
@@ -93,6 +138,24 @@ class down(nn.Module):
 
 
 class up(nn.Module):
+    """Upsampling block using either bilinear upsampling or transposed convolution.
+
+    Upsamples x1, aligns it with skip-connection x2, concatenates along channel
+    dimension, and applies a double_conv block.
+
+    Args:
+        in_ch (int): Number of channels in concatenated input.
+        out_ch (int): Number of output channels after convolution.
+        bilinear (bool): If True, use bilinear Upsample; otherwise ConvTranspose2d.
+        batch_norm (bool): Apply batch normalization in convolution layers.
+
+    Forward Args:
+        x1 (Tensor): Decoder feature map (to be upsampled).
+        x2 (Tensor): Skip-connection feature map from encoder.
+
+    Returns:
+        Tensor: Fused decoder feature map.
+    """
     def __init__(self, in_ch, out_ch, bilinear=True, batch_norm = False):
         super(up, self).__init__()
 
@@ -117,6 +180,21 @@ class up(nn.Module):
 
 
 class outconv(nn.Module):
+    """Final 1×1 convolution layer producing network output.
+
+    Pads input features to match the spatial size of the skip-origin (x0).
+
+    Args:
+        in_ch (int): Number of input channels.
+        out_ch (int): Number of output classes/channels.
+
+    Forward Args:
+        x0 (Tensor): Original input (for spatial alignment).
+        x (Tensor): Final decoder output.
+
+    Returns:
+        Tensor: Output image/map of shape (B, out_ch, H, W).
+    """
     def __init__(self, in_ch, out_ch):
         super(outconv, self).__init__()
         self.conv = nn.Conv2d(in_ch, out_ch, 1, padding = "same")
@@ -130,6 +208,34 @@ class outconv(nn.Module):
         return x
 
 class UNet(nn.Module):
+    """Standard U-Net with optional residual output connection.
+
+    Architecture:
+        Encoder:
+            inconv → down1 → down2 → down3 → down4
+        Decoder:
+            up1 → up2 → up3 → up4 → outconv
+
+    Features:
+        • Optional bilinear upsampling
+        • Optional batch normalization
+        • Optional residual output:  output = U(x) + λx
+        • Suitable for denoising, deblurring, and tomographic reconstruction
+
+    Args:
+        n_channels (int): Number of input channels (e.g., 1 for grayscale).
+        n_classes (int): Number of output channels.
+        up_conv (bool): Use bilinear upsampling instead of ConvTranspose2d.
+        residual (bool): Enable residual output (U(x) + λx).
+        batch_norm (bool): Apply batch normalization in encoder/decoder.
+        batch_norm_inconv (bool): Apply batch normalization in first layer.
+
+    Forward Args:
+        x0 (Tensor): Input image batch of shape (B, C, H, W).
+
+    Returns:
+        Tensor: Reconstructed/denoised image(s).
+    """
     def __init__(self, n_channels, n_classes, up_conv = False, residual = False, batch_norm = False, batch_norm_inconv = False):
         
         super(UNet, self).__init__()

@@ -312,7 +312,7 @@ class ReconstructionWidget(QTabWidget):
         self.orderbox_advanced = Combo_box(
             name="Rotation axis",
             initial=Order_Modes.Vertical.value,
-            choices=Order_Modes,image.png
+            choices=Order_Modes,
             layout=slayout,
             write_function=self.set_opt_processor_advanced,
         )

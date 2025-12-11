@@ -303,7 +303,7 @@ class ReconstructionWidget(QTabWidget):
         # Add layout to slayout
         slayout.addLayout(radio_layout)
         self.slices_advanced = Settings(
-            "Slices #", dtype=int, initial=0, layout=slayout, write_function=self.set_opt_processor_advanced
+            "Slice #", dtype=int, initial=0, layout=slayout, write_function=self.set_opt_processor_advanced
         )
         self.batch_size_advanced = Settings(
             "Batch size", dtype=int, initial=32, layout=slayout, write_function=self.set_opt_processor_advanced
@@ -312,7 +312,7 @@ class ReconstructionWidget(QTabWidget):
         self.orderbox_advanced = Combo_box(
             name="Rotation axis",
             initial=Order_Modes.Vertical.value,
-            choices=Order_Modes,
+            choices=Order_Modes,image.png
             layout=slayout,
             write_function=self.set_opt_processor_advanced,
         )

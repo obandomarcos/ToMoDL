@@ -1,9 +1,25 @@
 """
-This code creates the model described in MoDL: Model-Based Deep Learning Architecture for Inverse Problems for OPT data, modifying the implementation for PyTorch in order to use Torch Radon
+Deep-learning–enhanced tomographic reconstruction framework.
 
-@author: obanmarcos
+This module implements classical and learned reconstruction pipelines for
+Optical Projection Tomography (OPT) and X-ray CT, including:
+
+• CPU/GPU filtered backprojection (FBP)
+• TwIST and Total Variation–based iterative reconstruction
+• MoDL / ToMoDL model-based deep learning reconstruction
+• U-Net and ResNet-style learned denoisers
+• Conjugate-gradient–based data consistency (AtA) operator
+• Utilities for filtering, normalization, and sinogram handling
+
+Backends supported:
+    – scikit-image Radon/iradon
+    – QBI-Radon (PyTorch, GPU-accelerated)
+    – Custom UNet and ResNet denoisers
+
+The module integrates classical tomography algorithms with deep unfolded
+optimization models, following methods such as MoDL (Aggarwal et al. 2018) and
+deep OPT reconstruction (Davis et al., 2019).
 """
-
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -48,7 +64,20 @@ from . import unet
 device = torch.device("cuda:0" if use_torch_radon == True else "cpu")
 
 def mean_std_median_filter(images):
+    """Compute mean and standard deviation after median filtering.
 
+    Applies a median filter (disk radius 5) to each image and computes the
+    filtered mean and standard deviation. Useful for intensity renormalization
+    in learned reconstruction.
+
+    Args:
+        images (ndarray): Array of images with shape (N, 1, H, W) or (N, 1, H).
+
+    Returns:
+        tuple(ndarray, ndarray):
+            mean_images: Mean intensity per image, shape (N, 1)
+            std_images: Standard deviation per image, shape (N, 1)
+    """
     mean_images = np.zeros((images.shape[0], 1))
     std_images = np.zeros((images.shape[0], 1))
     for i, image in enumerate(images):
@@ -58,6 +87,19 @@ def mean_std_median_filter(images):
     return mean_images, std_images
 
 def ramp_filter(sinogram):
+    """Apply a discrete ramp filter to a sinogram.
+
+    Implements the Ram-Lak (ramp) filter using FFT with zero-padding.
+
+    Args:
+        sinogram (ndarray): Sinogram of shape (num_detectors, num_angles).
+
+    Returns:
+        ndarray: Filtered sinogram with the same shape.
+
+    Notes:
+        This is a CPU, NumPy-only implementation.
+    """
     num_detectors, num_angles = sinogram.shape
     n = int(2 ** np.ceil(np.log2(num_detectors)))  # zero-padding for FFT
     freqs = np.fft.fftfreq(n).reshape(-1, 1)
@@ -80,8 +122,19 @@ def ramp_filter(sinogram):
 
 #     return filtered_sino
 class dwLayer(nn.Module):
-    """
-    Creates denoiser singular layer
+    """Single convolutional layer used in the learned denoiser (dw block).
+
+    Supports:
+        • Optional batch normalization
+        • Xavier / constant initialization
+        • Swish (SiLU) activation unless last layer
+
+    Args:
+        kw_dictionary (dict): Contains:
+            weights_size (tuple): (in_channels, out_channels, kernel, stride)
+            is_last_layer (bool): If True, skip activation
+            init_method (str): "xavier" or "constant"
+            use_batch_norm (bool): Whether to apply batch normalization
     """
 
     def __init__(self, kw_dictionary):
@@ -151,7 +204,27 @@ class dwLayer(nn.Module):
 
 
 class dw(nn.Module):
+    """Residual convolutional denoiser block.
 
+    Builds a stack of convolutional layers followed by a residual connection:
+        output = F(x) + x
+
+    Args:
+        kw_dictionary (dict): Contains:
+            number_layers (int)
+            kernel_size (int)
+            features (int)
+            in_channels (int)
+            out_channels (int)
+            stride (int)
+            use_batch_norm (bool)
+            init_method (str)
+            device (torch.device)
+
+    Forward:
+        x (Tensor): Input batch (B, C, H, W)
+        Returns denoised output.
+    """
     def __init__(self, kw_dictionary):
         """
         Initialises dw block
@@ -221,8 +294,27 @@ class dw(nn.Module):
 
 
 class Aclass:
-    """
-    This class is created to do the data-consistency (DC) step as described in paper.
+    """Data-consistency (DC) operator for MoDL / ToMoDL reconstruction.
+
+    Implements the operator:
+        (AᵀA + λI)x
+    where A is the Radon transform.
+
+    Supports:
+        • QBI-Radon GPU implementation
+        • scikit-image CPU implementation
+        • Conjugate gradient inversion
+
+    Args:
+        kw_dictionary (dict):
+            image_size (int)
+            number_projections (int)
+            lambda (float)
+            use_torch_radon (bool)
+            use_scikit (bool)
+            iter_conjugate (int)
+            device (torch.device)
+            is_half_rotation (bool)
     """
 
     def __init__(self, kw_dictionary):
@@ -275,11 +367,7 @@ class Aclass:
             self.radon = Radon(self.number_projections, circle=False)
 
     def forward(self, img):
-        """
-        Applies the operator (A^H A + lam*I) to image, where A is the forward Radon transform.
-        Params:
-            - img (torch.Tensor): Input tensor
-        """
+        """Apply (AᵀA + λI) to an image tensor."""
 
         # sinogram = self.radon.forward(img)/self.img_size
         # iradon = self.radon.backprojection(sinogram)*np.pi/self.number_projections
@@ -297,10 +385,13 @@ class Aclass:
         return output
 
     def inverse(self, rhs):
-        """
-        Applies CG on the batch
-        Params:
-            - rhs (torch.Tensor): Right-hand side tensor for applying inversion of (A^H A + lam*I) operator
+        """Solve (AᵀA + λI)x = rhs using conjugate gradients.
+
+        Args:
+            rhs (Tensor): Right-hand side tensor.
+
+        Returns:
+            Tensor: Approximate solution of the linear system.
         """
         y = self.conjugate_gradients(self.forward, rhs)  # This indexing may fail
 
@@ -308,8 +399,17 @@ class Aclass:
 
     # @staticmethod
     def conjugate_gradients(self, A, rhs):
-        """
-        My implementation of conjugate gradients in PyTorch
+        """Conjugate gradient solver in PyTorch.
+
+        Solves:
+            minimize_x ||Ax – rhs||²
+
+        Args:
+            A (callable): Linear operator.
+            rhs (Tensor): Right-hand side vector.
+
+        Returns:
+            Tensor: Estimated solution.
         """
 
         i = 0
@@ -336,7 +436,27 @@ class Aclass:
 
 
 class ToMoDL(nn.Module):
+    """Deep unrolled model for tomographic reconstruction (MoDL-style).
 
+    Combines:
+        • Learned denoiser (U-Net or ResNet)
+        • Data-consistency step (CG inversion)
+        • K unrolled iterations
+
+    Based on:
+        - Aggarwal et al., "MoDL: Model-based deep learning...", TMI 2018.
+        - Davis et al., "CNNs for undersampled OPT reconstruction", 2019.
+
+    Args:
+        kw_dictionary (dict):
+            K_iterations (int): Number of unrolled iterations
+            lambda (float)
+            image_size (int)
+            number_projections_total (int)
+            acceleration_factor (int)
+            denoiser_method ("U-Net" or "resnet")
+            device (torch.device)
+    """
     def __init__(self, kw_dictionary):
         """
         Main function that creates the model
@@ -356,10 +476,13 @@ class ToMoDL(nn.Module):
         self.define_denoiser()
 
     def forward(self, x):
-        """
-        Forward pass through network
-        Params:
-            - x (torch.Tensor) : Backprojected sinogram, in image space
+        """Perform K unrolled DC–denoise iterations.
+
+        Args:
+            x (Tensor): Backprojected initial reconstruction (B, 1, H, W).
+
+        Returns:
+            dict: Outputs of each iteration (dc0, dw1, dc1, ..., dcK).
         """
 
         self.out["dc0"] = x
@@ -374,7 +497,7 @@ class ToMoDL(nn.Module):
         #     self.out["dc" + j] = normalize_images(self.AtA.inverse(rhs))
 
         #     del rhs
-        ############################### version 2 #######################################
+        #####################################################################################
         for i in range(1, self.K + 1):
             j = str(i)
             self.out["dw" + j] = self.dw.forward(self.out["dc" + str(i - 1)])
@@ -453,10 +576,13 @@ class ToMoDL(nn.Module):
 
 
 def normalize_images(images):
-    """
-    Normalizes tensor of images 1-channel images between 0 and 1.
-    Params:
-     - images (torch.Tensor): Tensor of 1-channel images
+    """Normalize images to zero mean and unit variance.
+
+    Args:
+        images (Tensor): Shape (B, 1, H, W).
+
+    Returns:
+        Tensor: Normalized images.
     """
 
     image_norm = torch.zeros_like(images)
@@ -484,6 +610,7 @@ for k, v in os.environ.items():
 
 
 class Rec_Modes(Enum):
+    """Supported reconstruction modes."""
     FBP_CPU = 0
     FBP_GPU = 1
     TWIST_CPU = 2
@@ -494,6 +621,10 @@ class Rec_Modes(Enum):
 
 
 class Order_Modes(Enum):
+    """Axis ordering of sinograms:
+        Vertical   → (theta, Q, Z)
+        Horizontal → (Q, theta, Z)
+    """
     Vertical = 0
     Horizontal = 1
 
@@ -508,7 +639,21 @@ def my_filtering_function(pair):
 
 
 class OPTProcessor:
+    """High-level OPT reconstruction controller.
 
+    Handles:
+        • Sinogram resizing
+        • CPU/GPU FBP
+        • TwIST reconstruction
+        • ToMoDL reconstruction
+        • U-Net-based reconstruction
+        • Correct axis ordering
+        • Rotation mode handling
+
+    Attributes include:
+        resize_val, rec_process, order_mode, clip_to_circle,
+        use_filter, batch_size, iterations, invert_color, etc.
+    """
     def __init__(self):
         """
         Variables for OPT processor
@@ -547,10 +692,14 @@ class OPTProcessor:
 
 
     def resize(self, sinogram_volume: np.ndarray, type_sino="3D"):
-        """
-        Resizes sinogram prior to reconstruction.
+        """Resize sinogram before reconstruction.
+
         Args:
-            -sinogram_volume (np.ndarray): array to resize in any mode specified.
+            sinogram_volume (ndarray): Input sinogram.
+            type_sino (str): "3D" or "2D".
+
+        Returns:
+            ndarray: Resized sinogram.
         """
 
         if self.order_mode == Order_Modes.Vertical.value:
@@ -594,14 +743,20 @@ class OPTProcessor:
         return sinogram_resize
 
     def reconstruct(self, sinogram: np.ndarray):
-        """
-        Reconstruct with specific method
-        - CPU methods the sinogram will have shape (Q, theta, 1)
-        - GPU methods the sinogram will have shape (Q, theta, batch_process)
-        TODO:
-            * Include methods ToMODL
-            * Optimize GPU usage with tensors
+        """Reconstruct a sinogram using the selected method.
 
+        Supported modes include:
+            - FBP_CPU
+            - FBP_GPU
+            - TWIST_CPU
+            - TOMODL_CPU / TOMODL_GPU
+            - UNET_CPU / UNET_GPU
+
+        Args:
+            sinogram (ndarray): Input sinogram.
+
+        Returns:
+            ndarray: Reconstructed image volume.
         """
         if self.is_half_rotation == True:
             rotation_factor = 1

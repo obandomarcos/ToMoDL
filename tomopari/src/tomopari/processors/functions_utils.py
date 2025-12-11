@@ -1,3 +1,26 @@
+"""
+Tomographic preprocessing and fast reconstruction utilities.
+
+This module provides helper functions for optical/CT tomographic workflows,
+including:
+
+• Flat-field estimation from corner/background regions  
+• Sinogram resizing for memory-efficient reconstruction  
+• Fast GPU-accelerated filtered back-projection using QBI-Radon  
+• Automatic rotation-axis correction by maximizing reconstruction variance  
+• Sinogram shifting and image normalization utilities
+
+These functions support 2D and 3D sinograms in multiple axis orderings, and are
+designed to integrate with PyTorch-based reconstruction pipelines.
+
+Dependencies:
+    • NumPy
+    • SciPy (ndimage)
+    • scikit-image (resize)
+    • PyTorch
+    • QBI-Radon (for GPU FBP reconstruction)
+"""
+
 import numpy as np
 # import cv2
 from skimage.transform import resize as resize_skimage
@@ -8,7 +31,21 @@ from QBI_radon import Radon
 
 
 def flat_field_estimate(img, ratio_corners=0.03):
+    """Estimate a flat-field (background) intensity from image corners.
 
+    The function extracts several small corner and side regions from the image
+    and computes their mean intensities, rejecting outliers before averaging.
+    This is useful for correcting illumination inhomogeneities in tomography
+    projections.
+
+    Args:
+        img (ndarray): Input 2D image.
+        ratio_corners (float): Fraction of the image size used to define
+            corner-region width. Default is 0.03 (3%).
+
+    Returns:
+        float: Estimated flat-field/background intensity.
+    """
     height, width = img.shape
     # get corner size as 2% of the  dimension
     corner_size = int(min(height, width) * ratio_corners)
@@ -40,10 +77,23 @@ def flat_field_estimate(img, ratio_corners=0.03):
 
 
 def resize_sino(sinogram_volume: np.ndarray, order_mode=0, resize_val=100, clip_to_circle=False):
-    """
-    Resizes sinogram prior to reconstruction.
+    """Resize sinograms before reconstruction.
+
+    This function rescales the detector dimension of a 3D sinogram volume to a
+    target size, optionally clipping to a circle-inscribed region to reduce
+    memory footprint.
+
     Args:
-        -sinogram_volume (np.ndarray): array to resize in any mode specified.
+        sinogram_volume (ndarray): Input sinogram volume shaped either as:
+            order_mode = 0 → (theta, detector, z)
+            order_mode = 1 → (detector, theta, z)
+        order_mode (int): Dimension ordering of the sinogram volume.
+        resize_val (int): Target detector size.
+        clip_to_circle (bool): If True, resizes directly to `resize_val`;
+            otherwise resizes to ceil(resize_val * sqrt(2)) to preserve corners.
+
+    Returns:
+        ndarray: Resized sinogram volume with preserved intensity range.
     """
 
     if order_mode == 0:
@@ -64,27 +114,33 @@ def resize_sino(sinogram_volume: np.ndarray, order_mode=0, resize_val=100, clip_
     elif order_mode == 1:
         # sinogram_resize = np.zeros((sinogram_size, theta, Z), dtype=np.float32)
         sinogram_resize = resize_skimage(sinogram_volume, (sinogram_size, theta, Z), preserve_range=True)
-    # for idx in range(Z):
-
-    #     if order_mode == 0:
-    #         sinogram_resize[:, :, idx] = cv2.resize(
-    #             sinogram_volume[:, :, idx],
-    #             (sinogram_size, theta),
-    #             interpolation=cv2.INTER_NEAREST,
-    #         )
-
-    #     elif order_mode == 1:
-    #         sinogram_resize[:, :, idx] = cv2.resize(
-    #             sinogram_volume[:, :, idx],
-    #             (theta, sinogram_size),
-    #             interpolation=cv2.INTER_NEAREST,
-    #         )
 
     return sinogram_resize
 
 def fast_reconstruct_FBP(sinogram: np.ndarray, resize_val=None, batch_process=32,device="cpu", rotation_factor=2, order_mode=0, clip_to_circle=False):
-    """
-    Fast reconstruction function.
+    """Perform fast filtered back-projection (FBP) reconstruction.
+
+    Uses the QBI-Radon GPU/PyTorch implementation of the inverse Radon transform
+    to reconstruct each slice in batches for memory efficiency.
+
+    Args:
+        sinogram (ndarray): Input 3D sinogram volume.
+        resize_val (int or None): Optional detector-size resizing before FBP.
+        batch_process (int): Number of slices reconstructed per batch.
+        device (str): 'cpu' or GPU device string (e.g. 'cuda:0').
+        rotation_factor (float): Scaling factor determining projection angle
+            coverage. Example: rotation_factor = 2 → angles span 0–2π.
+        order_mode (int): 0 → (theta, detector, z), 1 → (detector, theta, z).
+        clip_to_circle (bool): If True, reconstruction assumes circular support.
+
+    Returns:
+        ndarray: Reconstructed 3D volume with shape (z, x, y).
+
+    Notes:
+        Internally performs:
+            • Optional resizing
+            • Dimension reordering if required
+            • Batch GPU FBP using Radon.filter_backprojection()
     """
     if order_mode == 0:
         theta, Q, Z = sinogram.shape
@@ -125,13 +181,32 @@ def fast_reconstruct_FBP(sinogram: np.ndarray, resize_val=None, batch_process=32
 
 
 def find_center_shift(sinogram: np.ndarray, bar_thread=None, rotation_factor=2, type_sino="3D", order_mode=0, clip_to_circle=False, device="cpu"):
-    """
-    Corrects rotation axis by finding optimal registration via maximising reconstructed image's intensity variance.
+    """Estimate and correct rotation-axis misalignment in a sinogram.
 
-    Based on 'Walls, J. R., Sled, J. G., Sharpe, J., & Henkelman, R. M. (2005). Correction of artefacts in optical projection tomography. Physics in Medicine & Biology, 50(19), 4645.'
+    The method scans candidate detector-axis shifts, reconstructs slices using
+    FBP, and selects the shift that maximizes variance in the reconstruction,
+    following the approach of:
 
-    Params:
-    - sinogram
+        Walls et al., "Correction of artefacts in optical projection tomography,"
+        Physics in Medicine & Biology (2005).
+
+    Args:
+        sinogram (ndarray): 2D or 3D sinogram.
+        bar_thread: Optional progress-bar object with `.start()`, `.run()`.
+        rotation_factor (float): Projection angle scaling for FBP.
+        type_sino (str): "3D" or "2D" sinogram mode.
+        order_mode (int): Sinogram dimension ordering.
+        clip_to_circle (bool): Whether reconstruction assumes circular support.
+        device (str): FBP computation device ('cpu' or 'cuda').
+
+    Returns:
+        ndarray: Sinogram corrected for rotation-axis shift.
+
+    Notes:
+        • The search reduces automatically in step size for coarse-to-fine
+          refinement.
+        • Variance of reconstructed images is used as the objective metric.
+        • Supports GPU-based reconstruction through fast_reconstruct_FBP().
     """
 
     if order_mode == 0:

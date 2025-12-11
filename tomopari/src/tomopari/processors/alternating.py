@@ -1,3 +1,51 @@
+"""
+Tomographic Reconstruction Utilities Using TwIST, ADMM, and TV Denoising.
+
+
+This module provides a collection of iterative reconstruction algorithms and 
+image-processing utilities for tomographic imaging, including implementations of:
+
+* TwIST (Two-Step Iterative Soft Thresholding) reconstruction
+* ADMM-based regularized reconstruction
+* Conjugate Gradient inversion for linear operators
+* Total Variation (TV) denoising using Chambolle’s method
+* Forward and backward Radon transforms (via scikit-image)
+* Soft thresholding and TV-based regularization helpers
+* Evaluation tools such as MSE, SSIM, and objective-value tracking
+* Iteration utilities for testing reconstruction quality across slices
+
+The algorithms are designed to operate with generic forward and adjoint operators 
+(`A` and `AT`), making them suitable for a variety of inverse problems, including 
+computed tomography (CT), compressed sensing, and general linear inverse models.
+
+Dependencies:
+    - NumPy
+    - SciPy
+    - scikit-image
+    - time
+
+Main Features:
+    • TwIST solver: minimizes 0.5 * ||y - A(x)||² + tau * phi(x) using a 
+      two-step accelerated shrinkage method.
+    • ADMM solver: performs regularized reconstruction using a proximal splitting 
+      strategy with optional warm-start and denoising operators.
+    • TV denoising: scalar or vectorial TV minimization using Chambolle’s algorithm.
+    • Utility functions for finite differences, soft-thresholding, and Radon-based 
+      forward/backward operators.
+    • `iter_proj` helper: evaluates reconstruction performance under subsampled 
+      projection angles for tomography experiments.
+
+Typical usage example:
+    >>> y = radon(image, angles)
+    >>> A = lambda x: radon(x, angles)
+    >>> AT = lambda y: iradon(y, angles)
+    >>> x_rec, obj = TwIST(y, A, AT, tau=0.1, kwarg={})
+    >>> den = TVdenoise(x_rec, lamb=0.1, iters=50)
+
+This module is intended for research, simulation, and educational use in inverse 
+problems, reconstruction algorithms, and tomographic imaging.
+"""
+
 import numpy as np
 import scipy as sp
 from skimage.transform import radon, iradon
@@ -8,36 +56,44 @@ import sys
 # import DataLoading as dl 
 
 def TwIST(y, A, AT, tau, kwarg, true_img = None):
-  '''
-  This function solves the regularization problem
-     arg min_x = 0.5*|| y - A x ||_2^2 + tau phi( x ), 
+  """Two-Step Iterative Shrinkage/Thresholding (TwIST) reconstruction.
 
-  where A is a generic matrix and phi(.) is a regularizarion 
-  function  such that the solution of the denoising problem 
+  Implements the TwIST algorithm to solve the regularized inverse problem:
 
-      Psi_tau(y) = arg min_x = 0.5*|| y - x ||_2^2 + tau \phi( x ), 
-  
-  is known. 
+      minimize_x  0.5 * ||y - A(x)||_2^2 + tau * φ(x)
 
-  Params:
+  where `A` is a linear forward operator, `AT` its adjoint, and φ(.) a
+  regularization function with a known proximal mapping (denoiser) ψ_tau(.).
 
- y: 1D vector or 2D array (image) of observations
+  This is the accelerated two-step method introduced in:
 
- A: if y and x are both 1D vectors, A can be a 
-     k*n (where k is the size of y and n the size of x)
-     matrix or a handle to a function that computes
-     products of the form A*v, for some vector v.
-     In any other case (if y and/or x are 2D arrays), 
-     A has to be passed as a handle to a function which computes 
-     products of the form A*x; another handle to a function 
-     AT which computes products of the form A'*x is also required 
-     in this case. The size of x is determined as the size
-     of the result of applying AT.
+      J. M. Bioucas-Dias and M. A. T. Figueiredo,
+      "A Fast Two-Step Iterative Shrinkage/Thresholding Algorithm 
+        for Image Restoration,"
+      IEEE Transactions on Image Processing, 2007.
+      DOI: https://doi.org/10.1109/TIP.2006.890538
+      Preprint: https://arxiv.org/abs/0810.4745
 
-  tau: regularization parameter, usually a non-negative real 
-       parameter of the objective  function (see above).
+  Args:
+      y (ndarray): Observed data vector or 2D projection image.
+      A (callable or ndarray): Forward operator A(x), or matrix for 1D cases.
+      AT (callable): Adjoint operator Aᵀ(y).
+      tau (float or ndarray): Regularization parameter.
+      kwarg (dict): Optional algorithm parameters:
+          - 'LAMBDA', 'ALPHA', 'BETA'
+          - 'PSI', 'PHI'
+          - 'STOPCRITERION', 'TOLERANCEA', 'INITIALIZATION', etc.
+      true_img (ndarray, optional): Ground-truth image for ISNR/MSE tracking.
 
-  '''
+  Returns:
+      tuple:
+          x (ndarray): Reconstructed image/solution.
+          objective (list[float]): Objective value per iteration.
+
+  Notes:
+      TwIST accelerates classical IST by using a two-step recurrence,
+      improving convergence for sparse and regularized inverse problems.
+  """
   # Normalization / True_img comes prevously normalised at fbp reconstruction 
 
   # Default optional parameters
@@ -416,33 +472,41 @@ def TwIST(y, A, AT, tau, kwarg, true_img = None):
 def ADMM(y, A, AT, Den, alpha, delta, max_iter, 
           phi, tol, warm, invert, true_img = None, 
           alpha_weight = False, alpha_decay = 0.6, verbose = True):
-  # % ADMM Reconstruction based in Alternative directions method of multipliers
-  # % This function solves the regularization problem 
-  # %
-  # %     arg min_x = 0.5*|| y - A x ||_2^2 + tau \phi( x )
-  # %
-  # % where A is a generic matrix and phi(.) is a regularizarion 
-  # % function  such that the solution of the denoising problem 
-  # %
-  # %     Psi_tau(y) = arg min_x = 0.5*|| y - x ||_2^2 + tau \phi( x ), 
-  # %
-  # % ========================== INPUT PARAMETERS (required) ==================
-  # % Parameters    Values description
-  # % =========================================================================
-  # % y             Observations image.
-  # % delta         Regularization penalty parameter.
-  # % A             Forward model
-  # % AT            Backward operator
-  # % Den           Denoise function
-  # % alpha         Regularisation parameter of the problem
-  # % phi           Norm for regularisation denoise
-  # % img           Benchmark image
-  # % warm          Warm start. 1 - CG for initial guess
-  # % invert        Inversion method : 0 for direct inversion, 1 for CG
+  """ADMM-based reconstruction for regularized inverse problems.
 
-  # % based in 'Low-rank and sparse reconstruction in dynamic magnetic resonance imaging 
-  # % via proximal splitting methods' 
+  Solves:
+      minimize_x  0.5 * ||y - A(x)||_2^2 + alpha * φ(x)
 
+  using an Alternating Direction Method of Multipliers (ADMM) formulation.
+
+  Args:
+      y (ndarray): Observed measurements.
+      A (callable): Forward operator function A(x).
+      AT (callable): Adjoint operator Aᵀ(y).
+      Den (callable): Denoising proximal operator ψ(x, alpha).
+      alpha (float): Regularization strength.
+      delta (float): Augmented Lagrangian penalty parameter.
+      max_iter (int): Maximum number of ADMM iterations.
+      phi (callable): Regularization norm φ(x).
+      tol (float): Stopping tolerance based on objective change.
+      warm (bool): If True, uses a conjugate gradient warm start.
+      invert (int): 0 = CG inversion, 1 = direct inversion.
+      true_img (ndarray, optional): Ground-truth image.
+      alpha_weight (bool): Whether to decay `alpha` over iterations.
+      alpha_decay (float): Multiplicative decay factor for `alpha`.
+      verbose (bool): Print iterative status.
+
+  Returns:
+      tuple:
+          s (ndarray): Reconstructed image.
+          objective (list[float]): Objective value per iteration.
+          error_MSE (list[float]): MSE relative to `true_img`.
+          error_SSIM (list[float]): SSIM relative to `true_img`.
+
+  Notes:
+      Based on "Low-rank and sparse reconstruction in dynamic MRI via
+      proximal splitting methods."
+  """
 
   assert callable(A) 
   # print("A is callable")  # Assert A is callable
@@ -534,14 +598,24 @@ def ADMM(y, A, AT, Den, alpha, delta, max_iter,
   return s, objective, error_MSE, error_SSIM
 
 def ConjugateGradient(A, AT, y, b, u, delta, max_iter = 5):   
-    # % Conjugate gradient routine for linear operators - compressed sensing
-    # % A - Forward operator
-    # % AT - Backward operator
-    # % b - denoised variable ADMM
-    # % u - ADMM extra variable for augmented Lagrangian
-    # % delta - Regularisation penalty parameter
-    # % max_iter - Maximum number of iterations - defaults to 5
-    
+    """Conjugate Gradient solver for linear systems of the form:
+
+        (Aᵀ A + δ I) x = Aᵀ y + δ (b - u)
+
+    Used as an inner loop within ADMM for inversion.
+
+    Args:
+        A (callable): Forward operator A(x).
+        AT (callable): Adjoint operator Aᵀ(y).
+        y (ndarray): Observed measurements.
+        b (ndarray): ADMM auxiliary variable.
+        u (ndarray): ADMM dual variable.
+        delta (float): Regularization constant.
+        max_iter (int): Maximum number of CG iterations.
+
+    Returns:
+        ndarray: Approximate solution x.
+    """
     b_sol = AT(y) + delta*(b - u)
     xn = AT(y)
     
@@ -564,6 +638,24 @@ def ConjugateGradient(A, AT, y, b, u, delta, max_iter = 5):
     return xn
 
 def TVdenoise(f, lamb, iters):
+  """Total Variation (TV) denoising using Chambolle’s method.
+
+  Minimizes the ROF model:
+
+      minimize_u  TV(u) + (lambda/2) * ||f - u||_2^2
+
+  Args:
+      f (ndarray): Input noisy image.
+      lamb (float): Regularization parameter. Higher → stronger smoothing.
+      iters (int): Number of Chambolle iterations.
+
+  Returns:
+      ndarray: Denoised image u.
+
+  References:
+      A. Chambolle, "An Algorithm for Total Variation Minimization"
+      J. Math. Imaging Vision, 2004.
+  """
   #   %TVDENOISE  Total variation grayscale and color image denoising
   # %   u = TVDENOISE(f,lambda) denoises the input image f.  The smaller
   # %   the parameter lambda, the stronger the denoising.
@@ -671,15 +763,30 @@ def hR2(x, angles, angles2):
 # Utilities
 # Iterator to check projections
 def iter_proj(method, hR, hRT, volume, max_angle, projections, n_z):
-  '''
-  With method, reconstruct N_z z-slices with a reduced number of projections
-  Params:
-    - method receives y, hR, hRT and true_img properly set up for the number of 
-    projections required.
-    - hRT receives sinogram 'y' and projection angles
-    - hR receives image 'x' and projection angles
-    - n_z provides the z-slices to be taken
-  '''
+  """Runs reconstruction tests across selected slices with subsampled angles.
+
+  Args:
+      method (callable): Reconstruction algorithm with signature:
+          method(y, hR_sub, hRT_sub, true_img).
+      hR (callable): Forward projector for slices.
+      hRT (callable): Backprojector for slices.
+      volume (ndarray): 3D volume of sinograms (H × W × Z).
+      max_angle (int): Total number of projection angles available.
+      projections (int): Number of angles to subsample.
+      n_z (list[int]): Indices of slices to reconstruct.
+
+  Returns:
+      tuple:
+          recons_x (list): Reconstructed slices.
+          fbp_x (list): FBP reconstructions.
+          objectives (list): Objective histories.
+          errors_MSE (list): MSE histories.
+          errors_SSIM (list): SSIM histories.
+          trues_x (list): Ground-truth images.
+
+  Notes:
+      Assumes `dl.subsample` and `normalize` are available in scope.
+  """
 
   angle_step = max_angle//projections
   theta_sub, subsampled_vol = dl.subsample(volume, max_angle, angle_step) # Subset of angles and subsampled volume

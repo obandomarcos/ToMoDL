@@ -9,7 +9,7 @@ from config import *
 
 sys.path.append(where_am_i())
 
-import pytorch_lightning as pl
+import lightning as pl
 import argparse
 import numpy as np
 import matplotlib.pyplot as plt
@@ -22,14 +22,14 @@ from training import train_utilities as trutils
 from models.models_system import MoDLReconstructor
 import torch
 
-from pytorch_lightning.callbacks import ModelCheckpoint
-from pytorch_lightning.loggers import WandbLogger
+from lightning.callbacks import ModelCheckpoint
+from lightning.loggers import WandbLogger
 
 from torch.utils.data import DataLoader
 from torchvision import transforms as T
 from pytorch_msssim import SSIM
 # from torchmetrics import StructuralSimilarityIndexMeasure as SSIM
-from torchmetrics import MultiScaleStructuralSimilarityIndexMeasure as MSSSIM
+from torchmetrics.image import MultiScaleStructuralSimilarityIndexMeasure as MSSSIM
 import wandb
 from pathlib import Path
 import pandas as pd
@@ -249,6 +249,3 @@ if __name__ == '__main__':
         trainer_system.rotate_list(dataset_list, 3)
     
     dataframe.to_pickle(df_path)
-        
-
-

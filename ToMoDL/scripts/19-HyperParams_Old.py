@@ -1,7 +1,7 @@
 """
 Test MODL trained with PSNR and SSIM loss with different acceleration factors
 """
-#%% Import libraries
+# %% Import libraries
 import os
 import os,time, sys
 from config import * 
@@ -40,7 +40,7 @@ import seaborn as sns
 
 from torchvision import transforms as T
 from pytorch_msssim import SSIM
-from torchmetrics import MultiScaleStructuralSimilarityIndexMeasure as MSSSIM
+from torchmetrics.image import MultiScaleStructuralSimilarityIndexMeasure as MSSSIM
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
@@ -55,7 +55,7 @@ batch_size = 5
 img_size = 100
 augment_factor = 1
 
-#%% Model Settings
+# %% Model Settings
 
 train_name_modl = 'Optimization_K_SSIM_MODL_Test65'
 

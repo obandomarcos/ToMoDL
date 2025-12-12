@@ -13,7 +13,7 @@ from config import *
 
 sys.path.append(where_am_i())
 
-import pytorch_lightning as pl
+import lightning as pl
 import argparse
 import numpy as np
 import matplotlib.pyplot as plt
@@ -23,7 +23,7 @@ from utilities.folders import *
 
 from torchvision import transforms as T
 from pytorch_msssim import SSIM
-from torchmetrics import MultiScaleStructuralSimilarityIndexMeasure as MSSSIM
+from torchmetrics.image import MultiScaleStructuralSimilarityIndexMeasure as MSSSIM
 from models.models_system import MoDLReconstructor
 from models.modl import MoDL
 from pathlib import Path
@@ -319,5 +319,3 @@ if __name__ == '__main__':
     fig.savefig('/home/obanmarcos/Balseiro/DeepOPT/results/lambdas/Check_newmodel_problem_torchradon.png', bbox_inches = 'tight')
 
     plt.close(fig)
-
-

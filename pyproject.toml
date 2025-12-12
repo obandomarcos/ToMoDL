@@ -9,7 +9,7 @@ python = "3.8.17"
 torch-radon = { git = "https://github.com/matteo-ronchetti/torch-radon.git", branch = "v2" }
 torch = "<1.8.0"
 pytorch_msssim = "*"
-pytorch_lightning = "1.7.1"
+lightning = "2.4.0"
 numpy = "*"
 matplotlib = "*"
 wandb = "*"

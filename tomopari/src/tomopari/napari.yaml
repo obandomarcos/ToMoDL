@@ -1,0 +1,10 @@
+name: tomopari
+display_name: ToMoDL Reconstruction
+contributions:
+  commands:
+    - id: tomopari.make_reconstruct_widget
+      python_name: tomopari._reconstruction_widget:ReconstructionWidget
+      title: Reconstruct OPT data with ToMoDL
+  widgets:
+    - command: tomopari.make_reconstruct_widget
+      display_name: tomopari

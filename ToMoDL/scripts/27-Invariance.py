@@ -1,4 +1,4 @@
-#%%
+# %%
 import os
 import os, sys
 from config import * 
@@ -17,19 +17,19 @@ from utilities import dataloading_utilities as dlutils
 from torch.utils.data import DataLoader
 import matplotlib.pyplot as plt
 import torch
-from pytorch_lightning.callbacks import ModelCheckpoint
-from pytorch_lightning.loggers import WandbLogger
+from lightning.callbacks import ModelCheckpoint
+from lightning.loggers import WandbLogger
 
 from torchvision import transforms as T
 from pytorch_msssim import SSIM
 # from torchmetrics import StructuralSimilarityIndexMeasure as SSIM
-from torchmetrics import MultiScaleStructuralSimilarityIndexMeasure as MSSSIM
+from torchmetrics.image import MultiScaleStructuralSimilarityIndexMeasure as MSSSIM
 from skimage.transform import radon, iradon
 import matplotlib.patches as patches
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 acceleration_factor = 20
 
-#%%
+# %%
 # ResNet dictionary parameters
 resnet_options_dict = {'number_layers': 8,
                     'kernel_size':3,
@@ -116,7 +116,7 @@ model_system_dict = {'acc_factor_data': 1,
                 'track_alternating_admm': False,         
                 'track_alternating_twist': False,
                 'track_unet': False}
-#%%
+# %%
 hR = lambda x: radon(x, angles, circle = False)
 hRT = lambda sino: iradon(sino, angles, circle = False)
 Psi = lambda x,th: altmodels.TVdenoise(x,
@@ -136,7 +136,7 @@ TwIST = lambda y, y_true: altmodels.TwIST(y = hR(y),
                                             kwarg = kwarg,true_img = y_true)
 
 
-#%% 20% percent trained on 20
+# %% 20% percent trained on 20
 run = wandb.init()
 artifact_tomodl = run.use_artifact('omarcos/PSNR - Training Samples/model-uqb3ptp0:v0', type='model')
 artifact_tomodl_dir = artifact_tomodl.download()
@@ -148,7 +148,7 @@ model_system_dict['method'] = 'unet'
 artifact_unet = run.use_artifact('omarcos/Unet - Training Samples/model-a3be8n7l:v0', type='model')
 artifact_unet_dir = artifact_unet.download()
 model_unet = UNetReconstructor.load_from_checkpoint(Path(artifact_unet_dir) / "model.ckpt", kw_dictionary_model_system = model_system_dict)
-#%%
+# %%
 dataset_list_generic = ['140315_3dpf_head_{}', '140114_5dpf_head_{}', '140519_5dpf_head_{}', '140117_3dpf_body_{}', '140114_5dpf_upper tail_{}', 
 '140315_1dpf_head_{}', '140114_5dpf_lower tail_{}', '140714_5dpf_head_{}', '140117_3dpf_head_{}', '140117_3dpf_lower tail_{}', '140117_3dpf_upper tail_{}', '140114_5dpf_body_{}']
 dataset_list = [where_am_i('datasets')+'x{}/'.format(acceleration_factor)+dataset.format(acceleration_factor) for dataset in dataset_list_generic]
@@ -156,8 +156,8 @@ dataset_list = [where_am_i('datasets')+'x{}/'.format(acceleration_factor)+datase
 dataset_dict = {'root_folder' : dataset_list[1], 
                 'acceleration_factor' : acceleration_factor,
                 'transform' : None}
-#%%
-#%%
+# %%
+# %%
 
 def psnr(img1, img2, range_max_min = [0,1]):
     mse = ((img1-img2)**2).mean()
@@ -175,7 +175,7 @@ def normalize_image(image):
     # image = cv2.equalizeHist((255.0*(image - image.min())/(image.max()-image.min())).astype(np.uint8))
     image_norm = (image - image.min())/(image.max()-image.min())
     return image_norm  
-#%%
+# %%
 test_dataset = dlutils.ReconstructionDataset(**dataset_dict)    
 
 test_dataloader = DataLoader(test_dataset, 
@@ -183,7 +183,7 @@ test_dataloader = DataLoader(test_dataset,
                             shuffle = False,
                             num_workers = 0)
 models = [model_tomodl, model_unet]
-#%%
+# %%
 
 for i, batch in enumerate(test_dataloader):
     if i == 300:
@@ -207,14 +207,14 @@ im_unet = np.where((1.0 - im_unet) < value,1.0, im_unet+value)
 value = 0.1
 im_tomodl = np.where((1.0 - im_tomodl) < value,1.0, im_tomodl+value)
 
-#%%
+# %%
 bx, tx = (50,90)
 by, ty = (20,60)
 
 images = [[im_tomodl, im_unet, im_twist, us_unfil_im, us_fil_im, fs_fil_im], [im_tomodl[ by:ty, bx:tx], im_unet[ by:ty, bx:tx], im_twist[by:ty, bx:tx], us_unfil_im[ by:ty, bx:tx], us_fil_im[by:ty, bx:tx], fs_fil_im[ by:ty, bx:tx,]]]
 
 
-#%%
+# %%
 fig, axes = plt.subplots(2,6, figsize = (9,3))
 
 for enum, (axs, (im_tomodl, im_unet, im_twist, us_unfil_im, us_fil_im, fs_fil_im)) in enumerate(zip(axes, images)):
@@ -281,7 +281,6 @@ for enum, (axs, (im_tomodl, im_unet, im_twist, us_unfil_im, us_fil_im, fs_fil_im
             ax.spines['top'].set_color('orange') 
             ax.spines['right'].set_color('orange')
             ax.spines['left'].set_color('orange')
-
 
 
 cax = fig.add_axes([axs[5].get_position().x1+0.01,axs[5].get_position().y0+0.04,0.02,2*axs[5].get_position().height])

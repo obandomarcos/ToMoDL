@@ -1,13 +1,13 @@
 
-python == 3.8.17
-torch-radon @ git+https://github.com/matteo-ronchetti/torch-radon.git@v2
-torch == <1.8.0
+# python == 3.10.12
+torch-radon24
+torch >= 2.3.0
 pytorch_msssim 
-numpy 
+numpy == 1.26.4
 matplotlib 
 wandb
-opencv-python 
+opencv-python
 Pillow 
 scipy
 tqdm 
-pytorch_lightning == 1.7.1
+lightning

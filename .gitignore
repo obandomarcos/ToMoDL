@@ -2,10 +2,25 @@
 __pycache__/
 *.py[cod]
 *$py.class
-
+.history/
 # C extensions
 *.so
-
+datasets/140*
+datasets/Contrast*
+datasets/sino*
+datasets/PET*
+datasets/LDC*
+datasets/EMBL*
+datasets/ctf
+datasets/Data*
+datasets/student*
+datasets/*
+ToMoDL/udgbfdhh/
+ToMoDL/5tu5rvqb/
+ToMoDL/izp65yiq/
+ToMoDL/x60e*/
+ToMoDL/0daan*/
+ToMoDL/dlz*/
 # Distribution / packaging
 .Python
 build/
@@ -160,3 +175,7 @@ cython_debug/
 #.idea/
 
 wandb/
+tomopari/.pypirc
+tomopari/build
+tomopari/dist
+tomopari/src/*.egg-info

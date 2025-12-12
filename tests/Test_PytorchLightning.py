@@ -7,7 +7,7 @@ import os, sys
 
 sys.path.append('/home/obanmarcos/Balseiro/DeepOPT/')
 
-import pytorch_lightning as pl
+import lightning as pl
 import argparse
 import numpy as np
 import matplotlib.pyplot as plt
@@ -18,8 +18,8 @@ from utilities import model_utilities as modutils # Esto lo tengo que eliminar u
 from models.models_system import MoDLReconstructor
 import torch
 
-from pytorch_lightning.callbacks import ModelCheckpoint
-from pytorch_lightning.loggers import WandbLogger
+from lightning.callbacks import ModelCheckpoint
+from lightning.loggers import WandbLogger
 
 import wandb 
 import cv2

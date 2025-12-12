@@ -7,7 +7,7 @@
 <!-- [![codecov](https://codecov.io/gh/marcoso96/tomopari/branch/main/graph/badge.svg)](https://codecov.io/gh/marcoso96/tomopari) -->
 [![napari hub](https://img.shields.io/endpoint?url=https://api.napari-hub.org/shields/tomopari)](https://napari-hub.org/plugins/tomopari)
 
-A plugin for optical projection tomography reconstruction with model-based neural networks.
+A plugin for accelerated tomographic reconstruction.
 
 ----------------------------------
 

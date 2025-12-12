@@ -1,5 +1,5 @@
 ---
-title: 'tomopari: A plugin for optical projection tomography reconstruction with model-based neural networks'
+title: 'tomopari: A plugin for accelerated tomographic reconstruction'
 tags:
 authors:
   - name: Marcos Obando

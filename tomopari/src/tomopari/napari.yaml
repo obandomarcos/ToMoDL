@@ -1,5 +1,5 @@
 name: tomopari
-display_name: ToMoDL Reconstruction
+display_name: tomopari
 contributions:
   commands:
     - id: tomopari.make_reconstruct_widget

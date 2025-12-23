@@ -17,9 +17,15 @@
   <em>ToMoDL is a model-based neural network for tomographic reconstruction with a low number of samples<br>Introducing a physics informed reconstruction algorithm, high quality images can be recovered from more than 20 times less acquisition data.</em>
 </p>
 
-##
+## 
 
-Welcome to the ToMoDL GitHub repository! This repository contains code that implements a technique for reconstructing OPT (Optical Projection Tomography) images by solving an optimization problem using a Model-Based Deep Learning (MoDL) architecture. 🌟
+🌟 **Welcome to the ToMoDL GitHub repository!** 🌟  
+This repository contains code that implements a technique for reconstructing **OPT (Optical Projection Tomography)** images by solving an optimization problem using a **Model-Based Deep Learning (MoDL)** architecture 🧠📐.
+
+## 🚀 NEW **tomopari**:  
+If you would like to try **ToMoDL** and other **tomographic reconstruction methods** on **napari**, simply follow the instructions below 👇✨  
+🔗 https://github.com/obandomarcos/ToMoDL/tree/main/tomopari#readme
+
 
 ### 📝 Description
 

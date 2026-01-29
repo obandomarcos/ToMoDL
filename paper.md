@@ -56,6 +56,19 @@ Napari [@chiu2022napari] provides a fast, flexible and user-friendly viewer for 
 
 The user-friendly software presented here aims to bridge the gap between a wide variety of reconstruction techniques and napari by introducing a ready-to-use widget that offers state-of-the-art methods for tomographic reconstruction and provides a flexible framework that supports the inclusion of new methods in the future.
 
+
+# State of the field
+
+Several open-source tools exist for tomographic reconstruction.
+scikit-image [@scikit-image] provides accessible implementations of classical analytical methods such as filtered backprojection and is widely used by researchers familiar with Python-based image processing.
+ASTRA [@van2016fast] offers highly efficient CPU and GPU implementations of conventional tomographic algorithms and is commonly adopted in X-ray CT workflows where computational performance is critical.
+Other libraries, such as TorchRadon [@ronchetti2020torchradon], provide differentiable operators for learning-based reconstruction but primarily serve as low-level components rather than complete end-user solutions.
+
+*tomopari* was developed rather than contributing directly to these projects for several reasons. First, existing libraries typically require substantial programming expertise to assemble full pipelines for preprocessing, reconstruction, visualization, and analysis. Second, they focus mainly on classical or iterative methods and do not natively integrate modern deep learning approaches that enable high-quality reconstruction from undersampled data, which is essential for accelerated tomographic acquisitions and near real-time imaging.
+
+By embedding conventional, compressed sensing, and deep learning reconstruction methods directly within napari, *tomopari* provides a unified, interactive environment combining reconstruction with 3D visualization and downstream analysis. Leveraging napari’s plugin ecosystem further enables integration across the full workflow—from data acquisition to segmentation and quantitative analysis—within a single, easy-to-install application accessible to users at all expertise levels. While additional conventional methods remain to be added, *tomopari* is designed to be modular and extensible, providing a flexible foundation for evolving tomographic imaging workflows.
+
+
 # Software design
 *tomopari* is a Python-based napari plugin designed to bridge advanced tomographic reconstruction, 3D rendering and image analysis workflows. A key development goal was balancing computational performance and methodological flexibility with ease of use for non-expert users. This led to a layered architecture in which computationally intensive operations (e.g. Radon transform, iterative solvers, deep learning inference) are handled by optimised numerical backends (NumPy, PyTorch, QBI-radon), while user-facing functionality is implemented as a modular napari plugin.
 

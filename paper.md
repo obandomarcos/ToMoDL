@@ -46,7 +46,7 @@ Here, we introduce *tomopari*, a plugin for napari [@chiu2022napari] (open-sourc
 The input to the *tomopari* plugin is an ordered stack of projection images acquired during a tomography scan, typically provided in standard image formats such as TIFF, JPEG, or PNG. The user only needs to specify the rotation axis of the system (vertical or horizontal) and select the desired reconstruction method. Several additional options are available to enhance reconstruction quality and performance, including \textbf{projection image resizing or compression}, \textbf{manual or automatic center-of-rotation alignment} [@walls2005correction], \textbf{clipping to circular regions}, \textbf{filter selection for FBP methods}, \textbf{partial or full volume reconstruction}, \textbf{intensity inversion}, and \textbf{CPU/GPU computation selection}. Together, these features make *tomopari* a flexible and efficient framework for performing tomographic reconstructions directly within napari. Thus, enabling data pre-processing, 3D image reconstruction, visualisation and analysis, all within a single environment. 
 
 *tomopari* is integrally based on well-established open-source software libraries such as NumPy [@harris2020array], Scipy [@virtanen2020scipy] and scikit-image [@scikit-image]. The U-Net and ToMoDL are neural network-based techniques, which have been trained using the PyTorch framework [@NEURIPS2019_9015] and demonstrate excellent performance for accelerated sparse reconstruction. The computational burden imposed by the iterative application of the Radon transform (forward model) is mitigated through the use of an adapted version of QBI-radon — a fast, differentiable routine for computed tomography reconstruction [@trinh2025radon]. This implementation, developed as a PyTorch 2.0 extension, enables efficient execution on both CPU and GPU across all major operating systems.
-Combining QBI-radon with *tomopari* enables high-performance reconstructions while maintaining compatibility with modern deep learning workflows, makes it suitable for both analytical and model-based reconstruction methods.
+Combining QBI-radon with *tomopari* enables high-performance reconstructions while maintaining compatibility with modern deep learning workflows, making it suitable for both analytical and model-based reconstruction methods.
 
 # Statement of need
 
@@ -55,6 +55,20 @@ Tomographic image reconstruction is crucial across many domains where internal s
 Napari [@chiu2022napari] provides a fast, flexible and user-friendly viewer for 2D and 3D large-scale images, and has rapidly emerged  as a hub for high-performance applications including microscopy, medical imaging, astronomy, etc. Therefore, there is a context with an extensive offer of tomographic reconstruction algorithms and a lack of software integration for image analysts, enabling them to seamlessly access other complex tasks such as segmentation [@ronneberger2015u] and tracking [@wu2016deep].
 
 The user-friendly software presented here aims to bridge the gap between a wide variety of reconstruction techniques and napari by introducing a ready-to-use widget that offers state-of-the-art methods for tomographic reconstruction and provides a flexible framework that supports the inclusion of new methods in the future.
+
+# Software design
+*tomopari* is a Python-based napari plugin designed to bridge advanced tomographic reconstruction, 3D rendering and image analysis workflows. A key development goal was balancing computational performance and methodological flexibility with ease of use for non-expert users. This led to a layered architecture in which computationally intensive operations (e.g. Radon transform, iterative solvers, deep learning inference) are handled by optimised numerical backends (NumPy, PyTorch, QBI-radon), while user-facing functionality is implemented as a modular napari plugin.
+
+To avoid a programming-heavy API, *tomopari* provides a widget-based interface that integrates with napari’s layer model, providing a solution that is easy to use and install. Reconstruction methods share a common internal interface, allowing analytical, iterative, and learning-based approaches to be selected interchangeably while reusing pre-processing, batching, and device-selection logic. This design simplifies maintenance and enables future extension to additional geometries or reconstruction algorithms.
+
+Existing libraries (e.g., scikit-image, ASTRA, TorchRadon) provide efficient reconstruction primitives but lack graphical interfaces or integrated workflows. Incorporating *tomopari* into these projects would not address the need for an integrated, interactive environment that combines reconstruction, visualization, and analysis. *tomopari* fills this gap as a standalone plugin, offering high-performance reconstruction functionalities and compatibility with community tools, such as image-analysis napari hub plugins, creating a unified platform for interactive tomographic workflows. 
+
+# Research Impact Statement
+*tomopari* introduces a novel, user-oriented capability: the ability to perform state-of-the-art tomographic reconstructions, ranging from classical analytical methods to modern model-based deep learning, directly within an interactive N-dimensional image viewer. This integration enables rapid hypothesis testing, parameter exploration, and visual validation without requiring users to switch between multiple software environments or write custom scripts.
+
+The near-term research impact of *tomopari* is supported by several concrete indicators. First, the software provides recently published reconstruction methods, including ToMoDL, in a reproducible and reusable form, facilitating their adoption beyond the original developers. Second, the plugin supports multiple real-world imaging modalities (e.g., OPT, X-ray CT, synchrotron-based high-throughput tomography), demonstrating versatility across scales and experimental contexts. Third, the codebase is fully open source, released under a permissive license, and structured to support community contributions, with documented workflows, configurable parameters, and hardware-agnostic CPU/GPU execution.
+
+By embedding advanced reconstruction directly into napari, *tomopari* enables tighter coupling between reconstruction, segmentation, visualization, and quantitative analysis. This significantly shortens the analysis loop for experimental scientists and lowers the expertise required to apply modern reconstruction techniques, positioning tomopari as enabling infrastructure for reproducible and accelerated tomographic imaging research.
 
 # Methods and Workflow
 
@@ -125,6 +139,10 @@ Synchrotron X-ray projection data from an ant, fixed in a mixture of PFA (parafo
 In \autoref{fig:Figura2} we show representative examples of the 2D reconstructions obtained with FBP and ToMoDL and 3D volumes obtained using the plugin with the ToMoDL option. The volumes were fully rendered using the built-in napari capabilities, allowing for full integration of the data analysis workflow in napari. 
 
 ![\textbf{Reconstruction use cases}. Left panels: 2D slices reconstructed from undersampled data using FBP and ToMoDL methods (OPT, X-ray CT and synchrotron X-ray HiTT). For each case, the acceleration factor, degrees per step and rotation range are indicated. Right panels: 3D renderings of ToMoDL reconstructions.\label{fig:Figura2}](./tomopari/figures/Figure2.pdf)
+
+# AI usage disclosure
+
+Generative AI tools were not used in the creation of this software, the authorship of this manuscript, or the preparation of any supporting materials.
 
 # Acknowledgements
 

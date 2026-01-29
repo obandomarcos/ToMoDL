@@ -5,8 +5,8 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setup(
     name="tomopari",
-    version="0.1.1",
-    description="A plugin for optical projection tomography reconstruction with model-based neural networks.",
+    version="0.1.3",
+    description="A plugin for accelerated tomographic reconstruction.",
     long_description=long_description,
     long_description_content_type="text/markdown",
     author="Marcos Antonio Obando, Minh Nhat Trinh, David Palecek, Germán Mato, Teresa Correia",

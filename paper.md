@@ -39,7 +39,7 @@ bibliography: paper.bib
 
 # Summary
 
-Recent advances in various tomographic methodologies have contributed to a broad range of applications and research areas, from X-ray imaging for medical [@ginat2014advances] and industrial [@de2014industrial] applications to optical sectioning, which provides a mesoscopic framework for visualizing translucent samples [@sharpe2004optical], to name a few. Tomographic imaging involves acquiring raw data (2D projections) from various angles around the object of interest. After acquisition, data may be preprocessed to correct artefacts. Then, an appropriate reconstruction algorithm is used to generate a series of 2D cross-sectional images (slices) from the corrected raw projections. Finally, these slices are visualized individually and combined into 3D renderings, providing a complete and interactive view of the internal structure of the sample.  
+Recent advances in various tomographic methodologies have contributed to a broad range of applications and research areas, from medical [@ginat2014advances] and industrial X-ray imaging [@de2014industrial] to optical sectioning techniques, which provide a mesoscopic framework for visualizing translucent samples [@sharpe2004optical]. Tomographic imaging involves acquiring raw data (2D projections) from various angles around the object of interest. After acquisition, data may be preprocessed to correct artefacts. Then, an appropriate reconstruction algorithm is used to generate a series of 2D cross-sectional images (slices) from the corrected raw projections. Finally, these slices are visualized individually and combined into 3D renderings, providing a complete and interactive view of the internal structure of the sample.  
 
 # Statement of need
 

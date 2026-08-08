@@ -74,7 +74,7 @@ If the rotation axis is not correctly aligned during acquisition, enable **Autom
 
 6. **Reconstruction method**  
    - **FBP CPU / FBP GPU** → from the [QBI_radon] library  
-   - **TOMODL CPU / TOMODL GPU / UNET CPU / UNET GPU** → proposed in our [ToMoDL-paper]  
+   - **TOMODL CPU / TOMODL GPU** → proposed in our [ToMoDL-paper]  
 
 7. **Smoothing level**  
    Select smoothing strength (only applies to **TOMODL** methods). Can be more fine tuned in the **Advanced mode**.
@@ -136,6 +136,18 @@ If the rotation axis is not correctly aligned during acquisition, enable **Autom
 
    A new layer will appear on top of the projections stack with the reconstructed volume.
 
+## 💻 Installation Guide (Command Line)
+
+Create and activate a dedicated Conda environment, then install napari and PyTorch:
+
+```bash
+conda create -y -n tomopari python=3.13
+conda activate tomopari
+pip install "napari[all]==0.7.1"
+conda install -y pytorch==2.5.0 pytorch-cuda=12.4 -c pytorch -c nvidia -c conda-forge --override-channels
+napari
+```
+
 
 ## 💻 Installation Guide *(No Code — Highly Recommended)*
 
@@ -146,14 +158,14 @@ If the rotation axis is not correctly aligned during acquisition, enable **Autom
 You can directly download the official Napari **bundled installer** for your operating system:
 
 * 🪟 **Windows (.exe):**
-  👉 [napari-0.6.5-Windows-x86_64.exe](https://github.com/napari/napari/releases/download/v0.6.5/napari-0.6.5-Windows-x86_64.exe)
+  👉 [napari-0.7.1-Windows-x86_64.exe](https://github.com/napari/napari/releases/download/v0.7.1/napari-0.7.1-Windows-x86_64.exe)
 
 * 🐧 **Ubuntu (.sh):**
-  👉 [napari-0.6.5-Linux-x86_64.sh](https://github.com/napari/napari/releases/download/v0.6.5/napari-0.6.5-Linux-x86_64.sh)
+  👉 [napari-0.7.1-Linux-x86_64.sh](https://github.com/napari/napari/releases/download/v0.7.1/napari-0.7.1-Linux-x86_64.sh)
 
 📘 **Official Guide:**
 Follow the Napari documentation for detailed installation steps:
-🔗 [Napari Installation Guide (Bundled App)](https://napari.org/0.6.5/tutorials/fundamentals/installation_bundle_conda.html)
+🔗 [Napari Installation Guide (Bundled App)](https://napari.org/0.7.1/tutorials/fundamentals/installation_bundle_conda.html)
 
 ---
 
@@ -166,14 +178,14 @@ This step ensures **PyTorch** is properly installed within Napari’s internal C
 #### 🪟 **Windows Users**
 
 1. Download the installer:
-   🔗 [install_torch2napari_windows.bat](https://github.com/obandomarcos/ToMoDL/releases/download/v0.1.0/install_torch2napari_windows.bat)
+   🔗 [install_torch2napari_windows.bat](https://github.com/obandomarcos/ToMoDL/releases/download/v0.2.15/install_torch2napari_windows.bat)
 2. Double-click the `.bat` file to run it.
    *(It will automatically detect Napari’s environment and install PyTorch.)*
 
 #### 🐧 **Linux Users**
 
 1. Download the installer:
-   🔗 [install_torch2napari_linux.sh](https://github.com/obandomarcos/ToMoDL/releases/download/v0.1.0/install_torch2napari_linux.sh)
+   🔗 [install_torch2napari_linux.sh](https://github.com/obandomarcos/ToMoDL/releases/download/v0.2.15/install_torch2napari_linux.sh)
 2. Run it in your terminal:
 
    ```bash

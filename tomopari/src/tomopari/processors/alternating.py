@@ -48,7 +48,7 @@ problems, reconstruction algorithms, and tomographic imaging.
 
 import numpy as np
 import scipy as sp
-from skimage.transform import radon, iradon
+from skimage.transform import radon
 from time import time
 from skimage.metrics import structural_similarity as ssim
 import sys

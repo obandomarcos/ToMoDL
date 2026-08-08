@@ -15,9 +15,18 @@ echo ========================================
 echo.
 
 rem -------------------------------------------------
-rem 1. Resolve %LOCALAPPDATA% (expand % variables)
+rem 1. Ask for the Napari installation path
 rem -------------------------------------------------
-set "APPDATA_ROOT=%LOCALAPPDATA%"
+set "DEFAULT_APPDATA_ROOT=%LOCALAPPDATA%"
+set "NAPARI_PATH_INPUT="
+set /p "NAPARI_PATH_INPUT=Napari installation directory [%DEFAULT_APPDATA_ROOT%]: "
+
+if not defined NAPARI_PATH_INPUT (
+    set "APPDATA_ROOT=%DEFAULT_APPDATA_ROOT%"
+) else (
+    set "APPDATA_ROOT=%NAPARI_PATH_INPUT%"
+)
+
 if "%APPDATA_ROOT:~-1%"=="\" set "APPDATA_ROOT=%APPDATA_ROOT:~0,-1%"
 
 echo Scanning for Napari folder in:
@@ -25,22 +34,38 @@ echo   %APPDATA_ROOT%
 echo.
 
 rem -------------------------------------------------
-rem 2. Use DIR /B /AD to list *all* napari-* folders
+rem 2. Check a specific napari-* folder or scan its parent
 rem -------------------------------------------------
 set "NAPARI_ENV="
 set "CONDA_EXE="
 
-for /f "delims=" %%F in ('dir "%APPDATA_ROOT%\napari-*" /b /ad 2^>nul') do (
-    set "FULLDIR=%APPDATA_ROOT%\%%F"
-    set "TEST_EXE=!FULLDIR!\envs\%%F\Scripts\conda.exe"
+for %%F in ("%APPDATA_ROOT%") do set "ROOT_NAME=%%~nxF"
+
+if /i "!ROOT_NAME:~0,7!"=="napari-" (
+    set "FULLDIR=%APPDATA_ROOT%"
+    set "TEST_EXE=!FULLDIR!\envs\!ROOT_NAME!\Scripts\conda.exe"
     echo   [CHECK] "!FULLDIR!"
     if exist "!TEST_EXE!" (
         set "NAPARI_ENV=!FULLDIR!"
         set "CONDA_EXE=!TEST_EXE!"
-        echo   [FOUND] Napari environment: %%F
+        echo   [FOUND] Napari environment: !ROOT_NAME!
         goto :FOUND_ENV
     ) else (
         echo   [MISS] conda.exe not present in this folder
+    )
+) else (
+    for /f "delims=" %%F in ('dir "%APPDATA_ROOT%\napari-*" /b /ad 2^>nul') do (
+        set "FULLDIR=%APPDATA_ROOT%\%%F"
+        set "TEST_EXE=!FULLDIR!\envs\%%F\Scripts\conda.exe"
+        echo   [CHECK] "!FULLDIR!"
+        if exist "!TEST_EXE!" (
+            set "NAPARI_ENV=!FULLDIR!"
+            set "CONDA_EXE=!TEST_EXE!"
+            echo   [FOUND] Napari environment: %%F
+            goto :FOUND_ENV
+        ) else (
+            echo   [MISS] conda.exe not present in this folder
+        )
     )
 )
 

@@ -4,10 +4,10 @@ Tomographic preprocessing and fast reconstruction utilities.
 This module provides helper functions for optical/CT tomographic workflows,
 including:
 
-• Flat-field estimation from corner/background regions  
-• Sinogram resizing for memory-efficient reconstruction  
-• Fast GPU-accelerated filtered back-projection using QBI-Radon  
-• Automatic rotation-axis correction by maximizing reconstruction variance  
+• Flat-field estimation from corner/background regions
+• Sinogram resizing for memory-efficient reconstruction
+• Fast GPU-accelerated filtered back-projection using QBI-Radon
+• Automatic rotation-axis correction by maximizing reconstruction variance
 • Sinogram shifting and image normalization utilities
 
 These functions support 2D and 3D sinograms in multiple axis orderings, and are
@@ -21,9 +21,12 @@ Dependencies:
     • QBI-Radon (for GPU FBP reconstruction)
 """
 
+from functools import reduce
+
 import numpy as np
-# import cv2
-from skimage.transform import resize as resize_skimage
+
+import cv2
+import dask.array as da
 import tqdm
 import scipy.ndimage as ndi
 import torch
@@ -75,49 +78,78 @@ def flat_field_estimate(img, ratio_corners=0.03):
     return flat_field_estimate
 
 
+def resize_sino(
+    sinogram_volume: np.ndarray, order_mode: int = 0, resize_val: int = 100, clip_to_circle: bool = False
+) -> np.ndarray:
+    """Resize sinograms using OpenCV"""
 
-def resize_sino(sinogram_volume: np.ndarray, order_mode=0, resize_val=100, clip_to_circle=False):
-    """Resize sinograms before reconstruction.
+    if isinstance(sinogram_volume, da.Array):
+        sinogram_volume = sinogram_volume.compute()
 
-    This function rescales the detector dimension of a 3D sinogram volume to a
-    target size, optionally clipping to a circle-inscribed region to reduce
-    memory footprint.
-
-    Args:
-        sinogram_volume (ndarray): Input sinogram volume shaped either as:
-            order_mode = 0 → (theta, detector, z)
-            order_mode = 1 → (detector, theta, z)
-        order_mode (int): Dimension ordering of the sinogram volume.
-        resize_val (int): Target detector size.
-        clip_to_circle (bool): If True, resizes directly to `resize_val`;
-            otherwise resizes to ceil(resize_val * sqrt(2)) to preserve corners.
-
-    Returns:
-        ndarray: Resized sinogram volume with preserved intensity range.
-    """
-
-    if order_mode == 0:
+    # Determine shapes and order
+    if order_mode == 0:  # (theta, detector, Z)
         theta, Q, Z = sinogram_volume.shape
-    elif order_mode == 1:
+        vertical_order = True
+    elif order_mode == 1:  # (detector, theta, Z)
         Q, theta, Z = sinogram_volume.shape
-
-    if clip_to_circle == True:
-        sinogram_size = resize_val
+        vertical_order = False
     else:
-        sinogram_size = int(np.ceil(resize_val * np.sqrt(2)))
+        raise ValueError("order_mode must be 0 or 1")
 
-    if order_mode == 0:
+    # Target detector size
+    if clip_to_circle:
+        target_detector_size = int(resize_val)
+    else:
+        target_detector_size = int(np.ceil(resize_val * np.sqrt(2.0)))
 
-        # sinogram_resize = np.zeros((theta, sinogram_size, Z), dtype=np.float32)
-        sinogram_resize = resize_skimage(sinogram_volume, (theta, sinogram_size, Z), preserve_range=True)
+    # No resize needed
+    if Q == target_detector_size:
+        return np.ascontiguousarray(sinogram_volume, dtype=np.float32)
 
-    elif order_mode == 1:
-        # sinogram_resize = np.zeros((sinogram_size, theta, Z), dtype=np.float32)
-        sinogram_resize = resize_skimage(sinogram_volume, (sinogram_size, theta, Z), preserve_range=True)
+    # ------------------------------------------------------------------
+    # Put detector axis first: (detector, theta, Z)
+    # ------------------------------------------------------------------
+    if vertical_order:
+        detector_first = np.moveaxis(sinogram_volume, 1, 0)  # (Q, theta, Z)
+    else:
+        detector_first = sinogram_volume
 
-    return sinogram_resize
+    detector_size, theta, Z = detector_first.shape  # batch_size here is Z
 
-def fast_reconstruct_FBP(sinogram: np.ndarray, resize_val=None, batch_process=32,device="cpu", rotation_factor=2, order_mode=0, clip_to_circle=False):
+    # ------------------------------------------------------------------
+    # Reshape for efficient cv2.resize: (detector, theta * Z)
+    # ------------------------------------------------------------------
+    resize_input = np.ascontiguousarray(detector_first.reshape(detector_size, theta * Z))
+
+    # Choose interpolation
+    interpolation = cv2.INTER_AREA if target_detector_size < detector_size else cv2.INTER_LINEAR
+
+    # Resize
+    resized_2d = cv2.resize(
+        resize_input, dsize=(theta * Z, target_detector_size), interpolation=interpolation  # (width, height)
+    )
+
+    # Reshape back
+    resized = resized_2d.reshape(target_detector_size, theta, Z)
+
+    # ------------------------------------------------------------------
+    # Restore original order if needed
+    # ------------------------------------------------------------------
+    if vertical_order:
+        resized = np.moveaxis(resized, 0, 1)  # back to (theta, detector, Z)
+
+    return np.ascontiguousarray(resized, dtype=np.float32)
+
+
+def fast_reconstruct_FBP(
+    sinogram: np.ndarray,
+    resize_val=None,
+    batch_process=32,
+    device="cpu",
+    rotation_factor=2,
+    order_mode=0,
+    clip_to_circle=False,
+):
     """Perform fast filtered back-projection (FBP) reconstruction.
 
     Uses the QBI-Radon GPU/PyTorch implementation of the inverse Radon transform
@@ -146,10 +178,12 @@ def fast_reconstruct_FBP(sinogram: np.ndarray, resize_val=None, batch_process=32
         theta, Q, Z = sinogram.shape
     elif order_mode == 1:
         Q, theta, Z = sinogram.shape
-    iradon_functor = Radon(thetas=np.linspace(0, rotation_factor * np.pi, theta, endpoint=False),
-                        circle=clip_to_circle,
-                        filter_name="ramp",
-                        device=device)
+    iradon_functor = Radon(
+        thetas=np.linspace(0, rotation_factor * np.pi, theta, endpoint=False),
+        circle=clip_to_circle,
+        filter_name="ramp",
+        device=device,
+    )
 
     opt_volume = []
     if resize_val is not None:
@@ -180,7 +214,16 @@ def fast_reconstruct_FBP(sinogram: np.ndarray, resize_val=None, batch_process=32
     return opt_volume
 
 
-def find_center_shift(sinogram: np.ndarray, bar_thread=None, rotation_factor=2, type_sino="3D", order_mode=0, clip_to_circle=False, device="cpu"):
+def find_center_shift(
+    sinogram: np.ndarray,
+    resize_shape=None,
+    bar_thread=None,
+    rotation_factor=2,
+    type_sino="3D",
+    order_mode=0,
+    clip_to_circle=False,
+    device="cpu",
+):
     """Estimate and correct rotation-axis misalignment in a sinogram.
 
     The method scans candidate detector-axis shifts, reconstructs slices using
@@ -215,10 +258,10 @@ def find_center_shift(sinogram: np.ndarray, bar_thread=None, rotation_factor=2, 
         Q, theta, Z = sinogram.shape
 
     if Q > 300:
-        new_sinogram = resize_sino(sinogram, order_mode=order_mode, resize_val=100, clip_to_circle=clip_to_circle)
+        new_sinogram = resize_sino(sinogram, order_mode=order_mode, resize_val=128, clip_to_circle=clip_to_circle)
     else:
         new_sinogram = sinogram
-        
+
     if order_mode == 0:
         theta, Q, Z = new_sinogram.shape
         factor_shift = sinogram.shape[1] / Q
@@ -230,12 +273,17 @@ def find_center_shift(sinogram: np.ndarray, bar_thread=None, rotation_factor=2, 
     # new_sinogram = new_sinogram[:, :, int(Z * 0.2):int(Z * 0.7)]
     # print("new_sinogram shape: ", new_sinogram.shape)
     # max_shift is the number of pixels to shift, take 10 pecent of the sinogram size
-    max_shift = min(int(Q * 0.1), 200)
-    shift_step = 2
+    max_shift = min(int(Q * 0.05), 200)
+    shift_step = 1
     center_shift = 0
     # take only xx percent slices from sinogram from the center
 
-    print("max_shift: ", max_shift, "shift_step: ", shift_step, )
+    print(
+        "max_shift: ",
+        max_shift,
+        "shift_step: ",
+        shift_step,
+    )
     # reduce the number of theta to 100 to reduce the memory usage
     if theta > 100:
         factor_theta = theta // 100
@@ -244,32 +292,45 @@ def find_center_shift(sinogram: np.ndarray, bar_thread=None, rotation_factor=2, 
         elif order_mode == 1:
             new_sinogram = new_sinogram[:, ::factor_theta, :]
 
-
-    # calculate batch_process base on theta x Q size for optimizing GPU resource 
-    # should be the power of 2 nearest to the result of 1073741 / (theta * Q) with int 
+    # calculate batch_process base on theta x Q size for optimizing GPU resource
+    # should be the power of 2 nearest to the result of 1073741 / (theta * Q) with int
 
     if bar_thread is not None:
         bar_thread.start()
-        bar_thread.max = 2 *max_shift
+        bar_thread.max = 2 * max_shift
         bar_thread.value = 0
         bar_thread.run()
     center_shift = 0
-    while shift_step >= 1:
+    while shift_step >= 0.5:
         shifts = np.arange(-max_shift, max_shift, shift_step) + center_shift
         image_std = []
         for shift in tqdm.tqdm(shifts):
             if order_mode == 0 and type_sino == "3D":
-                shift_tuple = (0, shift, 0)
+                # shift_tuple = (0, shift, 0)
+                sino_shift = shift_volume_one_axis_cv2(
+                    new_sinogram,
+                    shift_value=shift,
+                    axis=1,
+                )
             elif order_mode == 1 or type_sino == "2D":
-                shift_tuple = (shift, 0, 0)
+                # shift_tuple = (shift, 0, 0)
+                sino_shift = shift_volume_one_axis_cv2(
+                    new_sinogram,
+                    shift_value=shift,
+                    axis=0,
+                )
 
-            sino_shift = ndi.shift(new_sinogram, shift_tuple, mode="nearest")
+            # sino_shift = ndi.shift(new_sinogram, shift_tuple, mode="nearest")
 
             # Get image reconstruction
-            shift_iradon = fast_reconstruct_FBP(sino_shift, device=device, rotation_factor=rotation_factor, order_mode=order_mode, clip_to_circle=False, 
-                                                batch_process=32)
-            if order_mode == 1:
-                print("shift: ", shift, "std: ", np.std(shift_iradon))
+            shift_iradon = fast_reconstruct_FBP(
+                sino_shift,
+                device=device,
+                rotation_factor=rotation_factor,
+                order_mode=order_mode,
+                clip_to_circle=False,
+                batch_process=32,
+            )
             # Calculate varianceshift
             image_std.append(np.std(shift_iradon))
             # create a progress bar thread to update the progress bar from -max_shift to max_shift with shift_step
@@ -277,21 +338,109 @@ def find_center_shift(sinogram: np.ndarray, bar_thread=None, rotation_factor=2, 
                 bar_thread.value = shift + shift_step + max_shift - center_shift
                 bar_thread.run()
         # Update shifts
+        print("image_std: ", image_std)
         center_shift = shifts[np.argmax(image_std)]
         max_shift /= 4
         shift_step /= 2
-        
+
         if bar_thread is not None:
             bar_thread.value = 0
             bar_thread.max = 2 * max_shift
             bar_thread.run()
-        print("center_shift: ", center_shift, "max_shift: ", max_shift, "shift_step: ", shift_step)
-    print("final shift: ", center_shift * factor_shift)
-    if order_mode == 0 and type_sino == "3D":
-        sinogram = ndi.shift(sinogram, (0, center_shift * factor_shift, 0), mode="nearest")
-    elif order_mode == 1 or type_sino == "2D":
-        sinogram = ndi.shift(sinogram, (center_shift * factor_shift, 0, 0), mode="nearest")
+    if resize_shape is not None:
+        factor_shift = resize_shape / Q
+    # center_shift = center_shift + 1 if center_shift < 0 else center_shift - 1
+    print("center_shift: ", center_shift, "max_shift: ", max_shift, "shift_step: ", shift_step)
+    
+    final_shift = center_shift * factor_shift
+    print("final shift: ", final_shift)
+
     if bar_thread is not None:
         bar_thread.value = 0
         bar_thread.run()
-    return sinogram
+    return sinogram, final_shift
+
+
+def shift_volume_one_axis_cv2(
+    source: np.ndarray,
+    shift_value: float,
+    axis: int,
+    interpolation: int = cv2.INTER_LINEAR,
+) -> np.ndarray:
+    """
+    Shift a 3D volume along axis 0 or axis 1.
+
+    Parameters
+    ----------
+    source:
+        Volume with shape (D, H, W).
+    shift_value:
+        Positive values shift toward larger indices.
+    axis:
+        0 shifts along D.
+        1 shifts along H.
+    """
+    if source.ndim != 3:
+        raise ValueError(f"Expected a 3D volume, got shape {source.shape}")
+
+    original_dtype = source.dtype
+
+    if axis == 0:
+        # (D, H, W) -> (D, H*W)
+        image_2d = np.ascontiguousarray(source.reshape(source.shape[0], -1))
+
+        shifted_2d = _shift_2d_vertical(
+            image_2d,
+            shift_value,
+            interpolation,
+        )
+
+        result = shifted_2d.reshape(source.shape)
+        
+    elif axis == 1:
+        # Move H to the first dimension:
+        # (D, H, W) -> (H, D, W) -> (H, D*W)
+        transposed = source.transpose(1, 0, 2)
+        image_2d = np.ascontiguousarray(transposed.reshape(source.shape[1], -1))
+
+        shifted_2d = _shift_2d_vertical(
+            image_2d,
+            shift_value,
+            interpolation,
+        )
+
+        # (H, D*W) -> (H, D, W) -> (D, H, W)
+        result = shifted_2d.reshape(
+            source.shape[1],
+            source.shape[0],
+            source.shape[2],
+        ).transpose(1, 0, 2)
+
+    else:
+        raise ValueError("This function currently supports axis 0 or axis 1.")
+
+    return result.astype(original_dtype, copy=False)
+
+
+def _shift_2d_vertical(
+    image: np.ndarray,
+    shift_value: float,
+    interpolation: int,
+) -> np.ndarray:
+    height, width = image.shape
+
+    transform = np.array(
+        [
+            [1.0, 0.0, 0.0],
+            [0.0, 1.0, shift_value],
+        ],
+        dtype=np.float32,
+    )
+
+    return cv2.warpAffine(
+        image,
+        transform,
+        dsize=(width, height),
+        flags=interpolation,
+        borderMode=cv2.BORDER_REPLICATE,
+    )

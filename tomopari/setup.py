@@ -1,11 +1,13 @@
 from setuptools import setup, find_packages
 
-with open("README.md", "r", encoding="utf-8") as fh:
-    long_description = fh.read()
+from pathlib import Path
+
+this_directory = Path(__file__).parent
+long_description = (this_directory / "README.md").read_text()
 
 setup(
     name="tomopari",
-    version="0.1.3",
+    version="0.2.15",
     description="A plugin for accelerated tomographic reconstruction.",
     long_description=long_description,
     long_description_content_type="text/markdown",
@@ -24,6 +26,8 @@ setup(
         "Programming Language :: Python :: 3.9",
         "Programming Language :: Python :: 3.10",
         "Programming Language :: Python :: 3.11",
+        "Programming Language :: Python :: 3.12",
+        "Programming Language :: Python :: 3.13",
         "Topic :: Scientific/Engineering :: Image Processing",
     ],
     python_requires=">=3.9",
@@ -35,8 +39,9 @@ setup(
         "scikit-image",
         "scipy",
         "qbi-radon",
+        "opencv-python-headless",
         # "pyopengl==3.1.6"
-    ],    
+    ],
     package_dir={"": "src"},
     packages=find_packages(where="src"),
     include_package_data=True,

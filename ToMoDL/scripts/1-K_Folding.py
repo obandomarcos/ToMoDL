@@ -27,27 +27,31 @@ from lightning.pytorch.callbacks import ModelCheckpoint
 from lightning.pytorch.loggers import WandbLogger
 
 from torchvision import transforms as T
-from pytorch_msssim import SSIM
+from torchmetrics.image import StructuralSimilarityIndexMeasure as SSIM
 from torchmetrics.image import PeakSignalNoiseRatio as PSNR
-
+from torchmetrics import MeanSquaredError as MSE
+from torch.nn import L1Loss
 
 # from torchmetrics import StructuralSimilarityIndexMeasure as SSIM
 from torchmetrics.image import MultiScaleStructuralSimilarityIndexMeasure as MSSSIM
 
 # os.environ["CUDA_LAUNCH_BLOCKING"] = "1"
 # os.environ["PYTORCH_USE_CUDA_DSA"] = "1"
-# torch.set_float32_matmul_precision("high")
+torch.set_float32_matmul_precision("high")
 # Options for folding menu
 use_default_model_dict = True
 use_default_dataloader_dict = True
 use_default_trainer_dict = True
 device_id = 0
+device = torch.device(f"cuda:{device_id}" if torch.cuda.is_available() else "cpu")
 max_epochs = 50
-image_size_train = 100
+image_size_train = 128
 print(where_am_i("datasets"))
+acc_factor = 20
 
 
 def runs(testing_options):
+
     # Model dictionary
     if use_default_model_dict == True:
         # ResNet dictionary parameters
@@ -67,28 +71,29 @@ def runs(testing_options):
             "use_torch_radon": True,
             "metric": "psnr",
             "K_iterations": 6,
-            "number_projections_total": 720,
-            "acceleration_factor": 20,
-            "image_size": image_size_train,
-            "lambda": 0.1,
+            "number_projections": 720,
+            "lambda": 0.15,
             "use_shared_weights": True,
-            "denoiser_method": "resnet",
+            "denoiser_method": "U-Net",
             "resnet_options": resnet_options_dict,
             "in_channels": 1,
             "out_channels": 1,
+            "iter_conjugate": 5,
         }
 
         # Training parameters
         loss_dict = {
-            "loss_name": "psnr",
-            "psnr_loss": PSNR(),
-            "ssim_loss": SSIM(data_range=1, size_average=True, channel=1),
-            "msssim_loss": MSSSIM(kernel_size=1),
+            "loss_name": "mse",
+            "psnr_loss": PSNR().to(device),
+            "mse_loss": MSE().to(device),
+            "l1_loss": L1Loss().to(device),
+            "ssim_loss": SSIM().to(device),
+            "msssim_loss": MSSSIM(kernel_size=1).to(device),
         }
 
         # Optimizer parameters
         # optimizer_dict = {"optimizer_name": "Adam+Tanh", "lr": 1e-4}
-        optimizer_dict = {"optimizer_name": "NAdam", "lr": 2e-5}
+        optimizer_dict = {"optimizer_name": "NAdam", "lr": 4e-4}
 
         # System parameters
         model_system_dict = {
@@ -106,7 +111,6 @@ def runs(testing_options):
             "load_path": "",
             "save_path": "MoDL_K_fold_{}",
             "track_alternating_admm": False,
-            "tv_iters": 40,
             "title": "HyperParams_Search",
             "metrics_folder": where_am_i("metrics"),
             "models_folder": where_am_i("models"),
@@ -166,14 +170,13 @@ def runs(testing_options):
         data_transform = None
 
         dataloader_dict = {
-            "datasets_folder": f"{where_am_i('datasets')}full_fish_{image_size_train}_vs5/",
+            "datasets_folder": f"{where_am_i('datasets')}full_fish_{image_size_train}/",
             "number_volumes": 0,
             "experiment_name": "Bassi",
-            # "img_resize": 256,
+            "image_size": image_size_train,
             "load_shifts": True,
             "save_shifts": False,
             "number_projections_total": 720,
-            "number_projections_undersampled": 72,
             "acceleration_factor": 20,
             "train_factor": 0.8,
             "val_factor": 0.2,
@@ -216,19 +219,31 @@ def runs(testing_options):
         trainer = trutils.TrainerSystem(trainer_dict, dataloader_dict, model_system_dict)
         trainer.k_folding()
 
+    if "train_mse" in testing_options:
+
+        model_system_dict["loss_dict"]["loss_name"] = "mse"
+
+        trainer = trutils.TrainerSystem(trainer_dict, dataloader_dict, model_system_dict)
+        trainer.k_folding()
+
 
 if __name__ == "__main__":
 
     k_folding_options = []
 
     parser = argparse.ArgumentParser(description="Do K-folding with different networks")
-
+    parser.add_argument("--train_mse", help="Train w/MSE loss with optimal hyperparameters", action="store_true")
     parser.add_argument("--train_psnr", help="Train w/PSNR loss with optimal hyperparameters", action="store_true")
     parser.add_argument("--train_ssim", help="Train w/SSIM loss with optimal hyperparameters", action="store_true")
     parser.add_argument("--train_msssim", help="Train w/MS-SSIM loss with optimal hyperparameters", action="store_true")
 
     args = parser.parse_args()
-    args.train_psnr = True
+    args.train_mse = True
+
+    if args.train_mse:
+
+        print("Training MODL with MSE loss...")
+        k_folding_options.append("train_mse")
 
     if args.train_psnr:
 

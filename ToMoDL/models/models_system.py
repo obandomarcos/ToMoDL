@@ -37,9 +37,10 @@ from torch.optim.lr_scheduler import ReduceLROnPlateau
 from timm.scheduler import TanhLRScheduler
 from torchmetrics.image import PeakSignalNoiseRatio
 
+device_id = 0
 
 # Modify for multi-gpu
-device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+device = torch.device(f"cuda:{device_id}" if torch.cuda.is_available() else "cpu")
 
 
 class MoDLReconstructor(pl.LightningModule):
@@ -63,6 +64,7 @@ class MoDLReconstructor(pl.LightningModule):
 
         self.save_hyperparameters(self.hparams)
         self.validation_step_outputs = []
+
     def forward(self, x):
 
         return self.model(x)
@@ -79,25 +81,24 @@ class MoDLReconstructor(pl.LightningModule):
 
         modl_rec = self.model(unfiltered_us_rec)
 
-        if (self.track_train == True) and (batch_idx % 50 == 0):
+        if (self.track_train == True) and (batch_idx % 500 == 0):
 
             self.log_plot(filtered_fs_rec, modl_rec, "train")
 
-        ssim_fbp_loss = 1 - self.loss_dict["ssim_loss"](filtered_us_rec, filtered_fs_rec)
-        ssim_loss = 1 - self.loss_dict["ssim_loss"](modl_rec["dc" + str(self.model.K)], filtered_fs_rec)
-        self.log("train/ssim_fbp", 1 - ssim_fbp_loss, on_step=True, on_epoch=False, prog_bar=True)
-        self.log("train/ssim", 1 - ssim_loss, on_step=True, on_epoch=False, prog_bar=True)
+        # ssim_fbp_loss = 1 - self.loss_dict["ssim_loss"](filtered_us_rec, filtered_fs_rec)
+        # ssim_loss = 1 - self.loss_dict["ssim_loss"](modl_rec["dc" + str(self.model.K)], filtered_fs_rec)
+        # self.log("train/ssim_fbp", 1 - ssim_fbp_loss, on_step=True, on_epoch=False, prog_bar=True)
+        # self.log("train/ssim", 1 - ssim_loss, on_step=True, on_epoch=False, prog_bar=True)
 
-        ####################### test not normalize ######################################
-        filtered_us_rec = self.normalize_image_std(filtered_us_rec)
-        filtered_fs_rec = self.normalize_image_std(filtered_fs_rec)
         modl_rec["dc" + str(self.model.K)] = self.normalize_image_std(modl_rec["dc" + str(self.model.K)])
-        self.loss_dict["psnr_loss"] = self.loss_dict["psnr_loss"].to(filtered_us_rec.device)
 
-        psnr_fbp= self.loss_dict["psnr_loss"](filtered_us_rec, filtered_fs_rec)
+        # self.loss_dict["psnr_loss"] = self.loss_dict["psnr_loss"].to(filtered_us_rec.device)
+        psnr_fbp = self.loss_dict["psnr_loss"](filtered_us_rec, filtered_fs_rec)
         psnr = self.loss_dict["psnr_loss"](modl_rec["dc" + str(self.model.K)], filtered_fs_rec)
 
-        psnr_loss = 1 - psnr
+        # self.loss_dict["l1_loss"] = self.loss_dict["l1_loss"].to(filtered_us_rec.device)
+        l1_loss = self.loss_dict["l1_loss"](modl_rec["dc" + str(self.model.K)], filtered_fs_rec)
+
         self.log(
             "train/psnr_fbp",
             psnr_fbp,
@@ -113,9 +114,11 @@ class MoDLReconstructor(pl.LightningModule):
             prog_bar=True,
         )
         self.log("lambda", self.model.lam, on_step=True, on_epoch=False, prog_bar=True)
+        if self.loss_dict["loss_name"] == "mse":
+            return l1_loss
 
-        if self.loss_dict["loss_name"] == "psnr":
-
+        elif self.loss_dict["loss_name"] == "psnr":
+            psnr_loss = 1 - psnr
             if torch.isnan(psnr_loss):
                 print("nan found, logging image")
                 self.log_plot(filtered_fs_rec, modl_rec, "train")
@@ -123,7 +126,8 @@ class MoDLReconstructor(pl.LightningModule):
             return psnr_loss
 
         elif self.loss_dict["loss_name"] == "ssim":
-
+            self.loss_dict["ssim_loss"] = self.loss_dict["ssim_loss"].to(filtered_us_rec.device)
+            ssim_loss = 1 - self.loss_dict["ssim_loss"](modl_rec["dc" + str(self.model.K)], filtered_fs_rec)
             if torch.isnan(ssim_loss):
                 print("nan found, logging image")
                 self.log_plot(filtered_fs_rec, modl_rec, "train")
@@ -146,48 +150,31 @@ class MoDLReconstructor(pl.LightningModule):
         """
 
         unfiltered_us_rec, filtered_us_rec, filtered_fs_rec = batch
-
         modl_rec = self.model(unfiltered_us_rec)
 
         if (self.track_val == True) and (batch_idx == 0):
 
             self.log_plot(filtered_fs_rec, modl_rec, "validation")
 
-        ssim_fbp_loss = 1 - self.loss_dict["ssim_loss"](filtered_us_rec, filtered_fs_rec)
-        ssim_loss = 1 - self.loss_dict["ssim_loss"](modl_rec["dc" + str(self.model.K)], filtered_fs_rec)
-        self.log("val/ssim_fbp", 1 - ssim_fbp_loss)
-        self.log("val/ssim", 1 - ssim_loss)
+        # ssim_fbp_loss = 1 - self.loss_dict["ssim_loss"](filtered_us_rec, filtered_fs_rec)
+        # ssim_loss = 1 - self.loss_dict["ssim_loss"](modl_rec["dc" + str(self.model.K)], filtered_fs_rec)
+        # self.log("val/ssim_fbp", 1 - ssim_fbp_loss)
+        # self.log("val/ssim", 1 - ssim_loss)
 
-        ###############################  test not normalize ######################################
-        filtered_us_rec = self.normalize_image_std(filtered_us_rec)
-        filtered_fs_rec = self.normalize_image_std(filtered_fs_rec)
         modl_rec["dc" + str(self.model.K)] = self.normalize_image_std(modl_rec["dc" + str(self.model.K)])
-        self.loss_dict["psnr_loss"] = self.loss_dict["psnr_loss"].to(filtered_us_rec.device)
+        # self.loss_dict["psnr_loss"] = self.loss_dict["psnr_loss"].to(filtered_us_rec.device)
         psnr_fbp = self.loss_dict["psnr_loss"](filtered_us_rec, filtered_fs_rec)
         psnr = self.loss_dict["psnr_loss"](modl_rec["dc" + str(self.model.K)], filtered_fs_rec)
-
-
-        metrics = {"val_psnr_fbp": psnr_fbp,
-                   "val_psnr": psnr,}
+        l1_loss = self.loss_dict["l1_loss"](modl_rec["dc" + str(self.model.K)], filtered_fs_rec)
+        metrics = {"val_psnr_fbp": psnr_fbp, "val_psnr": psnr, "val_l1_loss": l1_loss}
         self.validation_step_outputs.append(metrics)
-        if self.loss_dict["loss_name"] == "psnr":
+        return metrics
 
-            return psnr
-
-        elif self.loss_dict["loss_name"] == "ssim":
-
-            return ssim_loss
-
-        elif self.loss_dict["loss_name"] == "msssim":
-
-            msssim_loss = 1 - self.loss_dict["msssim_loss"](modl_rec["dc" + str(self.model.K)], filtered_fs_rec)
-            self.log("val/msssim", msssim_loss)
-
-            return msssim_loss
     def on_validation_epoch_end(self):
         avg_psnr_fbp = torch.mean(torch.stack([x["val_psnr_fbp"] for x in self.validation_step_outputs])).item()
         avg_psnr = torch.mean(torch.stack([x["val_psnr"] for x in self.validation_step_outputs])).item()
-        metrics = {"val_psnr_fbp": avg_psnr_fbp, "val_psnr": avg_psnr}
+        avg_l1_loss = torch.mean(torch.stack([x["val_l1_loss"] for x in self.validation_step_outputs])).item()
+        metrics = {"val_psnr_fbp": avg_psnr_fbp, "val_psnr": avg_psnr, "val_l1_loss": avg_l1_loss}
         self.log_dict(metrics)
         self.validation_step_outputs = []
 
@@ -213,16 +200,11 @@ class MoDLReconstructor(pl.LightningModule):
         ssim_loss = 1 - self.loss_dict["ssim_loss"](modl_rec["dc" + str(self.model.K)], filtered_fs_rec)
         self.log("test/ssim_fbp", 1 - ssim_fbp_loss)
         self.log("test/ssim", 1 - ssim_loss)
-
-        filtered_us_rec = self.normalize_image_std(filtered_us_rec)
-        filtered_fs_rec = self.normalize_image_std(filtered_fs_rec)
         modl_rec["dc" + str(self.model.K)] = self.normalize_image_std(modl_rec["dc" + str(self.model.K)])
 
         psnr_fbp = self.loss_dict["psnr_loss"](filtered_us_rec, filtered_fs_rec).item()
         psnr = self.loss_dict["psnr_loss"](modl_rec["dc" + str(self.model.K)], filtered_fs_rec).item()
-        self.log(
-            "test/psnr_fbp", psnr_fbp
-        )
+        self.log("test/psnr_fbp", psnr_fbp)
         self.log("test/psnr", psnr)
 
         self.log("lambda", self.model.lam)
@@ -267,8 +249,8 @@ class MoDLReconstructor(pl.LightningModule):
             #     Lr scheduler step
             #     """
             #     scheduler.step(epoch=self.current_epoch)
-            scheduler = ReduceLROnPlateau(optimizer, mode="max", factor=0.5, patience=5, verbose=True)
-            return [optimizer], [{"scheduler": scheduler, "monitor": "val_psnr", "strict": False}]
+            scheduler = ReduceLROnPlateau(optimizer, mode="max", factor=0.5, patience=3, verbose=True)
+            return [optimizer], [{"scheduler": scheduler, "monitor": "val_psnr", "strict": False, "interval": "epoch"}]
 
     # def lr_scheduler_step(self, scheduler, metric):
     #     """
@@ -402,7 +384,7 @@ class MoDLReconstructor(pl.LightningModule):
 
         for i, image in enumerate(images):
 
-            image_norm[i, ...] = (image - image.min()) / (image.max() - image.min())
+            image_norm[i, ...] = image / image.max()
 
         return image_norm
 
@@ -728,7 +710,7 @@ class UNetReconstructor(pl.LightningModule):
         torch.save(self.model.state_dict(), self.save_path.format(fold))
 
     @staticmethod
-    def normalize_image_01(images):
+    def normalize_image_01(images, quantile=1):
         """
         Normalizes tensor of images 1-channel images between 0 and 1.
         Params:
@@ -738,8 +720,8 @@ class UNetReconstructor(pl.LightningModule):
         image_norm = torch.zeros_like(images)
 
         for i, image in enumerate(images):
-
-            image_norm[i, ...] = (image - image.mean()) / (image.max() - image.min())
+            max_value = torch.quantile(image, quantile)
+            image_norm[i, ...] = torch.clamp(image / max_value, 0, 1)
 
         return image_norm
 

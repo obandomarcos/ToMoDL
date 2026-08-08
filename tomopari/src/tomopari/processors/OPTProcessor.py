@@ -20,24 +20,32 @@ The module integrates classical tomography algorithms with deep unfolded
 optimization models, following methods such as MoDL (Aggarwal et al. 2018) and
 deep OPT reconstruction (Davis et al., 2019).
 """
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from typing import Union
+import cv2
+import dask.array as da
+from skimage.transform import resize as resize_skimage
+
+torch._dynamo.config.suppress_errors = True
+torch._dynamo.config.capture_scalar_outputs = True
 
 from skimage.transform import radon as radon_scikit
 from skimage.transform import iradon as iradon_scikit
 from skimage.filters import median
 from skimage.transform import resize as resize_skimage
 from skimage.morphology import disk
-from .unet import UNet
+from .unet import AttU_Net
 
 from .alternating import TwIST, TVdenoise, TVnorm
 import numpy as np
 import os
+
 # import cv2
 from enum import Enum
-import tqdm
-import os
+
 try:
     from QBI_radon import Radon as radon_thrad
     from QBI_radon import ramp_filter_torch
@@ -55,13 +63,10 @@ except:
     use_tomopy = False
     use_scikit = True
 
-from skimage.transform import radon, iradon
-import numpy as np
-from . import unet
-
 
 # Modify for multi-gpu
-device = torch.device("cuda:0" if use_torch_radon == True else "cpu")
+device = torch.device("cuda" if use_torch_radon == True else "cpu")
+
 
 def mean_std_median_filter(images):
     """Compute mean and standard deviation after median filtering.
@@ -82,59 +87,15 @@ def mean_std_median_filter(images):
     std_images = np.zeros((images.shape[0], 1))
     for i, image in enumerate(images):
         image_median = median(image[0], disk(5))
+        # image_median = image[0]
         mean_images[i, 0] = image_median.mean()
         std_images[i, 0] = image_median.std()
     return mean_images, std_images
 
-def ramp_filter(sinogram):
-    """Apply a discrete ramp filter to a sinogram.
 
-    Implements the Ram-Lak (ramp) filter using FFT with zero-padding.
-
-    Args:
-        sinogram (ndarray): Sinogram of shape (num_detectors, num_angles).
-
-    Returns:
-        ndarray: Filtered sinogram with the same shape.
-
-    Notes:
-        This is a CPU, NumPy-only implementation.
-    """
-    num_detectors, num_angles = sinogram.shape
-    n = int(2 ** np.ceil(np.log2(num_detectors)))  # zero-padding for FFT
-    freqs = np.fft.fftfreq(n).reshape(-1, 1)
-    ramp = 2 * np.abs(freqs)
-
-    filtered_sino = np.zeros_like(sinogram)
-
-    for i in range(num_angles):
-        projection = sinogram[:, i]
-        padded = np.zeros(n)
-        padded[:num_detectors] = projection
-
-        proj_fft = np.fft.fft(padded)
-        filtered_fft = proj_fft * ramp[:, 0]
-        filtered_proj = np.real(np.fft.ifft(filtered_fft))[:num_detectors]
-
-        filtered_sino[:, i] = filtered_proj
-
-    return filtered_sino
-
-#     return filtered_sino
 class dwLayer(nn.Module):
-    """Single convolutional layer used in the learned denoiser (dw block).
-
-    Supports:
-        • Optional batch normalization
-        • Xavier / constant initialization
-        • Swish (SiLU) activation unless last layer
-
-    Args:
-        kw_dictionary (dict): Contains:
-            weights_size (tuple): (in_channels, out_channels, kernel, stride)
-            is_last_layer (bool): If True, skip activation
-            init_method (str): "xavier" or "constant"
-            use_batch_norm (bool): Whether to apply batch normalization
+    """
+    Creates denoiser singular layer
     """
 
     def __init__(self, kw_dictionary):
@@ -156,7 +117,8 @@ class dwLayer(nn.Module):
         self.initialize_layer(method=self.init_method)
 
         if self.use_batch_norm == True:
-            self.batch_norm = nn.BatchNorm2d(self.weights_size[1])
+            # self.batch_norm = nn.BatchNorm2d(self.weights_size[1])
+            self.norm = nn.GroupNorm(num_groups=1, num_channels=self.weights_size[1])
 
     def forward(self, x):
         """
@@ -168,7 +130,7 @@ class dwLayer(nn.Module):
 
         if self.use_batch_norm:
 
-            output = self.batch_norm(output)
+            output = self.norm(output)
 
         if self.is_last_layer != True:
 
@@ -204,27 +166,7 @@ class dwLayer(nn.Module):
 
 
 class dw(nn.Module):
-    """Residual convolutional denoiser block.
 
-    Builds a stack of convolutional layers followed by a residual connection:
-        output = F(x) + x
-
-    Args:
-        kw_dictionary (dict): Contains:
-            number_layers (int)
-            kernel_size (int)
-            features (int)
-            in_channels (int)
-            out_channels (int)
-            stride (int)
-            use_batch_norm (bool)
-            init_method (str)
-            device (torch.device)
-
-    Forward:
-        x (Tensor): Input batch (B, C, H, W)
-        Returns denoised output.
-    """
     def __init__(self, kw_dictionary):
         """
         Initialises dw block
@@ -232,6 +174,7 @@ class dw(nn.Module):
             - kw_dictionary (dict): Parameters dictionary
         """
         super(dw, self).__init__()
+
         self.process_kwdictionary(kw_dictionary=kw_dictionary)
 
         for i in np.arange(1, self.number_layers + 1):
@@ -241,7 +184,7 @@ class dw(nn.Module):
             if i == self.number_layers - 1:
                 self.dw_layer_dict["is_last_layer"] = True
 
-            self.nw["c" + str(i)] = dwLayer(self.dw_layer_dict).to(self.device)
+            self.nw["c" + str(i)] = dwLayer(self.dw_layer_dict).to(device)
 
         self.nw = nn.ModuleDict(self.nw)
 
@@ -277,7 +220,6 @@ class dw(nn.Module):
         self.stride = kw_dictionary["stride"]
         self.use_batch_norm = kw_dictionary["use_batch_norm"]
         self.init_method = kw_dictionary["init_method"]
-        self.device = kw_dictionary["device"]
 
         # Intermediate layers (in_channels, out_channels, kernel_size_x, kernel_size_y)
         self.weights_size = {
@@ -294,27 +236,8 @@ class dw(nn.Module):
 
 
 class Aclass:
-    """Data-consistency (DC) operator for MoDL / ToMoDL reconstruction.
-
-    Implements the operator:
-        (AᵀA + λI)x
-    where A is the Radon transform.
-
-    Supports:
-        • QBI-Radon GPU implementation
-        • scikit-image CPU implementation
-        • Conjugate gradient inversion
-
-    Args:
-        kw_dictionary (dict):
-            image_size (int)
-            number_projections (int)
-            lambda (float)
-            use_torch_radon (bool)
-            use_scikit (bool)
-            iter_conjugate (int)
-            device (torch.device)
-            is_half_rotation (bool)
+    """
+    This class is created to do the data-consistency (DC) step as described in paper.
     """
 
     def __init__(self, kw_dictionary):
@@ -324,57 +247,24 @@ class Aclass:
             - kw_dictionary (dict): Keyword dictionary
         """
 
-        self.img_size = kw_dictionary["image_size"]
         self.number_projections = kw_dictionary["number_projections"]
         self.lam = kw_dictionary["lambda"]
         self.use_torch_radon = kw_dictionary["use_torch_radon"]
-        self.use_scikit = kw_dictionary["use_scikit"]
-
-        self.is_half_rotation = kw_dictionary["is_half_rotation"]
-        if self.is_half_rotation == True:
-            self.angles = np.linspace(0, np.pi, self.number_projections, endpoint=False)
-        else:
-            self.angles = np.linspace(0, 2 * np.pi, self.number_projections, endpoint=False)
-        self.det_count = int(np.ceil(np.sqrt(2) * self.img_size))
         self.device = kw_dictionary["device"]
+        self.use_scikit = kw_dictionary["use_scikit"]
+        self.angles = np.linspace(0, 2 * np.pi, self.number_projections, endpoint=True)
         self.iter_conjugate = kw_dictionary["iter_conjugate"]
         if self.use_torch_radon == True:
-            self.radon = radon_thrad(thetas=self.angles, circle=False, device=self.device, filter_name=None)
-
-        elif self.use_scikit == True:
-
-            class Radon:
-                def __init__(self, num_angles, circle=True):
-                    self.num_angles = num_angles
-                    self.circle = circle
-
-                def forward(self, image):
-                    # Compute the Radon transform of the image
-                    image = image.detach().numpy()
-                    sinogram = radon(image, theta=np.linspace(0, 2 * 180, self.num_angles), circle=self.circle)
-                    sinogram = torch.tensor(sinogram).to(self.device)
-                    return sinogram
-
-                def backprojection(self, sinogram):
-                    # Compute the backprojection of the sinogram
-                    sinogram = sinogram.detach().numpy()
-                    reconstruction = iradon(
-                        sinogram, theta=np.linspace(0, 2 * 180, self.num_angles), circle=self.circle, filter_name=None
-                    )
-                    reconstruction = torch.tensor(reconstruction).to(self.device)
-                    return reconstruction
-
-            self.radon = Radon(self.number_projections, circle=False)
+            self.radon = radon_thrad(thetas=self.angles, circle=True, device=self.device, filter_name=None)
 
     def forward(self, img):
-        """Apply (AᵀA + λI) to an image tensor."""
+        """
+        Applies the operator (A^H A + lam*I) to image, where A is the forward Radon transform.
+        Params:
+            - img (torch.Tensor): Input tensor
+        """
 
-        # sinogram = self.radon.forward(img)/self.img_size
-        # iradon = self.radon.backprojection(sinogram)*np.pi/self.number_projections
-        # del sinogram
-        # output = iradon+self.lam*img
-
-        sinogram = self.radon(img) / self.img_size
+        sinogram = self.radon(img) / img.shape[-1]
         iradon = self.radon.filter_backprojection(sinogram) * np.pi / self.number_projections
         output = iradon + self.lam * img
 
@@ -385,31 +275,18 @@ class Aclass:
         return output
 
     def inverse(self, rhs):
-        """Solve (AᵀA + λI)x = rhs using conjugate gradients.
-
-        Args:
-            rhs (Tensor): Right-hand side tensor.
-
-        Returns:
-            Tensor: Approximate solution of the linear system.
+        """
+        Applies CG on the batch
+        Params:
+            - rhs (torch.Tensor): Right-hand side tensor for applying inversion of (A^H A + lam*I) operator
         """
         y = self.conjugate_gradients(self.forward, rhs)  # This indexing may fail
 
         return y
 
-    # @staticmethod
     def conjugate_gradients(self, A, rhs):
-        """Conjugate gradient solver in PyTorch.
-
-        Solves:
-            minimize_x ||Ax – rhs||²
-
-        Args:
-            A (callable): Linear operator.
-            rhs (Tensor): Right-hand side vector.
-
-        Returns:
-            Tensor: Estimated solution.
+        """
+        My implementation of conjugate gradients in PyTorch
         """
 
         i = 0
@@ -418,9 +295,8 @@ class Aclass:
         p = rhs
         rTr = torch.sum(r * r)
 
-        while (i < self.iter_conjugate) and torch.ge(rTr, 1e-5):
+        while (i < self.iter_conjugate) and torch.ge(rTr, 1e-4):
 
-            # print(rTr)
             Ap = A(p)
             alpha = rTr / torch.sum(p * Ap)
             x = x + alpha * p
@@ -451,12 +327,12 @@ class ToMoDL(nn.Module):
         kw_dictionary (dict):
             K_iterations (int): Number of unrolled iterations
             lambda (float)
-            image_size (int)
-            number_projections_total (int)
+            number_projections (int)
             acceleration_factor (int)
             denoiser_method ("U-Net" or "resnet")
             device (torch.device)
     """
+
     def __init__(self, kw_dictionary):
         """
         Main function that creates the model
@@ -466,7 +342,6 @@ class ToMoDL(nn.Module):
             - K (int): unrolled network number of iterations
             - n_angles (int): Number of total angles of the sinogram, fully sampled
             - proj_num (int): Number of undersampled angles of the model
-            - image_size (int): Image size in pixels
             -
 
         """
@@ -487,16 +362,6 @@ class ToMoDL(nn.Module):
 
         self.out["dc0"] = x
 
-        # for i in range(1, self.K + 1):
-
-        #     j = str(i)
-
-        #     self.out["dw" + j] = normalize_images(self.dw.forward(self.out["dc" + str(i - 1)]))
-        #     rhs = self.out["dc0"] / self.lam + self.out["dw" + j]
-
-        #     self.out["dc" + j] = normalize_images(self.AtA.inverse(rhs))
-
-        #     del rhs
         #####################################################################################
         for i in range(1, self.K + 1):
             j = str(i)
@@ -504,6 +369,8 @@ class ToMoDL(nn.Module):
             rhs = x / self.lam + self.out["dw" + j]
 
             self.out["dc" + j] = self.AtA.inverse(rhs)
+
+            # self.out["dc" + j] = self.normalize_image_01(self.out["dc" + j])
             del rhs
 
         return self.out
@@ -522,11 +389,8 @@ class ToMoDL(nn.Module):
 
         self.device = kw_dictionary["device"]
         self.K = kw_dictionary["K_iterations"]
-        self.number_projections_total = kw_dictionary["number_projections_total"]
+        self.number_projections = kw_dictionary["number_projections"]
         self.acceleration_factor = kw_dictionary["acceleration_factor"]
-        self.number_projections_undersampled = self.number_projections_total // self.acceleration_factor
-        self.image_size = kw_dictionary["image_size"]
-
         self.lam = kw_dictionary["lambda"]
         self.lam = torch.nn.Parameter(torch.tensor([self.lam], requires_grad=False, device=self.device))
 
@@ -536,13 +400,11 @@ class ToMoDL(nn.Module):
         self.in_channels = kw_dictionary["in_channels"]
         self.out_channels = kw_dictionary["out_channels"]
         self.iter_conjugate = kw_dictionary["iter_conjugate"]
-        if self.denoiser_method == "U-Net":
-            self.unet_options = kw_dictionary["unet_options"]
-        elif self.denoiser_method == "resnet":
+
+        if self.denoiser_method == "resnet":
             self.resnet_options = kw_dictionary["resnet_options"]
         self.AtA_dictionary = {
-            "image_size": self.image_size,
-            "number_projections": self.number_projections_total,
+            "number_projections": self.number_projections,
             "lambda": self.lam,
             "use_torch_radon": self.use_torch_radon,
             "use_scikit": self.use_scikit,
@@ -565,7 +427,7 @@ class ToMoDL(nn.Module):
 
         if self.denoiser_method == "U-Net":
 
-            self.dw = unet.UNet(self.unet_options)
+            self.dw = AttU_Net()
 
         elif self.denoiser_method == "resnet":
 
@@ -575,16 +437,7 @@ class ToMoDL(nn.Module):
                 self.dw = nn.ModuleList([dw(self.resnet_options) for _ in range(self.K)])
 
 
-def normalize_images(images):
-    """Normalize images to zero mean and unit variance.
-
-    Args:
-        images (Tensor): Shape (B, 1, H, W).
-
-    Returns:
-        Tensor: Normalized images.
-    """
-
+def normalize_images_zscore(images):
     image_norm = torch.zeros_like(images)
 
     for i, image in enumerate(images):
@@ -593,8 +446,6 @@ def normalize_images(images):
         image = (image - image.mean()) / image.std()
         # image_norm[i, ...] = (image - image.min()) / (image.max() - image.min())
         image_norm[i, ...] = image
-
-
     return image_norm
 
 
@@ -603,39 +454,31 @@ Process sinograms in 2D
 """
 
 
-
-for k, v in os.environ.items():
-    if k.startswith("QT_") and "cv2" in v:
-        del os.environ[k]
+# for k, v in os.environ.items():
+#     if k.startswith("QT_") and "cv2" in v:
+#         del os.environ[k]
 
 
 class Rec_Modes(Enum):
     """Supported reconstruction modes."""
-    FBP_CPU = 0
-    FBP_GPU = 1
-    TWIST_CPU = 2
+
+    FBP_GPU = 0
+    FBP_CPU = 1
+    TOMODL_GPU = 2
     TOMODL_CPU = 3
-    TOMODL_GPU = 4
+    UNET_GPU = 4
     UNET_CPU = 5
-    UNET_GPU = 6
+    TWIST_CPU = 6
 
 
 class Order_Modes(Enum):
     """Axis ordering of sinograms:
-        Vertical   → (theta, Q, Z)
-        Horizontal → (Q, theta, Z)
+    Vertical   → (theta, Q, Z)
+    Horizontal → (Q, theta, Z)
     """
+
     Vertical = 0
     Horizontal = 1
-
-
-def my_filtering_function(pair):
-    unwanted_key = "num_batches"
-    key, value = pair
-    if unwanted_key in key:
-        return False  # filter pair out of the dictionary
-    else:
-        return True  # keep pair in the filtered dictionary
 
 
 class OPTProcessor:
@@ -654,19 +497,21 @@ class OPTProcessor:
         resize_val, rec_process, order_mode, clip_to_circle,
         use_filter, batch_size, iterations, invert_color, etc.
     """
+
     def __init__(self):
         """
         Variables for OPT processor
         """
 
-        self.resize_val = 100
+        self.resize_val = 128
         self.rec_process = Rec_Modes.FBP_CPU.value
         self.order_mode = Order_Modes.Vertical.value
-        self.clip_to_circle = False
-        self.use_filter = True  
+        self.clip_to_circle = True
+        self.use_filter = True
         self.batch_size = 1
         self.is_half_rotation = False
-        self.filter_FBP = "ramp" # can be  "shepp-logan" or "cosine" or "hamming" or "hann" 
+        self.ratio_circle = 1
+        self.filter_FBP = "ramp"  # can be  "shepp-logan" or "cosine" or "hamming" or "hann"
         self.is_resize = False
         self.iradon_functor = None
         self.invert_color = False
@@ -680,67 +525,209 @@ class OPTProcessor:
         else:
             rotation_factor = 2
 
-        # This should change depending on the method
-        if self.rec_process == Rec_Modes.FBP_CPU.value:
+    def resize_batch(
+        self,
+        sinogram_batch: Union[np.ndarray, da.Array],
+    ) -> np.ndarray:
+        """
+        Resize one sinogram batch along the detector axis only.
 
-            self.angles_gen = lambda num_angles: np.linspace(0, rotation_factor * 180, num_angles, endpoint=False)
+        Expected input shapes
+        ---------------------
+        Vertical order:
+            (theta, Q, batch_size)
 
-        elif self.rec_process == Rec_Modes.FBP_GPU.value or self.rec_process == Rec_Modes.TOMODL_GPU.value:
+        Horizontal order:
+            (Q, theta, batch_size)
 
-            assert torch.cuda.is_available() == True
-            self.angles_gen = lambda num_angles: np.linspace(0, rotation_factor * np.pi, num_angles, endpoint=False)
+        Returns
+        -------
+        np.ndarray
+            Resized, C-contiguous batch with dtype float32.
 
+            Vertical order:
+                (theta, resized_Q, batch_size)
 
-    def resize(self, sinogram_volume: np.ndarray, type_sino="3D"):
-        """Resize sinogram before reconstruction.
-
-        Args:
-            sinogram_volume (ndarray): Input sinogram.
-            type_sino (str): "3D" or "2D".
-
-        Returns:
-            ndarray: Resized sinogram.
+            Horizontal order:
+                (resized_Q, theta, batch_size)
         """
 
-        if self.order_mode == Order_Modes.Vertical.value:
-            self.theta, self.Q, self.Z = sinogram_volume.shape
-        elif self.order_mode == Order_Modes.Horizontal.value:
-            self.Q, self.theta, self.Z = sinogram_volume.shape
+        # Compute only the selected Dask batch.
+        if isinstance(sinogram_batch, da.Array):
+            sinogram_batch = sinogram_batch.compute()
 
-        if self.clip_to_circle == True:
-            sinogram_size = self.resize_val
+        if self.clip_to_circle:
+            target_detector_size = int(self.resize_val)
         else:
-            sinogram_size = int(np.ceil(self.resize_val * np.sqrt(2)))
-        print("orginal sinogram range: ", sinogram_volume.min(), sinogram_volume.max())
-        if self.order_mode == Order_Modes.Vertical.value:
+            target_detector_size = int(np.ceil(self.resize_val * np.sqrt(2.0)))
 
-            # sinogram_resize = np.zeros((self.theta, sinogram_size, self.Z), dtype=np.float32)
-            sinogram_resize = resize_skimage(sinogram_volume, (self.theta, sinogram_size, self.Z), preserve_range=True)
+        # ---------------------------------------------------------------
+        # Put the detector axis first:
+        #
+        #     (theta, Q, batch) -> (Q, theta, batch)
+        #
+        # Horizontal mode is already in this format.
+        # ---------------------------------------------------------------
+        if self.order_mode == Order_Modes.Vertical.value:
+            detector_first = np.moveaxis(
+                sinogram_batch,
+                1,
+                0,
+            )
+            return_vertical = True
 
         elif self.order_mode == Order_Modes.Horizontal.value:
+            detector_first = sinogram_batch
+            return_vertical = False
 
-            # sinogram_resize = np.zeros((sinogram_size, self.theta, self.Z), dtype=np.float32)
-            sinogram_resize = resize_skimage(sinogram_volume, (sinogram_size, self.theta, self.Z), preserve_range=True)
-        print("resized sinogram range: ", sinogram_resize.min(), sinogram_resize.max())
-        # for idx in tqdm.tqdm(range(self.Z)):
+        else:
+            raise ValueError(f"Unsupported order mode: {self.order_mode}")
 
-        #     if self.order_mode == Order_Modes.Vertical.value:
-        #         sinogram_resize[:, :, idx] = cv2.resize(
-        #             sinogram_volume[:, :, idx],
-        #             (sinogram_size, self.theta),
-        #             interpolation=cv2.INTER_NEAREST,
-        #         )
+        detector_size, theta, batch_size = detector_first.shape
 
-        #     elif self.order_mode == Order_Modes.Horizontal.value:
-        #         sinogram_resize[:, :, idx] = cv2.resize(
-        #             sinogram_volume[:, :, idx],
-        #             (self.theta, sinogram_size),
-        #             interpolation=cv2.INTER_NEAREST,
-        #         )
+        # Nothing needs to be resized.
+        if detector_size == target_detector_size:
+            return np.ascontiguousarray(
+                sinogram_batch,
+                dtype=np.float32,
+            )
 
+        # ---------------------------------------------------------------
+        # Convert:
+        #
+        #     (Q, theta, batch) -> (Q, theta * batch)
+        #
+        # The first dimension is the only dimension being resized.
+        # ---------------------------------------------------------------
+        resize_input = np.ascontiguousarray(
+            detector_first.reshape(
+                detector_size,
+                theta * batch_size,
+            )
+        )
 
+        # INTER_AREA is generally better and faster for downsampling.
+        # INTER_LINEAR is suitable for upsampling.
+        if target_detector_size < detector_size:
+            interpolation = cv2.INTER_AREA
+        else:
+            interpolation = cv2.INTER_LINEAR
 
-        return sinogram_resize
+        resized_2d = cv2.resize(
+            resize_input,
+            dsize=(
+                theta * batch_size,
+                target_detector_size,
+            ),
+            interpolation=interpolation,
+        )
+
+        # OpenCV may collapse dimensions in unusual single-column cases.
+        resized_2d = resized_2d.reshape(
+            target_detector_size,
+            theta * batch_size,
+        )
+
+        resized = resized_2d.reshape(
+            target_detector_size,
+            theta,
+            batch_size,
+        )
+
+        # Restore the original axis order.
+        if return_vertical:
+            resized = np.moveaxis(
+                resized,
+                0,
+                1,
+            )
+
+        return np.ascontiguousarray(
+            resized,
+            dtype=np.float32,
+        )
+
+    # def resize_batch(
+    #     self,
+    #     sinogram_batch: Union[np.ndarray, da.Array],
+    #     type_sino: str = "3D",
+    # ) -> np.ndarray:
+    #     """
+    #     Resize one sinogram batch along the detector axis only.
+
+    #     Expected input shapes
+    #     ---------------------
+    #     Vertical order:
+    #         (theta, Q, batch_size)
+
+    #     Horizontal order:
+    #         (Q, theta, batch_size)
+
+    #     Returns
+    #     -------
+    #     np.ndarray
+    #         Resized batch with dtype float32.
+
+    #         Vertical order:
+    #             (theta, resized_Q, batch_size)
+
+    #         Horizontal order:
+    #             (resized_Q, theta, batch_size)
+    #     """
+
+    #     if sinogram_batch.ndim != 3:
+    #         raise ValueError(f"Expected a 3D sinogram batch, but received " f"shape {sinogram_batch.shape}.")
+
+    #     # Compute only the selected batch, not the complete Dask volume.
+    #     if isinstance(sinogram_batch, da.Array):
+    #         sinogram_batch = sinogram_batch.compute()
+
+    #     # Avoid float64 output and reduce memory usage.
+    #     sinogram_batch = np.asarray(
+    #         sinogram_batch,
+    #         dtype=np.float32,
+    #         order="C",
+    #     )
+
+    #     if self.clip_to_circle:
+    #         sinogram_size = int(self.resize_val)
+    #     else:
+    #         sinogram_size = int(np.ceil(self.resize_val * np.sqrt(2)))
+
+    #     if self.order_mode == Order_Modes.Vertical.value:
+    #         theta, detector_size, batch_size = sinogram_batch.shape
+
+    #         output_shape = (
+    #             theta,
+    #             sinogram_size,
+    #             batch_size,
+    #         )
+
+    #     elif self.order_mode == Order_Modes.Horizontal.value:
+    #         detector_size, theta, batch_size = sinogram_batch.shape
+
+    #         output_shape = (
+    #             sinogram_size,
+    #             theta,
+    #             batch_size,
+    #         )
+
+    #     else:
+    #         raise ValueError(f"Unsupported order mode: {self.order_mode}")
+
+    #     sinogram_resize = resize_skimage(
+    #         sinogram_batch,
+    #         output_shape=output_shape,
+    #         order=1,
+    #         mode="edge",
+    #         preserve_range=True,
+    #         anti_aliasing=sinogram_size < detector_size,
+    #     )
+
+    #     return sinogram_resize.astype(
+    #         np.float32,
+    #         copy=False,
+    #     )
 
     def reconstruct(self, sinogram: np.ndarray):
         """Reconstruct a sinogram using the selected method.
@@ -766,13 +753,13 @@ class OPTProcessor:
         self.angles_torch = np.linspace(0, rotation_factor * np.pi, self.theta, endpoint=False)
         self.angles = np.linspace(0, rotation_factor * 180, self.theta, endpoint=False)
 
-
         if self.iradon_functor == None:
             try:
                 self.angles_torch = np.linspace(0, rotation_factor * np.pi, self.theta, endpoint=False)
                 self.iradon_functor = radon_thrad(
                     thetas=self.angles_torch,
                     circle=self.clip_to_circle,
+                    ratio_circle=self.ratio_circle,
                     filter_name=None if self.use_filter == False else self.filter_FBP,
                     device=device,
                 )
@@ -784,6 +771,7 @@ class OPTProcessor:
             self.iradon_functor = radon_thrad(
                 thetas=self.angles_torch,
                 circle=self.clip_to_circle,
+                ratio_circle=self.ratio_circle,
                 filter_name=None if self.use_filter == False else self.filter_FBP,
                 device=device,
             )
@@ -827,14 +815,12 @@ class OPTProcessor:
                 "init_method": "xavier",
                 "device": device,
             }
-
             self.tomodl_dictionary = {
                 "use_torch_radon": True,
                 "metric": "psnr",
                 "K_iterations": self.iterations,
-                "number_projections_total": sinogram.shape[0],
-                "acceleration_factor": 10,
-                "image_size": sinogram.shape[1],
+                "number_projections": sinogram.shape[1],
+                "acceleration_factor": 20,
                 "lambda": 0.5,
                 "is_half_rotation": self.is_half_rotation,
                 "use_shared_weights": True,
@@ -843,38 +829,36 @@ class OPTProcessor:
                 "in_channels": 1,
                 "out_channels": 1,
                 "device": device,
-                "iter_conjugate": 10,
+                "iter_conjugate": 5,
             }
 
             self.iradon_functor = ToMoDL(self.tomodl_dictionary)
 
             __location__ = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)))
-            # artifact_path = os.path.join(__location__, "modl_dark_unnormal.ckpt")
-            # artifact_path = os.path.join(__location__, "tomodl256_3.ckpt")
-            artifact_path = os.path.join(__location__, "weights_tomodl100.ckpt")
-            tomodl_checkpoint = torch.load(artifact_path, map_location=torch.device("cuda:0"), weights_only=True)
+            if sinogram.shape[0] <= 256:
+                artifact_path = os.path.join(__location__, "tomodl100_state_dict.ckpt")
+            else:
+                # artifact_path = os.path.join(__location__, "tomodl100_state_dict.ckpt")
+                artifact_path = os.path.join(__location__, "tomodl500_sd.ckpt")
 
-            ########################### old weight loading ############################
+            tomodl_checkpoint = torch.load(artifact_path, map_location=device, weights_only=True)
             # tomodl_checkpoint["state_dict"] = {
-            #     k.replace("model.", ""): v for (k, v) in tomodl_checkpoint["state_dict"].items()
+            #     k.replace("model.", ""): v for k, v in tomodl_checkpoint["state_dict"].items()
             # }
-
-            # self.iradon_functor.load_state_dict(
-            #     dict(filter(my_filtering_function, tomodl_checkpoint["state_dict"].items()))
-            # )
-            ############################# fix lambda weight loading ############################
-            tomodl_checkpoint = {
-                k.replace("model.", ""): v for k, v in tomodl_checkpoint.items()
-            }
-            # tomodl_checkpoint["state_dict"] = dict(filter(my_filtering_function, tomodl_checkpoint["state_dict"].items()))
-            self.iradon_functor.load_state_dict(tomodl_checkpoint, strict=False)
+            self.iradon_functor.load_state_dict(tomodl_checkpoint, strict=True)
+            self.iradon_functor.to(device)
             self.iradon_functor.eval()
             # print(sinogram.shape)
-            # print("lambda is: ", self.iradon_functor.lam)
-            #######################################################################################
+            if sinogram.shape[0] > 256:
+                original_lam = self.iradon_functor.lam.item()
+                self.iradon_functor.lam = torch.nn.Parameter(
+                    torch.tensor([original_lam * (sinogram.shape[0] / 512)], requires_grad=False, device=device)
+                )
+                print("lambda is: ", self.iradon_functor.lam)
 
-            radon24 = radon_thrad(self.angles_torch, circle=self.clip_to_circle, filter_name=None, device=device)
-
+            radon24 = radon_thrad(
+                self.angles_torch, circle=self.clip_to_circle, ratio_circle=1, filter_name=None, device=device
+            )
 
             # the self.iradon_functor receive a reconstructed image (B, 1, Q, Q)
             # the input is a sinogram (B, 1, Q, theta)
@@ -891,20 +875,39 @@ class OPTProcessor:
 
                     mean_reconstruction = torch.from_numpy(mean_reconstruction)
                     std_reconstruction = torch.from_numpy(std_reconstruction)
-                    # median filter the reconstruction 
-                    reconstruction = normalize_images(reconstruction)  
+                    # median filter the reconstruction
+                    reconstruction = normalize_images_zscore(reconstruction)
                     # median filter the reconstruction
                     output = self.iradon_functor(reconstruction)[
                         "dc" + str(self.tomodl_dictionary["K_iterations"])
                     ].cpu()
-                    output = normalize_images(output)
-                    # undo the normalization with mean and std of reconstruction
-                    output = output * std_reconstruction.unsqueeze(1).unsqueeze(1) + mean_reconstruction.unsqueeze(1).unsqueeze(1)
+                    output = normalize_images_zscore(output)
+                    # # undo the normalization with mean and std of reconstruction
+                    output = output * std_reconstruction.unsqueeze(1).unsqueeze(1) + mean_reconstruction.unsqueeze(
+                        1
+                    ).unsqueeze(1)
                     # output shape (B, 1, Q, Q)
                     output = np.asarray(output.numpy())
+                    # if self.clip_to_circle:
+                    #     det_count = sino.shape[2]
+                    #     # create grid
+                    #     grid_y, grid_x = np.meshgrid(
+                    #         np.linspace(-1, 1, det_count), np.linspace(-1, 1, det_count), indexing="ij"
+                    #     )
+                    #     # create circle mask
+                    #     reconstruction_circle = (grid_x**2 + grid_y**2) <= self.ratio_circle**2
+                    #     # expand to batch dimension (like repeat in torch)
+                    #     reconstructed_circle = np.repeat(
+                    #         reconstruction_circle[None, None, :, :], output.shape[0], axis=0  # shape (1,1,H,W)
+                    #     )
+                    #     real_output = np.zeros((output.shape[0], output.shape[1], det_count, det_count))
+                    #     start_idx = (det_count - output.shape[2]) // 2
+                    #     end_idx = start_idx + output.shape[2]
+                    #     real_output[:, :, start_idx:end_idx, start_idx:end_idx] = output
+                    #     real_output[reconstructed_circle == 0] = 0
+                    #     output = real_output
                     # print("mean and std of reconstruction: ", output[0, 0, :, :].mean(), output[0, 0, :, :].std())
                     output = output.transpose(1, 2, 3, 0)[0]
-
 
                     return output
 
@@ -927,9 +930,8 @@ class OPTProcessor:
                 "use_torch_radon": True,
                 "metric": "psnr",
                 "K_iterations": self.iterations,
-                "number_projections_total": sinogram.shape[0],
-                "acceleration_factor": 10,
-                "image_size": sinogram.shape[1],
+                "number_projections": sinogram.shape[1],
+                "acceleration_factor": 20,
                 "lambda": 0.5,
                 "is_half_rotation": self.is_half_rotation,
                 "use_shared_weights": True,
@@ -938,24 +940,30 @@ class OPTProcessor:
                 "in_channels": 1,
                 "out_channels": 1,
                 "device": torch.device("cpu"),
-                "iter_conjugate": 10,
+                "iter_conjugate": 5,
             }
 
             self.iradon_functor = ToMoDL(self.tomodl_dictionary)
+
             __location__ = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)))
-            # artifact_path = os.path.join(__location__, "tomodl256_3.ckpt")
-            artifact_path = os.path.join(__location__, "weights_tomodl100.ckpt")
+            if sinogram.shape[0] < 256:
+                artifact_path = os.path.join(__location__, "tomodl100_state_dict.ckpt")
+            else:
+
+                artifact_path = os.path.join(__location__, "tomodl500_sd.ckpt")
             tomodl_checkpoint = torch.load(artifact_path, map_location=torch.device("cpu"), weights_only=True)
 
-            tomodl_checkpoint= {
-                k.replace("model.", ""): v for (k, v) in tomodl_checkpoint.items()
-            }
-
-            self.iradon_functor.load_state_dict(
-                dict(filter(my_filtering_function, tomodl_checkpoint.items()))
-            )
+            self.iradon_functor.load_state_dict(tomodl_checkpoint, strict=True)
+            self.iradon_functor.to(torch.device("cpu"))
             self.iradon_functor.eval()
-            radon24 = radon_thrad(self.angles_torch, circle=self.clip_to_circle, filter_name=None, device="cpu")
+
+            radon24 = radon_thrad(
+                self.angles_torch,
+                circle=self.clip_to_circle,
+                ratio_circle=1,
+                filter_name=None,
+                device="cpu",
+            )
 
             def _iradon(sino):
                 with torch.inference_mode():
@@ -970,20 +978,20 @@ class OPTProcessor:
 
                     mean_reconstruction = torch.from_numpy(mean_reconstruction)
                     std_reconstruction = torch.from_numpy(std_reconstruction)
-                    # median filter the reconstruction 
-                    reconstruction = normalize_images(reconstruction)  
+                    # median filter the reconstruction
+                    reconstruction = normalize_images_zscore(reconstruction)
                     # median filter the reconstruction
                     output = self.iradon_functor(reconstruction)[
                         "dc" + str(self.tomodl_dictionary["K_iterations"])
-                    ]
-                    output = normalize_images(output)
-                    # undo the normalization with mean and std of reconstruction
-                    output = output * std_reconstruction.unsqueeze(1).unsqueeze(1) + mean_reconstruction.unsqueeze(1).unsqueeze(1)
+                    ].cpu()
+                    output = normalize_images_zscore(output)
+                    # # undo the normalization with mean and std of reconstruction
+                    output = output * std_reconstruction.unsqueeze(1).unsqueeze(1) + mean_reconstruction.unsqueeze(
+                        1
+                    ).unsqueeze(1)
                     # output shape (B, 1, Q, Q)
                     output = np.asarray(output.numpy())
-                    # print("mean and std of reconstruction: ", output[0, 0, :, :].mean(), output[0, 0, :, :].std())
                     output = output.transpose(1, 2, 3, 0)[0]
-
 
                     return output
 
@@ -1014,88 +1022,180 @@ class OPTProcessor:
             )[0][..., None]
 
         elif self.rec_process == Rec_Modes.UNET_GPU.value:
-            radon24 = radon_thrad(self.angles_torch, circle=self.clip_to_circle, filter_name=None, device=device)
 
-            self.iradon_functor = UNet(
-                n_channels=1, n_classes=1, residual=True, up_conv=True, batch_norm=True, batch_norm_inconv=True
-            ).to(device)
-            # TODO: load the weights of the unet
+            resnet_options_dict = {
+                "number_layers": 8,
+                "kernel_size": 3,
+                "features": 64,
+                "in_channels": 1,
+                "out_channels": 1,
+                "stride": 1,
+                "use_batch_norm": True,
+                "init_method": "xavier",
+                "device": device,
+            }
+
+            self.tomodl_dictionary = {
+                "use_torch_radon": True,
+                "metric": "psnr",
+                "K_iterations": self.iterations,
+                "number_projections": sinogram.shape[1],
+                "acceleration_factor": 20,
+                "lambda": 0.5,
+                "is_half_rotation": self.is_half_rotation,
+                "use_shared_weights": True,
+                "denoiser_method": "U-Net",
+                "resnet_options": resnet_options_dict,
+                "in_channels": 1,
+                "out_channels": 1,
+                "device": device,
+                "iter_conjugate": 5,
+            }
+            self.iradon_functor = ToMoDL(self.tomodl_dictionary)
+
+            __location__ = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)))
+            if sinogram.shape[0] <= 128:
+                artifact_path = os.path.join(__location__, "tomodl128_Unet_sd.ckpt")
+            elif 128 < sinogram.shape[0] <= 256:
+                artifact_path = os.path.join(__location__, "tomodl256_Unet_sd.ckpt")
+            else:
+                artifact_path = os.path.join(__location__, "tomodl512_Unet_sd.ckpt")
+            tomodl_checkpoint = torch.load(artifact_path, map_location=device, weights_only=True)
+
+            # tomodl_checkpoint["state_dict"] = {
+            #     k.replace("model.", ""): v for k, v in tomodl_checkpoint["state_dict"].items()
+            # }
+            self.iradon_functor.load_state_dict(tomodl_checkpoint, strict=True)
+            self.iradon_functor.to(device)
+            self.iradon_functor.eval()
+
+            radon24 = radon_thrad(
+                self.angles_torch, circle=self.clip_to_circle, ratio_circle=1, filter_name=None, device=device
+            )
 
             def _iradon(sino):
-                sino = sino.transpose(2, 0, 1)
-                sino = torch.from_numpy(sino[:, None, :, :]).to(device)
-                # sino = ramp_filter_torch(sino, device=device)
-                reconstruction = radon24.filter_backprojection(sino)
-                output = self.iradon_functor(reconstruction).detach().cpu()
-                output = np.asarray(output.numpy())
-                return output.transpose(1, 2, 3, 0)[0]
+                with torch.inference_mode():
+                    sino = sino.transpose(2, 0, 1)
+                    sino = torch.from_numpy(sino[:, None, :, :]).to(device)
+                    sino = ramp_filter_torch(sino, device=device)
+                    reconstruction = radon24.filter_backprojection(sino)
+                    # save mean and std of reconstruction for each image in the batch
+                    # make reconstruction to cpu to apply median filter
+                    reconstruction_new = reconstruction.clone().cpu().numpy()
+                    mean_reconstruction, std_reconstruction = mean_std_median_filter(reconstruction_new)
+
+                    mean_reconstruction = torch.from_numpy(mean_reconstruction)
+                    std_reconstruction = torch.from_numpy(std_reconstruction)
+                    # median filter the reconstruction
+                    reconstruction = normalize_images_zscore(reconstruction)
+                    # median filter the reconstruction
+                    output = self.iradon_functor(reconstruction)[
+                        "dc" + str(self.tomodl_dictionary["K_iterations"])
+                    ].cpu()
+                    output = normalize_images_zscore(output)
+                    # # undo the normalization with mean and std of reconstruction
+                    output = output * std_reconstruction.unsqueeze(1).unsqueeze(1) + mean_reconstruction.unsqueeze(
+                        1
+                    ).unsqueeze(1)
+                    # output shape (B, 1, Q, Q)
+                    output = np.asarray(output.numpy())
+                    output = output.transpose(1, 2, 3, 0)[0]
+
+                    return output
 
             self.iradon_function = _iradon
 
         elif self.rec_process == Rec_Modes.UNET_CPU.value:
-            radon24 = radon_thrad(self.angles_torch, circle=self.clip_to_circle, filter_name=None, device="cpu")
-            self.iradon_functor = UNet(
-                n_channels=1, n_classes=1, residual=True, up_conv=True, batch_norm=True, batch_norm_inconv=True
-            ).to("cpu")
-            # TODO: load the weights of the unet
+            resnet_options_dict = {
+                "number_layers": 8,
+                "kernel_size": 3,
+                "features": 64,
+                "in_channels": 1,
+                "out_channels": 1,
+                "stride": 1,
+                "use_batch_norm": True,
+                "init_method": "xavier",
+                "device": torch.device("cpu"),
+            }
+
+            self.tomodl_dictionary = {
+                "use_torch_radon": True,
+                "metric": "psnr",
+                "K_iterations": self.iterations,
+                "number_projections": sinogram.shape[1],
+                "acceleration_factor": 20,
+                "lambda": 0.5,
+                "is_half_rotation": self.is_half_rotation,
+                "use_shared_weights": True,
+                "denoiser_method": "U-Net",
+                "resnet_options": resnet_options_dict,
+                "in_channels": 1,
+                "out_channels": 1,
+                "device": torch.device("cpu"),
+                "iter_conjugate": 5,
+            }
+
+            self.iradon_functor = ToMoDL(self.tomodl_dictionary)
+
+            __location__ = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)))
+            if sinogram.shape[0] <= 128:
+                artifact_path = os.path.join(__location__, "tomodl128_Unet_sd.ckpt")
+            elif 128 < sinogram.shape[0] <= 256:
+                artifact_path = os.path.join(__location__, "tomodl256_Unet_sd.ckpt")
+            else:
+                artifact_path = os.path.join(__location__, "tomodl512_Unet_sd.ckpt")
+            tomodl_checkpoint = torch.load(artifact_path, map_location=torch.device("cpu"), weights_only=True)
+
+            # tomodl_checkpoint["state_dict"] = {
+            #     k.replace("model.", ""): v for k, v in tomodl_checkpoint["state_dict"].items()
+            # }
+            self.iradon_functor.load_state_dict(tomodl_checkpoint, strict=True)
+            self.iradon_functor.to(torch.device("cpu"))
+            self.iradon_functor.eval()
+
+            radon24 = radon_thrad(
+                self.angles_torch,
+                circle=self.clip_to_circle,
+                ratio_circle=1,
+                filter_name=None,
+                device="cpu",
+            )
 
             def _iradon(sino):
-                sino = sino.transpose(2, 0, 1)
-                sino = torch.from_numpy(sino[:, None, :, :])
-                # sino = ramp_filter_torch(sino, device="cpu")
-                reconstruction = radon24.filter_backprojection(sino)
-                output = self.iradon_functor(reconstruction).detach().cpu()
-                output = np.asarray(output.numpy())
-                return output.transpose(1, 2, 3, 0)[0]
+                with torch.inference_mode():
+                    sino = sino.transpose(2, 0, 1)
+                    sino = torch.from_numpy(sino[:, None, :, :])
+                    sino = ramp_filter_torch(sino, device="cpu")
+                    reconstruction = radon24.filter_backprojection(sino)
+                    # save mean and std of reconstruction for each image in the batch
+                    # make reconstruction to cpu to apply median filter
+                    reconstruction_new = reconstruction.clone().numpy()
+                    mean_reconstruction, std_reconstruction = mean_std_median_filter(reconstruction_new)
+
+                    mean_reconstruction = torch.from_numpy(mean_reconstruction)
+                    std_reconstruction = torch.from_numpy(std_reconstruction)
+                    # median filter the reconstruction
+                    reconstruction = normalize_images_zscore(reconstruction)
+                    # median filter the reconstruction
+                    output = self.iradon_functor(reconstruction)[
+                        "dc" + str(self.tomodl_dictionary["K_iterations"])
+                    ].cpu()
+                    output = normalize_images_zscore(output)
+                    # # undo the normalization with mean and std of reconstruction
+                    output = output * std_reconstruction.unsqueeze(1).unsqueeze(1) + mean_reconstruction.unsqueeze(
+                        1
+                    ).unsqueeze(1)
+                    # output shape (B, 1, Q, Q)
+                    output = np.asarray(output.numpy())
+                    output = output.transpose(1, 2, 3, 0)[0]
+
+                    return output
+
             self.iradon_function = _iradon
 
-
         reconstruction = self.iradon_function(sinogram)
-        
-        if self.invert_color == True:
-            reconstruction = reconstruction.max() - reconstruction
+
+        # if self.invert_color == True:
+        #     reconstruction = reconstruction.max() - reconstruction
 
         return reconstruction
-
-    # def correct_and_reconstruct(self, sinogram: np.ndarray, type_sino="3D"):
-    #     """
-    #     Corrects rotation axis by finding optimal registration via maximising reconstructed image's intensity variance.
-
-    #     Based on 'Walls, J. R., Sled, J. G., Sharpe, J., & Henkelman, R. M. (2005). Correction of artefacts in optical projection tomography. Physics in Medicine & Biology, 50(19), 4645.'
-
-    #     Params:
-    #     - sinogram
-    #     """
-
-    #     while self.shift_step >= 1:
-    #         shifts = np.arange(-self.max_shift, self.max_shift, self.shift_step) + self.center_shift
-    #         image_std = []
-    #         for i, shift in enumerate(shifts):
-    #             if self.order_mode == Order_Modes.Vertical.value and type_sino == "3D":
-    #                 shift_tuple = (0, shift, 0)
-    #             elif self.order_mode == Order_Modes.Horizontal.value or type_sino == "2D":
-    #                 shift_tuple = (shift, 0, 0)
-
-    #             sino_shift = ndi.shift(sinogram, shift_tuple, mode="nearest")
-
-    #             # Get image reconstruction
-    #             shift_iradon = self.reconstruct(sino_shift)
-
-    #             # Calculate variance
-    #             image_std.append(np.std(shift_iradon))
-
-    #         # Update shifts
-    #         self.center_shift = shifts[np.argmax(image_std)]
-    #         self.max_shift /= 5
-    #         self.shift_step /= 2.5
-    #         if self.order_mode == Order_Modes.Vertical.value and type_sino == "3D":
-    #             sinogram = ndi.shift(sinogram, (0, self.center_shift, 0), mode="nearest")
-    #         elif self.order_mode == Order_Modes.Horizontal.value or type_sino == "2D":
-    #             sinogram = ndi.shift(sinogram, (self.center_shift, 0, 0), mode="nearest")
-
-    #     # Restart shifts
-    #     self.max_shift = 200
-    #     self.shift_step = 10
-    #     self.center_shift = 0
-    #     return self.reconstruct(sinogram)
-

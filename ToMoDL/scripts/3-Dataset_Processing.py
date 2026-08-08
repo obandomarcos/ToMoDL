@@ -1,7 +1,7 @@
-'''
+"""
 Processes datasets for different acceleration factors
 author: obanmarcos
-'''
+"""
 
 from config import *
 from concurrent.futures import process
@@ -18,6 +18,7 @@ from utilities import dataloading_utilities as dlutils
 from utilities.folders import *
 from torch.utils.data import DataLoader, ConcatDataset
 
+
 def process_datasets(args_options):
 
     folder_paths = [
@@ -33,39 +34,38 @@ def process_datasets(args_options):
     ]
 
     zebra_dataset_dict = {
-        "dataset_folder": f"{dataset_path}full_fish_100_vs6_unfiltered_sino",
+        "dataset_folder": f"{dataset_path}full_fish_128",
         "experiment_name": "Bassi",
-        "img_resize": 100,
+        "img_resize": 128,
         "load_shifts": False,
         "save_shifts": True,
         "number_projections_total": 720,
-        "number_projections_undersampled": 72,
+        "acceleration_factor": 20,
         "batch_size": 5,
         "sampling_method": "equispaced-linear",
-        "acceleration_factor": 20,
     }
 
     # 1 - Load datasets
     # 1a - Check ZebraDataset writing of x10 acceleration factor
-    for acceleration_factor in args_options['acc_factors']:
+    for acceleration_factor in args_options["acc_factors"]:
 
-        zebra_dataset_dict['acceleration_factor'] = acceleration_factor
-        zebra_dataset_dict['number_projections_undersampled'] = zebra_dataset_dict['number_projections_total']//zebra_dataset_dict['acceleration_factor']
+        zebra_dataset_dict["acceleration_factor"] = acceleration_factor
 
         for folder in folder_paths:
 
             # zebra_dataset_dict['dataset_folder'] = folder
-            zebra_dataset_dict['folder_path'] = folder
+            zebra_dataset_dict["folder_path"] = folder
             zebra_dataset_test = dlutils.DatasetProcessor(zebra_dataset_dict)
 
             del zebra_dataset_test
 
-if __name__ == '__main__':
-    
-    '''
+
+if __name__ == "__main__":
+
+    """
     To-Do: ArgParsing
-    '''
+    """
     args_options = {}
-    args_options['acc_factors'] = [20]
+    args_options["acc_factors"] = [20]
 
     process_datasets(args_options)

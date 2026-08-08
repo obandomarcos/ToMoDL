@@ -20,7 +20,12 @@ from torch.utils.data import DataLoader, ConcatDataset, random_split
 
 import lightning as pl
 from lightning.pytorch.loggers import WandbLogger
-from lightning.pytorch.callbacks import ModelCheckpoint, StochasticWeightAveraging, GradientAccumulationScheduler
+from lightning.pytorch.callbacks import (
+    ModelCheckpoint,
+    StochasticWeightAveraging,
+    GradientAccumulationScheduler,
+    LearningRateMonitor,
+)
 
 import wandb
 
@@ -102,10 +107,10 @@ class TrainerSystem:
         if self.track_checkpoints == True:
 
             # Default checkpoints
-            val_psnr_checkpoint_callback = ModelCheckpoint(monitor="val_psnr", mode="max", save_last=True)
-            val_ssim_checkpoint_callback = ModelCheckpoint(monitor="val/ssim", mode="max")
-
-            self.lightning_trainer_dict["callbacks"] += [val_psnr_checkpoint_callback, val_ssim_checkpoint_callback]
+            val_psnr_checkpoint_callback = ModelCheckpoint(monitor="val_psnr", mode="max", save_top_k=5)
+            # val_l1_checkpoint_callback = ModelCheckpoint(monitor="val_l1_loss", mode="min", save_top_k=10)
+            LearningRateMonitor_callback = LearningRateMonitor(logging_interval="epoch")
+            self.lightning_trainer_dict["callbacks"] += [val_psnr_checkpoint_callback, LearningRateMonitor_callback]
 
         self.create_trainer()
 
@@ -158,8 +163,7 @@ class TrainerSystem:
         self.save_shifts = kwdict["save_shifts"]
         self.number_projections_total = kwdict["number_projections_total"]
         self.acceleration_factor = kwdict["acceleration_factor"]
-        self.number_projections_undersampled = self.number_projections_total // self.acceleration_factor
-
+        self.image_size = kwdict["image_size"]
         self.use_subset_by_part = kwdict["use_subset_by_part"]
 
         # Dataset splitting (fraction)
@@ -216,7 +220,6 @@ class TrainerSystem:
         self.model_system_dict["max_epochs"] = self.lightning_trainer_dict["max_epochs"]
         self.loss_method = kwdict["loss_dict"]["loss_name"]
         # just for making name in wandb to be unique
-        self.image_size = kwdict["kw_dictionary_modl"]["image_size"]
 
     def print_check_datasets(self):
 

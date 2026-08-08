@@ -29,36 +29,40 @@ https://napari.org/stable/plugins/index.html
 1. **Load ordered stack**  
 ![plot](https://raw.githubusercontent.com/obandomarcos/ToMoDL/refs/heads/nhattm/tomopari/figures/stack_image.png)
 
-   Go to **File → Open Files as Stack...** and load the angular projections for parallel beam optical tomography reconstruction.
-   
-   After loading, the stack of θ-angular projection images should have shape of $N_{angles} × det_h × det_w$, where:
+Go to **File → Open Files as Stack...** and load the angular projections for parallel beam optical tomography reconstruction.
 
-   - $N_{angles}$ is the number of projection views (one image per rotation angle θ),
-   - $det_h$ is the detector height (vertical pixel dimension),
-   - $det_w$ is the detector width (horizontal pixel dimension).
+After loading, the stack of `θ`-angular projection images should have shape `(N_angles × H × W)`
+
+where:
+
+- `N_angles`: number of projection views (one image per rotation angle `θ`),
+- `H`: detector height (vertical pixel dimension),
+- `W`: detector width (horizontal pixel dimension).
+
 2. **Select image layer**  
-![plot](https://raw.githubusercontent.com/obandomarcos/ToMoDL/refs/heads/nhattm/tomopari/figures/select_layer.png) 
+![plot](https://raw.githubusercontent.com/obandomarcos/ToMoDL/refs/heads/nhattm/tomopari/figures/select_layer.png)
 
-   In the dropdown menu, click **Select image layer** and choose the loaded volume.  
+In the dropdown menu, click **Select image layer** and choose the loaded volume.
 
-<!--  make this line be bigger and bold -->
-<h3>From here you can choose between two reconstruction modes: Basic and Advanced.</h3>
+---
+
+### <span style="font-size:1.2em;"><strong>From here you can choose between two reconstruction modes: Basic and Advanced.</strong></span>
 
 ### 🔹 Basic Mode
-![plot](https://raw.githubusercontent.com/obandomarcos/ToMoDL/refs/heads/nhattm/tomopari/figures/basic_mode.png)  
+![plot](https://raw.githubusercontent.com/obandomarcos/ToMoDL/refs/heads/nhattm/tomopari/figures/basic_mode.png)
 
 3. **Half-rotation**  
-   - Click **Half rotation** if your projection data were acquired from 0° to 180°.  
-   - Leave it unchecked if data were acquired from 0° to 360°.
+- Click **Half rotation** if your projection data were acquired from 0° to 180°.  
+- Leave it unchecked if data were acquired from 0° to 360°.
 
 4. **Automatic axis alignment**  
-   If the rotation axis is not correctly aligned during acquisition, enable **Automatic axis alignment**.  This aligns the sinogram to the detector center using the [Wall-method].
+If the rotation axis is not correctly aligned during acquisition, enable **Automatic axis alignment**. This aligns the sinogram to the detector center using the [Wall-method].
 
 5. **Compression**  
    Compression affects the detector dimension differently depending on the acquisition mode:
 
-   - Vertical-axis mode → the $det_w$ will be resized
-   - Horizontal-axis mode → the $det_h$ will be resized
+   - Vertical-axis mode → the `W` will be resized
+   - Horizontal-axis mode → the `H` will be resized
 
    Available compression levels:
    - **HIGH** → resize to 100  
@@ -80,15 +84,15 @@ https://napari.org/stable/plugins/index.html
 
 8. **Rotation axis**  
    Select how your data is organized with respect to the rotation axis:
-   - **Vertical** → rotation axis parallel to $det_h$
-   - **Horizontal** → rotation axis parallel to $det_w$
+   - **Vertical** → rotation axis parallel to `H`
+   - **Horizontal** → rotation axis parallel to `W`
 ---
 
 ### 🔹 Advanced Mode
 ![plot](https://raw.githubusercontent.com/obandomarcos/ToMoDL/refs/heads/nhattm/tomopari/figures/advanced_mode.png)
 
 9. **Manual axis alignment**  
-   Shift the object along $det_w$ in vertical mode, and along $det_h$ in horizontal mode. 
+   Shift the object along `W` in vertical mode, and along `H` in horizontal mode. 
    - Negative values → shift left (toward lower pixel indices)
    - Positive values → shift right (toward higher pixel indices)
 

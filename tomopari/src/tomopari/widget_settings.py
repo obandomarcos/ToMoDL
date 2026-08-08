@@ -3,30 +3,35 @@
 Created on Tue Jan 25 16:34:41 2022
 @author: Andrea Bassi @ Polimi
 """
+
 from qtpy.QtWidgets import QLabel, QFormLayout, QSpinBox, QDoubleSpinBox, QCheckBox, QComboBox
 from qtpy.QtCore import Qt
 from enum import Enum, EnumMeta
 
-class Settings():
-    '''
-    Auxiliary class to create an numerical or boolean attribute 
+
+class Settings:
+    """
+    Auxiliary class to create an numerical or boolean attribute
     with a corresponding Qwidget (QSpinBox, QDoubleSpinBox or QCheckBox),
-    and update its value as a property (self.val). 
-    '''
-    
-    def __init__(self, name ='setting_name',
-                 dtype = int,
-                 initial = 0,
-                 vmin = 0,
-                 vmax = 2**16-1,
-                 spinbox_decimals=3,
-                 spinbox_step=0.05,
-                 width = 150,
-                 unit = '',
-                 layout = None,
-                 write_function = None,
-                 read_function = None):
-        '''
+    and update its value as a property (self.val).
+    """
+
+    def __init__(
+        self,
+        name="setting_name",
+        dtype=int,
+        initial=0,
+        vmin=0,
+        vmax=2**16 - 1,
+        spinbox_decimals=3,
+        spinbox_step=0.05,
+        width=150,
+        unit="",
+        layout=None,
+        write_function=None,
+        read_function=None,
+    ):
+        """
         Parameters
         ----------
         name : str
@@ -53,8 +58,8 @@ class Settings():
             Function/method that is executed on value change of the QWidget
         read_function : function or method
             not implemented
-        '''
-        self.name= name
+        """
+        self.name = name
         self._val = initial
         self.dtype = dtype
         self.spinbox_decimals = spinbox_decimals
@@ -63,21 +68,21 @@ class Settings():
         self.write_function = write_function
         # self.read_function = read_function
         self.create_spin_box(layout, dtype, vmin, vmax, unit, width)
-        
+
     def __repr__(self):
-        return f'{self.name} : {self._val}'
-        
-    @property    
+        return f"{self.name} : {self._val}"
+
+    @property
     def val(self):
         self._val = self.get_func()
-        return self.dtype(self._val) 
-    
-    @val.setter 
+        return self.dtype(self._val)
+
+    @val.setter
     def val(self, new_val):
         new_val = self.dtype(new_val)
         self.set_func(new_val)
         self._val = new_val
-        
+
     def create_spin_box(self, layout, dtype, vmin, vmax, unit, width):
         name = self.name
         val = self._val
@@ -96,19 +101,22 @@ class Settings():
             sbox.setSingleStep(self.spinbox_step)
             sbox.setMaximum(vmax)
             sbox.setMinimum(vmin)
-            sbox.setSuffix(' '+unit)
+            sbox.setSuffix(" " + unit)
             self.set_func = sbox.setValue
             self.get_func = sbox.value
             change_func = sbox.valueChanged
             sbox.setFixedWidth(width)
         elif dtype == bool:
             sbox = QCheckBox()
+
             self.set_func = sbox.setChecked
-            self.get_func = sbox.checkState
-            change_func = sbox.stateChanged
-        
-        else: raise(TypeError( 'Specified setting type not supported'))
-        
+            self.get_func = sbox.isChecked
+
+            change_func = sbox.toggled
+
+        else:
+            raise (TypeError("Specified setting type not supported"))
+
         self.set_func(val)
         if self.write_function is not None:
             change_func.connect(self.write_function)
@@ -116,30 +124,34 @@ class Settings():
         settingLayout.setFormAlignment(Qt.AlignLeft)
         lab = QLabel(name)
         lab.setWordWrap(False)
-        settingLayout.addRow(sbox,lab)
+        settingLayout.addRow(sbox, lab)
         layout.addLayout(settingLayout)
-        self.sbox = sbox 
-    
-    def set_min_max(self, vmin = 0, vmax = 3):
+        self.sbox = sbox
+
+    def set_min_max(self, vmin=0, vmax=3):
         vmax = self.dtype(vmax)
         vmin = self.dtype(vmin)
         self.sbox.setMaximum(vmax)
         self.sbox.setMinimum(vmin)
 
 
-class Combo_box():
-    '''
-    Auxiliary class to create an combobox. 
-    '''
-    def __init__(self, name ='combo name',
-                 initial = '_',
-                 choices = ['_','one','two'],
-                 userdata = [],
-                 layout = None,
-                 width = 150,
-                 write_function = None,
-                 read_function = None):
-        '''
+class Combo_box:
+    """
+    Auxiliary class to create an combobox.
+    """
+
+    def __init__(
+        self,
+        name="combo name",
+        initial="_",
+        choices=["_", "one", "two"],
+        userdata=[],
+        layout=None,
+        width=150,
+        write_function=None,
+        read_function=None,
+    ):
+        """
         Parameters
         ----------
         name : str
@@ -159,67 +171,67 @@ class Combo_box():
             Function/method that is executed on value change of the combobox
         read_function : function or method
             not implemented
-        '''
+        """
         self.name = name
         self.write_function = write_function
         self.create_combo_box(name, choices, userdata, width, layout)
         self.choices = choices
-    
-    @property    
+    @property
     def val(self):
         return self.combo.currentIndex()
-    
-    @property    
+
+    @property
     def text(self):
         _text = self.combo.currentText()
-        return str(_text) 
-    
-    @property 
+        return str(_text)
+
+    @property
     def current_data(self):
-            _data = self.combo.currentData()
-            return _data    
-       
+        _data = self.combo.currentData()
+        return _data
+
     def create_combo_box(self, name, choices, userdata, width, layout):
         combo = QComboBox()
-        if type(choices) is list:  
+        if type(choices) is list:
             choices_names = choices
         elif type(choices) is EnumMeta:
             choices_names = choices._member_names_
             userdata = list(choices._value2member_map_.keys())
-        assert len(userdata) in (0,len(choices_names)), f'Uncorrect userdata in {self.name} Combobox'    
+        assert len(userdata) in (0, len(choices_names)), f"Uncorrect userdata in {self.name} Combobox"
         for idx, choice in enumerate(choices_names):
-            shown_text = choice.replace('_',' ')
+            shown_text = choice.replace("_", " ")
             if len(userdata) == len(choices):
                 data = userdata[idx]
                 combo.addItem(shown_text, userData=data)
             else:
                 combo.addItem(shown_text)
 
-        #combo.setEditable(True)
-        #combo.lineEdit().setAlignment(Qt.AlignCenter)
+        # combo.setEditable(True)
+        # combo.lineEdit().setAlignment(Qt.AlignCenter)
         comboLayout = QFormLayout()
         comboLayout.setFormAlignment(Qt.AlignLeft)
         lab = QLabel(name)
         lab.setWordWrap(False)
-        comboLayout.addRow(combo,lab)
+        comboLayout.addRow(combo, lab)
         layout.addLayout(comboLayout)
         if self.write_function is not None:
             combo.currentIndexChanged.connect(self.write_function)
         # combo.setFixedWidth(width)
         self.combo = combo
 
+
 class BaseEnum(Enum):
-    
+
     @classmethod
     def to_dict(cls):
         """Returns a dictionary representation of the enum."""
         return {e.name: e.value for e in cls}
-    
+
     @classmethod
     def keys(cls):
         """Returns a list of all the enum keys."""
         return cls._member_names_
-    
+
     @classmethod
     def values(cls):
         """Returns a list of all the enum values."""
@@ -228,18 +240,20 @@ class BaseEnum(Enum):
 
 def add_timer(function):
     import time
+
     """
     Function decorator to mesaure the execution time of a function or a method.
-    """ 
-    def inner(*args,**kwargs):
-        
-        print(f'\nStarting method "{function.__name__}" ...') 
-        start_time = time.time() 
-        result = function(*args,**kwargs) 
-        end_time = time.time() 
-        print(f'Execution time for method "{function.__name__}": {end_time-start_time:.6f} s') 
-        
-        
+    """
+
+    def inner(*args, **kwargs):
+
+        print(f'\nStarting method "{function.__name__}" ...')
+        start_time = time.time()
+        result = function(*args, **kwargs)
+        end_time = time.time()
+        print(f'Execution time for method "{function.__name__}": {end_time-start_time:.6f} s')
+
         return result
+
     inner.__name__ = function.__name__
-    return inner 
+    return inner

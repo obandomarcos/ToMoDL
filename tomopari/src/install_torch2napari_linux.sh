@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # ================================================
 # PyTorch Installer for Napari – Auto-Detect ANY version (Linux/Mac)
-# Automatically finds ~/.local/napari-* and installs torch using pip
+# Searches a user-selected path (default: ~/.local) and installs torch using pip
 # ================================================
 
 set -euo pipefail
@@ -15,9 +15,23 @@ echo "========================================"
 echo
 
 # -------------------------------------------------
-# 1. Define Napari root path (~/.local/)
+# 1. Ask for the Napari installation path
 # -------------------------------------------------
-APPDATA_ROOT="$HOME/.local"
+DEFAULT_APPDATA_ROOT="$HOME/.local"
+NAPARI_PATH_INPUT=""
+
+read -r -p "Napari installation directory [$DEFAULT_APPDATA_ROOT]: " NAPARI_PATH_INPUT || true
+
+if [ -z "$NAPARI_PATH_INPUT" ]; then
+    APPDATA_ROOT="$DEFAULT_APPDATA_ROOT"
+elif [ "$NAPARI_PATH_INPUT" = "~" ]; then
+    APPDATA_ROOT="$HOME"
+elif [[ "$NAPARI_PATH_INPUT" == "~/"* ]]; then
+    APPDATA_ROOT="$HOME/${NAPARI_PATH_INPUT:2}"
+else
+    APPDATA_ROOT="$NAPARI_PATH_INPUT"
+fi
+
 echo "Scanning for Napari folder in:"
 echo "  $APPDATA_ROOT"
 echo
@@ -28,7 +42,13 @@ echo
 NAPARI_ENV=""
 PYTHON_EXE=""
 
-for folder in "$APPDATA_ROOT"/napari-*; do
+if [[ "$(basename "$APPDATA_ROOT")" == napari-* ]]; then
+    NAPARI_FOLDERS=("$APPDATA_ROOT")
+else
+    NAPARI_FOLDERS=("$APPDATA_ROOT"/napari-*)
+fi
+
+for folder in "${NAPARI_FOLDERS[@]}"; do
     [ -d "$folder" ] || continue
 
     echo "  [CHECK] $folder"

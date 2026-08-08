@@ -27,7 +27,7 @@ except ModuleNotFoundError:
 from skimage.transform import radon, iradon
 import matplotlib.pyplot as plt
 import numpy as np
-from . import unet
+from .unet import AttU_Net
 
 device_id = 0
 try:
@@ -62,7 +62,8 @@ class dwLayer(nn.Module):
         self.initialize_layer(method=self.init_method)
 
         if self.use_batch_norm == True:
-            self.batch_norm = nn.BatchNorm2d(self.weights_size[1])
+            # self.batch_norm = nn.BatchNorm2d(self.weights_size[1])
+            self.norm = nn.GroupNorm(num_groups=1, num_channels=self.weights_size[1])
 
     def forward(self, x):
         """
@@ -74,7 +75,7 @@ class dwLayer(nn.Module):
 
         if self.use_batch_norm:
 
-            output = self.batch_norm(output)
+            output = self.norm(output)
 
         if self.is_last_layer != True:
 
@@ -191,17 +192,15 @@ class Aclass:
             - kw_dictionary (dict): Keyword dictionary
         """
 
-        self.img_size = kw_dictionary["image_size"]
         self.number_projections = kw_dictionary["number_projections"]
         self.lam = kw_dictionary["lambda"]
         self.use_torch_radon = kw_dictionary["use_torch_radon"]
         self.use_scikit = kw_dictionary["use_scikit"]
-        self.angles = np.linspace(0, 2 * np.pi, self.number_projections, endpoint=False)
-        self.det_count = int(np.ceil(np.sqrt(2) * self.img_size))
-
+        self.angles = np.linspace(0, 2 * np.pi, self.number_projections, endpoint=True)
+        self.iter_conjugate = kw_dictionary["iter_conjugate"]
         if self.use_torch_radon == True:
-            # self.radon = thrad(self.img_size, self.angles, clip_to_circle=False, det_count=self.det_count)
-            self.radon = thrad(thetas=self.angles, circle=False, device=device, filter_name=None)
+
+            self.radon = thrad(thetas=self.angles, circle=True, device=device, filter_name=None)
 
         elif self.use_scikit == True:
 
@@ -226,7 +225,7 @@ class Aclass:
                     reconstruction = torch.tensor(reconstruction).to(device)
                     return reconstruction
 
-            self.radon = Radon(self.number_projections, circle=False)
+            self.radon = Radon(self.number_projections, circle=True)
 
     def forward(self, img):
         """
@@ -240,7 +239,7 @@ class Aclass:
         # del sinogram
         # output = iradon+self.lam*img
 
-        sinogram = self.radon(img) / self.img_size
+        sinogram = self.radon(img) / img.shape[-1]
         iradon = self.radon.filter_backprojection(sinogram) * np.pi / self.number_projections
         output = iradon + self.lam * img
         del sinogram
@@ -261,46 +260,7 @@ class Aclass:
 
         return y
 
-    # def forward(self, img):
-    #     """
-    #     Applies the operator (A^H A + lam*I) to image, where A is the forward Radon transform.
-    #     Params:
-    #         - img (torch.Tensor): Input tensor
-    #     """
-    #     if use_torch_radon:
-    #         sinogram = self.radon(img) / self.img_size
-    #         iradon = self.radon.filter_backprojection(sinogram) * np.pi / self.number_projections
-    #         output = iradon + self.lam * img
-
-    #     else:
-    #         sinogram = self.radon.forward(img) / self.img_size
-    #         iradon = self.radon.backprojection(sinogram) * np.pi / self.number_projections
-    #         output = iradon.to(device) + self.lam * img
-    #     del sinogram
-
-    #     # print('output forward: {} {}'.format(output.max(), output.min()))
-    #     # print('Term z max {}, min {}'.format((iradon/self.lam).max(), (iradon/self.lam).min()))
-    #     # print('Term input max {}, min {}'.format(img.max(), img.min()))
-    #     # print('Term output max {}, min {}'.format(output.max(), output.min()))
-    #     return output
-
-    # def inverse(self, rhs):
-    #     """
-    #     Applies CG on each image on the batch
-    #     Params:
-    #         - rhs (torch.Tensor): Right-hand side tensor for applying inversion of (A^H A + lam*I) operator
-    #     """
-
-    #     y = torch.zeros_like(rhs)
-
-    #     for i in range(rhs.shape[0]):
-
-    #         y = self.conjugate_gradients(self.forward, rhs)  # This indexing may fail
-
-    #     return y
-
-    @staticmethod
-    def conjugate_gradients(A, rhs):
+    def conjugate_gradients(self, A, rhs):
         """
         My implementation of conjugate gradients in PyTorch
         """
@@ -311,7 +271,7 @@ class Aclass:
         p = rhs
         rTr = torch.sum(r * r)
 
-        while (i < 10) and torch.ge(rTr, 1e-5):
+        while (i < self.iter_conjugate) and torch.ge(rTr, 1e-4):
 
             Ap = A(p)
             alpha = rTr / torch.sum(p * Ap)
@@ -338,7 +298,6 @@ class ToMoDL(nn.Module):
             - K (int): unrolled network number of iterations
             - n_angles (int): Number of total angles of the sinogram, fully sampled
             - proj_num (int): Number of undersampled angles of the model
-            - image_size (int): Image size in pixels
             -
 
         """
@@ -355,27 +314,17 @@ class ToMoDL(nn.Module):
         """
 
         self.out["dc0"] = x
-
-        # for i in range(1, self.K + 1):
-
-        #     j = str(i)
-            
-        #     self.out["dw" + j] = normalize_images(self.dw.forward(self.out["dc" + str(i - 1)]))
-        #     rhs = x / self.lam + self.out["dw" + j]
-
-        #     self.out["dc" + j] = normalize_images(self.AtA.inverse(rhs))
-
-        #     del rhs
-        
-        ###############333 version 2 #######################################33
+        ########################## version 1 #######################################
         for i in range(1, self.K + 1):
             j = str(i)
             self.out["dw" + j] = self.dw.forward(self.out["dc" + str(i - 1)])
             rhs = x / self.lam + self.out["dw" + j]
 
             self.out["dc" + j] = self.AtA.inverse(rhs)
+
+            # self.out["dc" + j] = self.normalize_image_01(self.out["dc" + j])
             del rhs
-        
+
         #####################################################################################
         return self.out
 
@@ -391,10 +340,7 @@ class ToMoDL(nn.Module):
         self.use_scikit = use_scikit
         self.use_tomopy = use_tomopy
         self.K = kw_dictionary["K_iterations"]
-        self.number_projections_total = kw_dictionary["number_projections_total"]
-        self.acceleration_factor = kw_dictionary["acceleration_factor"]
-        self.number_projections_undersampled = self.number_projections_total // self.acceleration_factor
-        self.image_size = kw_dictionary["image_size"]
+        self.number_projections = kw_dictionary["number_projections"]
 
         self.lam = kw_dictionary["lambda"]
         self.lam = torch.nn.Parameter(torch.tensor([self.lam], requires_grad=True, device=device))
@@ -405,18 +351,18 @@ class ToMoDL(nn.Module):
         self.in_channels = kw_dictionary["in_channels"]
         self.out_channels = kw_dictionary["out_channels"]
 
-        if self.denoiser_method == "U-Net":
-            self.unet_options = kw_dictionary["unet_options"]
-        elif self.denoiser_method == "resnet":
+        if self.denoiser_method == "resnet":
             self.resnet_options = kw_dictionary["resnet_options"]
 
+        self.iter_conjugate = kw_dictionary["iter_conjugate"]
+
         self.AtA_dictionary = {
-            "image_size": self.image_size,
-            "number_projections": self.number_projections_total,
+            "number_projections": self.number_projections,
             "lambda": self.lam,
             "use_torch_radon": self.use_torch_radon,
             "use_scikit": self.use_scikit,
             "use_tomopy": self.use_tomopy,
+            "iter_conjugate": self.iter_conjugate,
         }
 
         self.AtA = Aclass(self.AtA_dictionary)
@@ -432,7 +378,7 @@ class ToMoDL(nn.Module):
 
         if self.denoiser_method == "U-Net":
 
-            self.dw = unet.UNet(self.unet_options)
+            self.dw = AttU_Net()
 
         elif self.denoiser_method == "resnet":
 
@@ -440,23 +386,3 @@ class ToMoDL(nn.Module):
                 self.dw = dw(self.resnet_options)
             else:
                 self.dw = nn.ModuleList([dw(self.resnet_options) for _ in range(self.K)])
-
-
-def normalize_images(images):
-    """
-    Normalizes tensor of images 1-channel images between 0 and 1.
-    Params:
-     - images (torch.Tensor): Tensor of 1-channel images
-    """
-
-    image_norm = torch.zeros_like(images)
-
-    for i, image in enumerate(images):
-        # print(image.max())
-        image = (image - image.mean()) / image.std()
-        # image_norm[i, ...] = (image - image.min()) / (image.max() - image.min())
-        # test  normalize image to be between -1 and 1
-        # image_norm[i, ...] = (image - image.min()) / (image.max() - image.min()) * 2 - 1
-        image_norm[i, ...] = image
-
-    return image_norm

@@ -180,7 +180,8 @@ This step ensures **PyTorch** is properly installed within Napari’s internal C
 1. Download the installer:
    🔗 [install_torch2napari_windows.bat](https://github.com/obandomarcos/ToMoDL/releases/download/v0.2.15/install_torch2napari_windows.bat)
 2. Double-click the `.bat` file to run it.
-   *(It will automatically detect Napari’s environment and install PyTorch.)*
+3. When prompted, enter the path to your Napari installation folder (or press **Enter** to use the default location).  
+*(It will automatically detect Napari’s environment and install PyTorch.)*
 
 #### 🐧 **Linux Users**
 
@@ -191,6 +192,7 @@ This step ensures **PyTorch** is properly installed within Napari’s internal C
    ```bash
    bash install_torch2napari_linux.sh
    ```
+3. When prompted, enter the path to your Napari installation folder (or press **Enter** to use the default location).
 
 ---
 

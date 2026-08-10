@@ -346,9 +346,7 @@ class ReconstructionWidget(QTabWidget):
         self.fast_mode_basic = QCheckBox("FAST mode")
         self.fast_mode_basic.setVisible(False)
         self.fast_mode_basic.toggled.connect(self.set_opt_processor_basic)
-        self.reconbox_basic.combo.currentIndexChanged.connect(
-            self.update_basic_fast_mode_visibility
-        )
+        self.reconbox_basic.combo.currentIndexChanged.connect(self.update_basic_fast_mode_visibility)
         slayout.addWidget(self.fast_mode_basic)
 
         self.smoothingbox_basic = Combo_box(
@@ -455,9 +453,7 @@ class ReconstructionWidget(QTabWidget):
         self.fast_mode_advanced = QCheckBox("FAST mode")
         self.fast_mode_advanced.setVisible(False)
         self.fast_mode_advanced.toggled.connect(self.set_opt_processor_advanced)
-        self.reconbox_advanced.combo.currentIndexChanged.connect(
-            self.update_fast_mode_visibility
-        )
+        self.reconbox_advanced.combo.currentIndexChanged.connect(self.update_fast_mode_visibility)
         slayout.addWidget(self.fast_mode_advanced)
         self.clipcirclebox_advanced = Settings(
             "Clip to circle", dtype=bool, initial=True, layout=slayout, write_function=self.set_opt_processor_advanced
@@ -1047,7 +1043,7 @@ class ReconstructionWidget(QTabWidget):
                         image_clahe = (image_clahe - np.min(image_clahe)) / (np.max(image_clahe) - np.min(image_clahe))
                         image_clahe = clahe.apply((image_clahe * 65535).astype(np.uint16, copy=False))
                         source[:, :, image] = image_clahe.astype(np.float32, copy=False)
-                        
+
                 source = source.astype(np.float32, copy=False)
 
                 # -------------------------------------------------------------
@@ -1217,9 +1213,7 @@ class ReconstructionWidget(QTabWidget):
             Rec_modes.TOMODL_GPU.value,
             Rec_modes.TOMODL_CPU.value,
         }
-        self.fast_mode_basic.setVisible(
-            self.reconbox_basic.current_data in tomodl_modes
-        )
+        self.fast_mode_basic.setVisible(self.reconbox_basic.current_data in tomodl_modes)
 
     def get_basic_reconstruction_mode(self):
         """Resolve basic TOMODL FAST selections to their processor path."""
@@ -1266,9 +1260,7 @@ class ReconstructionWidget(QTabWidget):
             Rec_modes.TOMODL_GPU.value,
             Rec_modes.TOMODL_CPU.value,
         }
-        self.fast_mode_advanced.setVisible(
-            self.reconbox_advanced.current_data in tomodl_modes
-        )
+        self.fast_mode_advanced.setVisible(self.reconbox_advanced.current_data in tomodl_modes)
 
     def get_advanced_reconstruction_mode(self):
         """Resolve TOMODL FAST selections to their processor implementation."""
